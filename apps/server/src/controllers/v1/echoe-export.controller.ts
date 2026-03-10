@@ -1,0 +1,49 @@
+/**
+ * Echoe Export Controller
+ * Handles exporting decks to .apkg files
+ */
+
+import { JsonController, Get, QueryParam, Res } from 'routing-controllers';
+import { Service, Inject } from 'typedi';
+
+import { ErrorCode } from '../../constants/error-codes.js';
+import { EchoeExportService, ExportOptions } from '../../services/echoe-export.service.js';
+import { logger } from '../../utils/logger.js';
+import type { Response } from 'express';
+
+@Service()
+@JsonController('/api/v1/export')
+export class EchoeExportController {
+  constructor(@Inject(() => EchoeExportService) private exportService: EchoeExportService) {}
+
+  /**
+   * GET /api/v1/export/apkg
+   * Export a deck to .apkg format
+   */
+  @Get('/apkg')
+  async exportApkg(
+    @QueryParam('deckId') deckId?: number,
+    @QueryParam('includeScheduling') includeScheduling?: string,
+    @Res() res?: Response
+  ): Promise<void> {
+    try {
+      const includeSchedulingBool = includeScheduling === 'true';
+
+      const options: ExportOptions = {
+        deckId,
+        includeScheduling: includeSchedulingBool,
+      };
+
+      const result = await this.exportService.exportApkg(options);
+
+      // Set response headers for file download
+      res?.setHeader('Content-Type', 'application/apkg');
+      res?.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+
+      return res?.send(result.buffer) as unknown as void;
+    } catch (error) {
+      logger.error('Failed to export .apkg:', error);
+      throw ErrorCode.DB_ERROR;
+    }
+  }
+}

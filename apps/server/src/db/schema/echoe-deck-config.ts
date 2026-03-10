@@ -1,0 +1,38 @@
+import {
+  mysqlTable,
+  bigint,
+  int,
+  varchar,
+  tinyint,
+  text,
+  index,
+} from 'drizzle-orm/mysql-core';
+
+/**
+ * Deck configuration table - stores deck-specific settings
+ * Mirrors Anki 2.1's deck_config table
+ */
+export const echoeDeckConfig = mysqlTable(
+  'echoe_deck_config',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Config ID
+    name: varchar('name', { length: 191 }).notNull(), // Config name
+    replayq: tinyint('replayq').notNull().default(1), // Replay queue on answer
+    timer: int('timer').notNull().default(0), // Show timer (0=off, 1=on)
+    maxTaken: int('max_taken').notNull().default(60), // Max time taken (seconds)
+    autoplay: tinyint('autoplay').notNull().default(1), // Auto-play audio (0=never, 1=front, 2=back, 3=both)
+    ttsSpeed: tinyint('tts_speed').notNull().default(1), // TTS speed (0-4, maps to 0.5-2.0)
+    mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
+    usn: int('usn').notNull(), // Update sequence number (sync)
+    newConfig: text('new_config').notNull().$type<string>(), // JSON for new card settings
+    revConfig: text('rev_config').notNull().$type<string>(), // JSON for review settings
+    lapseConfig: text('lapse_config').notNull().$type<string>(), // JSON for lapse settings
+  },
+  (table) => ({
+    nameIdx: index('name_idx').on(table.name),
+    usnIdx: index('usn_idx').on(table.usn),
+  })
+);
+
+export type EchoeDeckConfig = typeof echoeDeckConfig.$inferSelect;
+export type NewEchoeDeckConfig = typeof echoeDeckConfig.$inferInsert;

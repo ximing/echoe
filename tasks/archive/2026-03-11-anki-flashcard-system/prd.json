@@ -1,0 +1,586 @@
+{
+  "project": "echoe",
+  "branchName": "ralph/anki-flashcard-system",
+  "description": "Anki-Compatible Flashcard Learning System - Full SRS with FSRS algorithm, .apkg import/export, card management, and study sessions",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "FSRS Algorithm Service",
+      "description": "As a developer, I need to implement the FSRS spaced repetition algorithm service so that cards are scheduled at scientifically optimal intervals.",
+      "acceptanceCriteria": [
+        "Install ts-fsrs package in apps/server",
+        "Create src/services/fsrs.service.ts with @Service() decorator",
+        "Service exposes scheduleCard(card, rating, now): FSRSOutput with next due date, interval, stability, difficulty",
+        "Supports all 4 ratings: Again (1), Hard (2), Good (3), Easy (4)",
+        "Supports configurable FSRSParameters: learning steps (default [1,10] min), graduating interval (default 1 day), easy interval multiplier (default 1.3), interval multiplier (default 2.5), max interval (default 36500 days)",
+        "Handles delayed reviews (card reviewed after due date)",
+        "Handles relearning queue (failed review cards)",
+        "Handles learning queue (new cards in learning steps)",
+        "Unit tests cover: new card scheduling, review card scheduling, lapse handling, delayed review, parameter configuration",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Implemented: FSRSService with scheduleCard, getSchedulingOptions, handleDelayedReview, handleRelearning, handleLearning, forgetCard, getIntervalText. 24 unit tests passing. Typecheck passes."
+    },
+    {
+      "id": "US-002",
+      "title": "Anki Database Schema - Core Tables",
+      "description": "As a developer, I need to create the core MySQL database tables (col, notes, cards, revlog) compatible with Anki 2.1 format so that card data can be stored and imported/exported.",
+      "acceptanceCriteria": [
+        "Create src/db/schema/anki-col.ts: col table with fields id, crt, mod, scm, ver, dty, usn, ls, conf (TEXT), models (TEXT), decks (TEXT), dconf (TEXT), tags (TEXT)",
+        "Create src/db/schema/anki-notes.ts: notes table with fields id (BIGINT), guid (VARCHAR 191), mid (BIGINT), mod (INT), usn (INT), tags (TEXT), flds (TEXT), sfld (TEXT), csum (BIGINT), flags (INT), data (TEXT)",
+        "Create src/db/schema/anki-cards.ts: cards table with fields id (BIGINT), nid (BIGINT), did (BIGINT), ord (INT), mod (INT), usn (INT), type (INT), queue (INT), due (BIGINT), ivl (INT), factor (INT), reps (INT), lapses (INT), left (INT), odue (BIGINT), odid (BIGINT), flags (INT), data (TEXT)",
+        "Create src/db/schema/anki-revlog.ts: revlog table with fields id (BIGINT), cid (BIGINT), usn (INT), ease (INT), ivl (INT), lastIvl (INT), factor (INT), time (INT), type (INT)",
+        "No foreign key constraints on any table",
+        "All VARCHAR fields use 191 char limit",
+        "Export all new schemas from src/db/schema/index.ts",
+        "Run pnpm build && pnpm migrate:generate successfully",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Schema files created: anki-col.ts, anki-notes.ts, anki-cards.ts, anki-revlog.ts. All fields match Anki 2.1 format. VARCHAR(191) for keys. No foreign keys. Migration generated. Build and typecheck pass."
+    },
+    {
+      "id": "US-003",
+      "title": "Anki Database Schema - Deck & Config Tables",
+      "description": "As a developer, I need to create the deck, deck_config, notetypes, templates, media, graves, and config tables so that the full Anki data model is represented.",
+      "acceptanceCriteria": [
+        "Create src/db/schema/anki-decks.ts: decks table with fields id (BIGINT), name (VARCHAR 191), conf (BIGINT), extendNew (INT), extendRev (INT), usn (INT), lim (INT), collapsed (TINYINT), dyn (TINYINT), mod (INT), desc (TEXT), mid (BIGINT)",
+        "Create src/db/schema/anki-deck-config.ts: deck_config table with fields id (BIGINT), name (VARCHAR 191), replayq (TINYINT), timer (INT), maxTaken (INT), autoplay (TINYINT), mod (INT), usn (INT), new_config (TEXT), rev_config (TEXT), lapse_config (TEXT)",
+        "Create src/db/schema/anki-notetypes.ts: notetypes table with fields id (BIGINT), name (VARCHAR 191), mod (INT), usn (INT), sortf (INT), did (BIGINT), tmpls (TEXT), flds (TEXT), css (TEXT), type (INT), latexPre (TEXT), latexPost (TEXT), req (TEXT)",
+        "Create src/db/schema/anki-templates.ts: templates table with fields id (BIGINT), ntid (BIGINT), name (VARCHAR 191), ord (INT), qfmt (TEXT), afmt (TEXT), bqfmt (TEXT), bafmt (TEXT), did (BIGINT), mod (INT), usn (INT)",
+        "Create src/db/schema/anki-media.ts: media table with fields id (INT AUTO_INCREMENT), filename (VARCHAR 191), original_filename (VARCHAR 191), size (INT), mime_type (VARCHAR 100), hash (VARCHAR 64), created_at (BIGINT), used_in_cards (TINYINT)",
+        "Create src/db/schema/anki-graves.ts: graves table with fields usn (INT), oid (BIGINT), type (INT)",
+        "Create src/db/schema/anki-config.ts: config table with fields key (VARCHAR 191 PRIMARY KEY), value (TEXT)",
+        "No foreign key constraints on any table",
+        "Export all new schemas from src/db/schema/index.ts",
+        "Run pnpm build && pnpm migrate:generate successfully",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Created 7 schema files: anki-decks.ts, anki-deck-config.ts, anki-notetypes.ts, anki-templates.ts, anki-media.ts, anki-graves.ts, anki-config.ts. All fields match Anki 2.1 format. VARCHAR(191) for keys. No foreign keys. Migration 0001 generated. Build and typecheck pass."
+    },
+    {
+      "id": "US-004",
+      "title": "Seed Default Note Types",
+      "description": "As a developer, I need to seed the database with Anki's 5 default note types on first startup so users can immediately create cards without manual setup.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-seed.service.ts with @Service() decorator",
+        "On first startup (col table empty), seed 5 note types: Basic, Basic (reversed), Basic (optional reversed), Basic (type in answer), Cloze",
+        "Basic note type: fields [Front, Back], template qfmt='{{Front}}', afmt='{{FrontSide}}<hr id=answer>{{Back}}'",
+        "Basic (reversed) note type: fields [Front, Back], 2 templates (Front->Back, Back->Front)",
+        "Cloze note type: fields [Text, Extra], template qfmt='{{cloze:Text}}', afmt='{{cloze:Text}}<br>{{Extra}}'",
+        "Basic (type in answer) note type: fields [Front, Back], qfmt includes {{type:Back}}",
+        "Seed creates a default deck 'Default' with id=1 if no decks exist",
+        "Seed runs idempotently (safe to call multiple times)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Deck Management API",
+      "description": "As a developer, I need CRUD API endpoints for deck management so that the frontend can create, read, update, and delete decks.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-deck.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-deck.controller.ts",
+        "GET /api/v1/anki/decks returns all decks with today's counts: { id, name, newCount, learnCount, reviewCount, children[] }",
+        "POST /api/v1/anki/decks creates deck; name supports '::' separator for sub-decks",
+        "PUT /api/v1/anki/decks/:id renames deck and/or updates description",
+        "DELETE /api/v1/anki/decks/:id accepts query param deleteCards=true/false; deletes sub-decks if deleteCards=true",
+        "GET /api/v1/anki/decks/:id/config returns deck_config JSON",
+        "PUT /api/v1/anki/decks/:id/config updates deck_config (learning steps, graduating interval, leech threshold, etc.)",
+        "Sub-deck hierarchy computed from '::' in deck name",
+        "Add DTOs to packages/dto/src/anki.ts and export from index",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Note & Card Management API",
+      "description": "As a developer, I need CRUD API endpoints for notes and cards so that the frontend can create and manage flashcard content.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-note.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-note.controller.ts",
+        "GET /api/v1/anki/notes accepts query params: deckId, tags, q (search), status (new/learn/review/suspended/buried), page, limit",
+        "POST /api/v1/anki/notes creates note with { notetypeId, deckId, fields: Record<string,string>, tags: string[] }; auto-generates cards from templates",
+        "PUT /api/v1/anki/notes/:id updates fields and tags",
+        "DELETE /api/v1/anki/notes/:id deletes note and all its cards, adds to graves table",
+        "GET /api/v1/anki/cards/:id returns card with full note data and scheduling info",
+        "POST /api/v1/anki/cards/bulk accepts { cardIds: number[], action: 'suspend'|'unsuspend'|'bury'|'unbury'|'forget'|'move'|'addTag'|'removeTag', payload? }",
+        "GET /api/v1/anki/notetypes returns all note types with field and template definitions",
+        "POST /api/v1/anki/notetypes creates or clones note type",
+        "PUT /api/v1/anki/notetypes/:id updates fields and templates",
+        "DELETE /api/v1/anki/notetypes/:id rejects with 400 if notes exist using this type",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Study Session API",
+      "description": "As a developer, I need study session API endpoints so that the frontend can fetch cards to study and submit review ratings.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-study.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-study.controller.ts",
+        "GET /api/v1/anki/study/queue?deckId=&limit= returns ordered queue: overdue learn > due learn > due review > new cards; respects deck's daily new/review limits",
+        "POST /api/v1/anki/study/review accepts { cardId, rating (1-4), timeSpent (ms) }; updates card via FSRSService; writes revlog entry; returns updated card with next due info",
+        "POST /api/v1/anki/study/undo reverts last review from session undo stack (min 5 entries); restores card to previous state; removes revlog entry; returns reverted card",
+        "POST /api/v1/anki/study/bury accepts { cardId, mode: 'card'|'note' }; sets queue=-2 for card or queue=-3 for all siblings",
+        "POST /api/v1/anki/study/forget accepts { cardId, restorePosition?: boolean }; resets type=0, queue=0, ivl=0, factor=2500, reps=0",
+        "GET /api/v1/anki/study/counts?deckId= returns { new, learn, review } for today",
+        "Daily counts reset at configurable day boundary (config key: 'dayBoundaryHour', default 0 = midnight)",
+        "Buried cards (queue -2, -3) automatically unburied at day boundary",
+        "Leech detection: when card lapses >= deck leech threshold, set queue=-1 (suspended) and add tag 'leech'",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Card Rendering Engine (Frontend)",
+      "description": "As a developer, I need a client-side card template rendering engine so that cards with HTML, field substitution, cloze, and LaTeX display correctly.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/components/anki/CardRenderer.tsx",
+        "Accepts props: { qfmt: string, afmt: string, css: string, fields: Record<string,string>, side: 'front'|'back', clozeOrdinal?: number }",
+        "Renders HTML subset safely: div, span, p, br, b, strong, i, em, u, strike, a, img, audio, ul, ol, li (sanitize with DOMPurify or equivalent)",
+        "Replaces {{FieldName}} with field value",
+        "Supports {{#FieldName}}...{{/FieldName}} conditional (show block only if field non-empty)",
+        "Supports {{^FieldName}}...{{/FieldName}} inverse conditional (show if field empty)",
+        "Renders cloze: {{c1::text}} shows [...] on front for active ordinal, shows text for inactive ordinals; on back shows text for all",
+        "Renders cloze with hint: {{c1::text::hint}} shows [hint] on front",
+        "Renders [sound:filename.mp3] as <audio> element with src pointing to /api/v1/anki/media/filename.mp3",
+        "Renders LaTeX via KaTeX: \\(...\\) inline, \\[...\\] block (install katex package)",
+        "Applies card CSS in scoped <style> tag",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Created CardRenderer.tsx with all required features: DOMPurify for HTML sanitization, KaTeX for LaTeX, field substitution, Handlebars-style conditionals, cloze rendering with hint support, audio tag rendering."
+    },
+    {
+      "id": "US-009",
+      "title": "Media File API",
+      "description": "As a developer, I need API endpoints to serve and manage media files so that card images and audio work correctly.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-media.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-media.controller.ts",
+        "GET /api/v1/anki/media/:filename serves media file from storage with correct Content-Type header",
+        "POST /api/v1/anki/media/upload accepts multipart file; stores via UnifiedStorageAdapterFactory; saves record to media table; returns { filename, url }",
+        "GET /api/v1/anki/media lists all media files with { filename, size, mimeType, usedInCards }",
+        "POST /api/v1/anki/media/check-unused scans all note flds for media references; returns list of filenames in media table not referenced by any note",
+        "DELETE /api/v1/anki/media/bulk accepts { filenames: string[] }; deletes files from storage and media table",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Implemented all endpoints. GET /api/v1/anki/media/:filename serves files with correct Content-Type. POST /api/v1/anki/media/upload uses multer for multipart, stores via UnifiedStorageAdapterFactory. GET /api/v1/anki/media lists all files. POST /api/v1/anki/media/check-unused scans note fields for [sound:] and <img src=> patterns. DELETE /api/v1/anki/media/bulk deletes from both storage and database."
+    },
+    {
+      "id": "US-010",
+      "title": ".apkg Import API",
+      "description": "As an Anki user, I want to import my existing .apkg deck files so I can continue studying my existing content.",
+      "acceptanceCriteria": [
+        "Install better-sqlite3 and jszip (or adm-zip) in apps/server",
+        "Create src/services/anki-import.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-import.controller.ts",
+        "POST /api/v1/anki/import/apkg accepts multipart .apkg file upload (max 500MB)",
+        "Unzips .apkg; extracts collection.anki2 (or collection.anki21) SQLite file and media files",
+        "Parses SQLite: reads notes, cards, revlog, decks, notetypes, templates from source DB",
+        "Imports notetypes and templates first (upsert by id)",
+        "Imports decks (upsert by id)",
+        "Imports notes: if note with same guid exists, update fields/tags; otherwise insert",
+        "Imports cards linked to imported notes (upsert by id)",
+        "Imports revlog entries (insert ignore duplicates by id)",
+        "Imports media files to storage via AnkiMediaService; updates media table",
+        "Returns { notesAdded, notesUpdated, notesSkipped, mediaImported, errors: string[] }",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Implemented: POST /api/v1/anki/import/apkg - extracts collection.anki2/.anki21, parses SQLite with better-sqlite3, imports notetypes/decks/notes/cards/revlog/media. Build passes, typecheck passes."
+    },
+    {
+      "id": "US-011",
+      "title": ".apkg Export API",
+      "description": "As a user, I want to export decks as .apkg files for backup or sharing.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-export.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-export.controller.ts",
+        "GET /api/v1/anki/export/apkg?deckId=&includeScheduling=true generates .apkg file stream",
+        "Creates temporary SQLite DB with Anki 2.1 schema",
+        "Exports notes and cards for the specified deck (and sub-decks)",
+        "When includeScheduling=false: exports cards with type=0, queue=0, due=card position, ivl=0, factor=2500, reps=0 (clean new cards)",
+        "When includeScheduling=true: exports cards with full scheduling state and includes revlog entries",
+        "Exports notetypes and templates referenced by exported notes",
+        "Exports media files referenced in note fields; adds media manifest JSON",
+        "Zips SQLite + media files into .apkg",
+        "Response header: Content-Disposition: attachment; filename={deckName}_{YYYY-MM-DD}.apkg",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Implemented: GET /api/v1/anki/export/apkg - creates in-memory SQLite with Anki 2.1 schema, exports notetypes/decks/notes/cards/revlog/media, builds .apkg via JSZip. includeScheduling=false exports clean new cards. Typecheck passes."
+    },
+    {
+      "id": "US-012",
+      "title": "Main Deck List Screen",
+      "description": "As a learner, I want to see all my decks with today's card counts so I know what needs to be studied.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/ directory with index page",
+        "Add /anki route to React Router configuration",
+        "Deck list shows all decks with: deck name, new count (blue badge), learn count (red badge), review count (green badge)",
+        "Sub-decks shown indented under parent deck; parent row has expand/collapse toggle",
+        "Bottom bar shows total cards due today (sum across all decks)",
+        "Empty state when no decks: shows 'Import .apkg' and 'Create Deck' buttons",
+        "Floating action button or top bar button to create new deck",
+        "Create deck dialog: text input for name (tooltip: use '::' for sub-decks), submit button",
+        "Right-click or long-press on deck shows context menu: Rename, Configure, Delete",
+        "Delete deck dialog: checkbox 'Also delete all cards in this deck'",
+        "Data fetched from GET /api/v1/anki/decks",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Study Session Screen",
+      "description": "As a learner, I want to study cards in a session with smooth card display and rating buttons so I can efficiently review my flashcards.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/study.tsx for route /anki/study/:deckId",
+        "Top status bar shows: progress 'X / Y', elapsed timer (MM:SS), menu button (kebab icon)",
+        "Card content area occupies ~70% of screen height, scrollable for long content",
+        "Uses CardRenderer component to render card front on load",
+        "'Show Answer' button at bottom center",
+        "After clicking 'Show Answer': renders card back; shows 4 rating buttons (Again, Hard, Good, Easy) each with estimated next interval (e.g., '10m', '3d', '1w')",
+        "Clicking a rating button calls POST /api/v1/anki/study/review and loads next card",
+        "Undo button in top bar: calls POST /api/v1/anki/study/undo, shows previous card",
+        "Card flip CSS animation when showing answer (can be toggled off in settings)",
+        "Session complete screen when queue exhausted: shows cards studied count, time spent, breakdown by rating",
+        "Menu options: Bury Card, Bury Note, Forget, Edit Card",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Card Editor Screen",
+      "description": "As a learner, I want to add and edit cards with a rich text editor so I can create quality flashcard content.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/card-editor.tsx for route /anki/cards/new and /anki/cards/:id/edit",
+        "Note type selector dropdown at top (fetches from GET /api/v1/anki/notetypes)",
+        "Deck selector dropdown",
+        "For each field in selected note type: labeled rich text editor area",
+        "Rich text toolbar per field: Bold (Ctrl+B), Italic (Ctrl+I), Underline (Ctrl+U), Strikethrough",
+        "Toggle button to switch between rich text mode and raw HTML source mode per field",
+        "Image insert button: opens file picker, uploads via POST /api/v1/anki/media/upload, inserts <img> tag",
+        "Tag input with autocomplete from existing tags (comma or Enter to add)",
+        "Save button: POST /api/v1/anki/notes for new, PUT /api/v1/anki/notes/:id for edit",
+        "Edit mode pre-fills all field values from existing note",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Implemented: CardEditorPage at apps/web/src/pages/anki/card-editor.tsx. Note type selector, deck selector, dynamic field editors with rich text toolbar (Bold, Italic, Underline, Strikethrough, Code), toggle between rich text and source mode, image upload, tag input, live card preview. Edit mode loads existing note data. Typecheck passes, Build passes, Lint passes."
+    },
+    {
+      "id": "US-015",
+      "title": "Card Browser Screen",
+      "description": "As a learner, I want to browse, search, and bulk-edit my cards so I can manage my card collection efficiently.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/browser.tsx for route /anki/browser",
+        "Card list shows columns: front field preview (truncated), deck name, due date, status badge (new/learn/review/suspended/buried/leech)",
+        "Search bar at top for full-text search (calls GET /api/v1/anki/notes?q=)",
+        "Filter chips row: All, New, Review, Suspended, Buried, Marked, Leech",
+        "Sort dropdown: Added date, Due date, Modified date",
+        "Click on card row: opens card edit modal (CardEditor component in modal)",
+        "Checkbox on each row; header checkbox selects all",
+        "When 1+ cards selected: bulk action bar appears with buttons: Delete, Suspend, Unsuspend, Forget, Add Tag, Remove Tag",
+        "Card detail panel (right side or bottom sheet): shows card ID, note ID, added date, review history from revlog",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": "Implemented: browser.tsx page with full card browser functionality. Added GET /api/v1/anki/cards endpoint in backend with filtering, sorting, pagination. Features: search bar, deck filter, sort dropdown, filter chips (All/New/Learning/Review/Suspended/Buried/Leech), checkbox selection, bulk actions (Delete, Suspend, Unsuspend, Forget), detail panel with card info and revlog. Added Browse Cards button in AnkiPage header. Typecheck passes."
+    },
+    {
+      "id": "US-016",
+      "title": "Learning Statistics Screen",
+      "description": "As a learner, I want to view my study progress and statistics so I can track my learning over time.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-stats.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-stats.controller.ts",
+        "GET /api/v1/anki/stats/today?deckId= returns { studied, timeSpent, again, hard, good, easy }",
+        "GET /api/v1/anki/stats/history?deckId=&days=30 returns array of { date, count, timeSpent } for each day",
+        "GET /api/v1/anki/stats/maturity?deckId= returns { new, learning, young, mature } counts",
+        "GET /api/v1/anki/stats/forecast?deckId=&days=30 returns array of { date, dueCount } for future days",
+        "Create apps/web/src/pages/anki/stats.tsx for route /anki/stats",
+        "Today overview cards: cards studied, time spent, rating breakdown",
+        "Review history bar chart using a chart library (recharts or similar); toggle 7d/30d/1y",
+        "Card maturity pie or bar chart: New / Learning / Young / Mature",
+        "Forecast bar chart: next 30 days predicted reviews",
+        "Deck selector to filter stats by deck",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": "Implemented: Added GET /api/v1/anki/stats/today, /history, /maturity, /forecast endpoints in backend. Created AnkiStatsService with loadTodayStats, loadHistory, loadMaturity, loadForecast methods. Created stats.tsx page with 4 chart types (Today's summary, Card maturity pie, Study history bar, Forecast line). Added Statistics button in AnkiPage header and route /anki/stats. Typecheck and build pass."
+    },
+    {
+      "id": "US-017",
+      "title": "Cloze Card Support",
+      "description": "As a language learner, I want to use cloze deletion cards so I can practice fill-in-the-blank style questions.",
+      "acceptanceCriteria": [
+        "CardRenderer correctly handles cloze note type (type=1 in notetypes)",
+        "On front: {{c1::text}} renders as [...] for active ordinal, renders as text for all other ordinals",
+        "On front: {{c1::text::hint}} renders as [hint] for active ordinal",
+        "On back: all cloze deletions rendered as plain text (fully revealed)",
+        "Card browser shows 'Cloze' badge on cloze-type cards",
+        "Card editor for cloze note type: Text field has a 'Cloze' toolbar button that wraps selection as {{c1::selected}} (auto-increments ordinal)",
+        "Multiple cloze ordinals (c1, c2, c3) in one note each generate a separate card (ord=0 for c1, ord=1 for c2, etc.)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Type-in-Answer Card Support",
+      "description": "As a language learner, I want to type my answer and see a diff comparison so I can practice active recall.",
+      "acceptanceCriteria": [
+        "CardRenderer handles {{type:FieldName}} in qfmt: renders as <input type='text'> element",
+        "Input is focused automatically when card loads",
+        "On 'Show Answer': compare typed value with the field's actual value character-by-character",
+        "Diff display in card back: correct chars shown in green, wrong chars in red, missing chars shown underlined in red, extra chars struck through in red",
+        "Diff ignores case by default (configurable)",
+        "Diff ignores leading/trailing whitespace by default",
+        "Create apps/web/src/utils/anki/diff.ts with diffStrings(typed: string, correct: string): DiffResult[]",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Leech Detection & Bury Card Management",
+      "description": "As a learner, I want the system to detect stubborn cards and allow me to bury cards until tomorrow so I can manage my study queue effectively.",
+      "acceptanceCriteria": [
+        "AnkiStudyService.submitReview: after updating card, check if lapses >= deck leech threshold; if so, set queue=-1 and add 'leech' tag to note",
+        "POST /api/v1/anki/study/review response includes { isLeech: boolean } field",
+        "Study screen shows toast notification 'Leech! Card suspended.' when isLeech=true",
+        "POST /api/v1/anki/study/bury?mode=card sets card queue=-2 (manually buried)",
+        "POST /api/v1/anki/study/bury?mode=note sets all sibling cards queue=-3 (sibling buried)",
+        "Deck config 'buryRelated' option: when true, after reviewing a card, auto-bury all siblings (queue=-3)",
+        "AnkiStudyService: at day boundary, reset all cards with queue=-2 or queue=-3 to their previous queue value (stored in data field or inferred from type)",
+        "Card browser filter 'Leech' shows cards with 'leech' tag",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Custom Study Session",
+      "description": "As a learner, I want to temporarily increase my study load or review cards ahead of schedule so I can study more intensively when needed.",
+      "acceptanceCriteria": [
+        "Add 'Custom Study' button to deck detail or deck context menu on main deck list",
+        "Custom Study dialog with 3 options: 'Increase today's new card limit' (number input), 'Review ahead' (days input), 'Preview new cards' (no input needed)",
+        "'Increase today's new card limit': stores temporary override in session/config for that deck; GET /api/v1/anki/study/queue respects this override",
+        "'Review ahead N days': GET /api/v1/anki/study/queue?deckId=&reviewAhead=N returns review cards due within N days",
+        "'Preview': GET /api/v1/anki/study/queue?deckId=&preview=true returns new cards; POST /api/v1/anki/study/review with preview=true does not update card state or write revlog",
+        "Custom study revlog entries (non-preview) use type=4",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 20,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Audio Auto-play & TTS Support",
+      "description": "As a learner, I want audio to play automatically and have text-to-speech support so I can practice listening.",
+      "acceptanceCriteria": [
+        "CardRenderer: after rendering card side, find all <audio> elements and auto-play them in sequence if autoplay setting is enabled",
+        "Settings: autoplay config options: 'front only', 'back only', 'both', 'never' (stored in config table)",
+        "'Replay Audio' button visible in study screen when current card side has audio; replays all audio elements",
+        "CardRenderer handles {{tts en_US:FieldName}} syntax: renders as a button that calls browser SpeechSynthesis API with the field value",
+        "TTS language code extracted from template syntax (e.g., en_US, zh_CN)",
+        "TTS speed configurable in settings (0.5x to 2x, default 1x)",
+        "Audio controls (play/pause) visible on each <audio> element",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": true,
+      "notes": "Implemented: Global settings storage via anki_config table, CardRenderer audio autoplay on front/back, Replay Audio button, Browser SpeechSynthesis TTS for {{tts en_US:FieldName}} syntax, ttsSpeed setting (0.5-2.0). Typecheck passes, Build passes."
+    },
+    {
+      "id": "US-022",
+      "title": "Application Settings Screen",
+      "description": "As a user, I want to configure application behavior so the app works the way I prefer.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/settings.tsx for route /anki/settings",
+        "Settings persisted via GET/PUT /api/v1/anki/config (key-value store in config table)",
+        "Learning section: global daily new card limit (default 20), global daily review limit (default 200), daily start hour (0-23, default 0)",
+        "Display section: font size (small/medium/large), dark mode (auto/light/dark), card flip animation toggle",
+        "Audio section: autoplay mode (front/back/both/never), TTS speed slider (0.5-2.0)",
+        "Data section: 'Export All Data' button (triggers GET /api/v1/anki/export/apkg without deckId filter for all decks), 'Clear Cache' button",
+        "Deck Config Presets section: list saved presets; 'Save Current Default Config as Preset' button with name input; delete preset button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 22,
+      "passes": true,
+      "notes": "Implemented: settings.tsx page with 5 tabs (Learning, Display, Audio, Data, Presets). Learning: newLimit, reviewLimit, dayStartHour. Display: fontSize, theme, flipAnimation. Audio: autoplay, ttsSpeed. Data: Export All Data. Presets: list, save, delete. Added route /anki/settings, Settings button in AnkiPage, registered AnkiSettingsService. Typecheck passes for web and server."
+    },
+    {
+      "id": "US-023",
+      "title": "Filtered Deck (Custom Study Deck)",
+      "description": "As a learner, I want to create filtered decks based on search criteria so I can focus on specific card subsets.",
+      "acceptanceCriteria": [
+        "AnkiDeckService supports creating filtered decks (dyn=1 in decks table)",
+        "POST /api/v1/anki/decks with { name, dyn: true, searchQuery, rebuildDaily: boolean } creates filtered deck",
+        "GET /api/v1/anki/decks/:id/preview?q= returns { count, sampleCards: Card[] } (first 5 matching cards) without modifying any data",
+        "When filtered deck is created or rebuilt: runs search query, moves matching cards to filtered deck (set odid=original deck id, did=filtered deck id)",
+        "POST /api/v1/anki/decks/:id/rebuild re-runs search query and refreshes card pool",
+        "POST /api/v1/anki/decks/:id/empty returns all cards (odid != 0) back to their home deck (did=odid, odid=0)",
+        "Studying cards in filtered deck updates scheduling normally",
+        "Filtered decks shown with funnel icon in deck list",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Note Type Manager Screen",
+      "description": "As a power user, I want to create and manage custom note types so I can define my own card structures.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/notetypes.tsx for route /anki/notetypes",
+        "List all note types with name and note count",
+        "'Clone' button next to each type: calls POST /api/v1/anki/notetypes with { cloneFrom: id }",
+        "Click note type to open editor modal",
+        "Note type editor: rename field, add field button, delete field button (with confirmation)",
+        "Note type editor: list of templates; click template to edit; add template button; delete template button",
+        "Template editor: front template textarea, back template textarea, CSS textarea",
+        "Live preview panel: shows rendered CardRenderer output with sample field values as user types template",
+        "Save button calls PUT /api/v1/anki/notetypes/:id",
+        "Delete button: disabled with tooltip 'Cannot delete: X notes use this type' if notes exist",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 24,
+      "passes": true,
+      "notes": "Implemented: Note types management page at /anki/notetypes with listing, cloning, editing, template management, live preview, and delete with confirmation. Typecheck passes, Build passes."
+    },
+    {
+      "id": "US-025",
+      "title": "Tag Manager",
+      "description": "As a content manager, I want to organize and clean up tags so my card collection stays tidy.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-tag.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-tag.controller.ts",
+        "GET /api/v1/anki/tags returns all tags with usage count, sorted by count desc",
+        "PUT /api/v1/anki/tags/:tag/rename accepts { newName: string }; updates all notes.tags fields containing old tag",
+        "DELETE /api/v1/anki/tags/:tag deletes tag only if usage count is 0; returns 400 if still in use",
+        "POST /api/v1/anki/tags/merge accepts { source: string, target: string }; replaces source tag with target in all notes; deletes source",
+        "Create apps/web/src/pages/anki/tags.tsx for route /anki/tags",
+        "Tag list with search input, rename inline edit, delete button (disabled if in use), merge button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 25,
+      "passes": true,
+      "notes": "Implemented: Tag Manager at /anki/tags with tag list, search, inline rename, delete (disabled if in use), merge dialog. Backend: anki-tag.service.ts and anki-tag.controller.ts with getTags, renameTag, deleteTag, mergeTags endpoints. Typecheck passes, Build passes."
+    },
+    {
+      "id": "US-026",
+      "title": "Media Manager Screen",
+      "description": "As a user, I want to find and delete unused media files so I can reclaim storage space.",
+      "acceptanceCriteria": [
+        "Create apps/web/src/pages/anki/media.tsx for route /anki/media",
+        "Page shows total media count and total size in header",
+        "List of all media files: filename, file type icon, size, 'used' or 'unused' badge",
+        "'Check Unused' button: calls POST /api/v1/anki/media/check-unused; marks unused files in list",
+        "After check: 'Delete Unused (N files)' button appears; clicking shows confirmation dialog with list of files to delete",
+        "Confirm delete calls DELETE /api/v1/anki/media/bulk",
+        "Click on a media file row: shows panel listing all notes/cards that reference this file (search notes.flds for filename)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 26,
+      "passes": true,
+      "notes": "Implemented: Media manager page at /anki/media with file list, search, check unused, delete unused functionality. Typecheck passes, Build passes."
+    },
+    {
+      "id": "US-027",
+      "title": "CSV/TSV Bulk Import",
+      "description": "As a content creator, I want to import cards from spreadsheet files so I can bulk-create flashcards from existing data.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-csv-import.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-csv-import.controller.ts",
+        "POST /api/v1/anki/import/csv accepts multipart CSV or TSV file upload",
+        "Auto-detect encoding (UTF-8, GBK via iconv-lite or chardet) and delimiter (comma, tab, semicolon)",
+        "GET /api/v1/anki/import/csv/preview returns first 5 rows as array of string arrays",
+        "POST /api/v1/anki/import/csv/execute accepts { columnMapping: Record<number, string>, notetypeId, deckId, hasHeader: boolean }; creates notes",
+        "Returns { added, updated, skipped, errors: { row: number, reason: string }[] }",
+        "Create apps/web/src/pages/anki/csv-import.tsx for route /anki/import/csv",
+        "File upload step; preview table showing first 5 rows; column mapping dropdowns; execute button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 27,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Duplicate Card Detection",
+      "description": "As a content manager, I want to find duplicate or near-duplicate cards so I can clean up my collection.",
+      "acceptanceCriteria": [
+        "Create src/services/anki-duplicate.service.ts with @Service() decorator",
+        "Create src/controllers/v1/anki-duplicate.controller.ts",
+        "POST /api/v1/anki/notes/find-duplicates accepts { notetypeId, fieldName, threshold: number (0-1, default 1.0 for exact) }",
+        "For threshold=1.0: group notes where specified field value is identical (case-insensitive)",
+        "For threshold<1.0: compute Levenshtein similarity between all note pairs; group pairs above threshold",
+        "Returns array of duplicate groups: { notes: Note[] }[]",
+        "POST /api/v1/anki/notes/merge-duplicates accepts { keepId: number, deleteIds: number[] }; deletes specified notes",
+        "Create apps/web/src/pages/anki/duplicates.tsx for route /anki/duplicates",
+        "Note type selector, field selector, threshold slider",
+        "'Find Duplicates' button; results shown as grouped cards side-by-side",
+        "Each group: radio to select which to keep; 'Delete Others' button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 28,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
