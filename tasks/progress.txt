@@ -46,3 +46,20 @@
   - `generateText` from `@tiptap/core` does NOT need a DOM - it works purely in Node.js
   - All 45 tests pass after this change
 ---
+
+## 2026-03-12 - US-003
+- What was implemented: Added `fields_json` JSON column to `echoe_notes` table as primary structured field storage
+  - Updated `apps/server/src/db/schema/echoe-notes.ts`: added `json` import, imported `CanonicalFields` type, added `fieldsJson` column (`json('fields_json').$type<CanonicalFields>().notNull().default({})`)
+  - Generated Drizzle migration `drizzle/0002_sleepy_tyrannus.sql`: `ALTER TABLE echoe_notes ADD fields_json json DEFAULT ('{}') NOT NULL`
+  - Migration is idempotent (Drizzle tracks applied migrations in `table_migrations`)
+- Files changed:
+  - `apps/server/src/db/schema/echoe-notes.ts` (modified)
+  - `apps/server/drizzle/0002_sleepy_tyrannus.sql` (new migration file)
+  - `apps/server/drizzle/meta/_journal.json` (updated)
+  - `apps/server/drizzle/meta/0002_snapshot.json` (new snapshot)
+- **Learnings for future iterations:**
+  - No `@/` path alias in tsconfig — use relative imports (e.g., `../../types/note-fields.js`)
+  - Drizzle `json()` column with `.notNull().default({})` maps to MySQL `json DEFAULT ('{}') NOT NULL`
+  - Import `CanonicalFields` type from `../../types/note-fields.js` in schema files
+  - Always build before generating migrations; migration generation reads from `dist/` folder
+---
