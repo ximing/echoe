@@ -16,6 +16,7 @@ import { echoeDecks, type NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeNotetypes, type NewEchoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
+import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 
 import type { NewEchoeMedia } from '../db/schema/echoe-media.js';
 
@@ -322,6 +323,28 @@ export class EchoeImportService {
   }
 
   /**
+   * Build a map of notetype id → ordered field names by reading from the source database.
+   * Anki's notetypes.flds is a JSON array of field definition objects, each with a "name" property.
+   */
+  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<number, string[]> {
+    const map = new Map<number, string[]>();
+    try {
+      const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: string }[];
+      for (const row of rows) {
+        try {
+          const fieldDefs = JSON.parse(row.flds) as { name: string }[];
+          map.set(row.id, fieldDefs.map((f) => f.name));
+        } catch {
+          // If parsing fails, leave this notetype out of the map
+        }
+      }
+    } catch {
+      // If notetypes table is missing, return empty map
+    }
+    return map;
+  }
+
+  /**
    * Import notes from source database
    */
   private async importNotes(
@@ -339,10 +362,26 @@ export class EchoeImportService {
         return { added: 0, updated: 0, skipped: 0, errors: [] };
       }
 
+      // Build notetype field names map once for all notes
+      const notetypeFieldsMap = this.buildNotetypeFieldsMap(sourceDb);
+
       const db = getDatabase();
 
       for (const row of rows) {
         try {
+          // Resolve notetype field names for this note
+          const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
+
+          // Parse flds (\x1f-separated) into a field name → value map
+          const rawValues = row.flds.split('\x1f');
+          const fields: Record<string, string> = {};
+          for (let i = 0; i < notetypeFields.length; i++) {
+            fields[notetypeFields[i]] = rawValues[i] ?? '';
+          }
+
+          // Normalize using the standard module
+          const normalized = normalizeNoteFields({ notetypeFields, fields });
+
           // Check if note with same guid already exists
           const existing = await db
             .select({ id: echoeNotes.id })
@@ -351,20 +390,22 @@ export class EchoeImportService {
             .limit(1);
 
           if (existing.length > 0) {
-            // Update existing note (only update mod, tags, flds)
+            // Update existing note with normalized field data
             await db
               .update(echoeNotes)
               .set({
                 mod: row.mod,
                 tags: row.tags || '[]',
-                flds: row.flds,
-                sfld: row.sfld,
-                csum: row.csum,
+                flds: normalized.flds,
+                sfld: normalized.sfld,
+                csum: normalized.csum,
+                fldNames: normalized.fldNames,
+                fieldsJson: normalized.fieldsJson,
               })
               .where(eq(echoeNotes.guid, row.guid));
             updated++;
           } else {
-            // Insert new note
+            // Insert new note with normalized field data
             const newNote: NewEchoeNotes = {
               id: row.id,
               guid: row.guid,
@@ -372,11 +413,13 @@ export class EchoeImportService {
               mod: row.mod,
               usn: row.usn,
               tags: row.tags || '[]',
-              flds: row.flds,
-              sfld: row.sfld,
-              csum: row.csum,
+              flds: normalized.flds,
+              sfld: normalized.sfld,
+              csum: normalized.csum,
               flags: row.flags || 0,
               data: row.data || '{}',
+              fldNames: normalized.fldNames,
+              fieldsJson: normalized.fieldsJson,
             };
             await db.insert(echoeNotes).values(newNote);
             added++;
