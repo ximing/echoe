@@ -46,3 +46,17 @@
 - When removing UI elements, always check and clean up unused imports
 - The header buttons that were removed: Browse Cards, Statistics, Note Types, Tags, Media, Settings, Duplicates, Import, Custom Study Deck
 - Functions should be accessible via sidebar navigation or Settings page
+---
+## 2026-03-11 - US-006
+- Added Card Management section to Settings menu with links to: Note Types, Tags, Media, Import, Duplicates, Statistics, Card Settings
+- Added new icons (FileText, Tag, Image, Upload, Copy, BarChart3, Settings) from lucide-react
+- Card Management section appears at top of settings menu with a divider separating from general settings
+- Links navigate to existing /cards/* routes (already defined in App.tsx)
+
+**Files changed:**
+- apps/web/src/pages/settings/components/settings-menu.tsx (added Card Management section with 7 menu items)
+
+**Learnings for future iterations:**
+- Use NavLink for proper routing with active state styling
+- All card management pages already exist under /cards/* routes - no need to create new pages
+- Use Array.map() to render menu items for maintainability
