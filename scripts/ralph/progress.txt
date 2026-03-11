@@ -331,3 +331,17 @@ Started: 2026年 2月15日 星期日 23时33分46秒 CST
   - The service has no external dependencies (no DB, no config) — it's pure computation, making it easy to test without mocks
   - SpacedRepetitionService exported interfaces: SRCardState (input), SRNextReview (output) — import these for type safety in US-004+
 ---
+
+## 2026-03-11 - US-001
+- Wrapped all /cards/* and /settings routes with Layout component in App.tsx
+- Imported Layout component and added to all protected routes
+- Layout component already uses useLocation() for navigation highlighting (isCardsPage, isSettingsPage)
+- TypeScript typecheck passes
+- ESLint passes for App.tsx (pre-existing lint errors in other files)
+- Files changed:
+  - apps/web/src/App.tsx (added Layout wrapper to all /cards/* and /settings routes)
+- **Learnings for future iterations:**
+  - Layout component already supports path-based navigation highlighting via location.pathname.startsWith() checks
+  - The Layout provides a 70px left sidebar that wraps the main content area
+  - ProtectedRoute wraps Layout, not the other way around (order: ProtectedRoute > Layout > Page)
+---

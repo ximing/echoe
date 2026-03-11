@@ -20,6 +20,7 @@ import { ThemeSettings } from './pages/settings/components/theme-settings';
 import { About } from './pages/settings/components/about';
 import NotFoundPage from './pages/not-found';
 import { ProtectedRoute } from './components/protected-route';
+import { Layout } from './components/layout';
 import { ToastContainer } from './components/toast';
 import { setNavigate } from './utils/navigation';
 import { isElectron } from './electron/isElectron';
@@ -58,7 +59,9 @@ function App() {
           path="/cards"
           element={
             <ProtectedRoute>
-              <HomePage />
+              <Layout>
+                <HomePage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -66,7 +69,9 @@ function App() {
           path="/cards/browser"
           element={
             <ProtectedRoute>
-              <CardBrowserPage />
+              <Layout>
+                <CardBrowserPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -74,7 +79,9 @@ function App() {
           path="/cards/stats"
           element={
             <ProtectedRoute>
-              <StatsPage />
+              <Layout>
+                <StatsPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -82,7 +89,9 @@ function App() {
           path="/cards/study/:deckId?"
           element={
             <ProtectedRoute>
-              <StudyPage />
+              <Layout>
+                <StudyPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -90,7 +99,9 @@ function App() {
           path="/cards/cards/new"
           element={
             <ProtectedRoute>
-              <CardEditorPage />
+              <Layout>
+                <CardEditorPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -98,7 +109,9 @@ function App() {
           path="/cards/cards/:noteId/edit"
           element={
             <ProtectedRoute>
-              <CardEditorPage />
+              <Layout>
+                <CardEditorPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -106,7 +119,9 @@ function App() {
           path="/cards/cards/:cardId/edit-card"
           element={
             <ProtectedRoute>
-              <CardEditorPage />
+              <Layout>
+                <CardEditorPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -114,7 +129,9 @@ function App() {
           path="/cards/deck/:deckId/edit"
           element={
             <ProtectedRoute>
-              <CardEditorPage />
+              <Layout>
+                <CardEditorPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -122,7 +139,9 @@ function App() {
           path="/cards/notetypes"
           element={
             <ProtectedRoute>
-              <NoteTypesPage />
+              <Layout>
+                <NoteTypesPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -130,7 +149,9 @@ function App() {
           path="/cards/tags"
           element={
             <ProtectedRoute>
-              <TagsPage />
+              <Layout>
+                <TagsPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -138,7 +159,9 @@ function App() {
           path="/cards/media"
           element={
             <ProtectedRoute>
-              <MediaPage />
+              <Layout>
+                <MediaPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -146,7 +169,9 @@ function App() {
           path="/cards/import/csv"
           element={
             <ProtectedRoute>
-              <CsvImportPage />
+              <Layout>
+                <CsvImportPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -154,7 +179,9 @@ function App() {
           path="/cards/duplicates"
           element={
             <ProtectedRoute>
-              <DuplicatesPage />
+              <Layout>
+                <DuplicatesPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -162,7 +189,9 @@ function App() {
           path="/cards/settings"
           element={
             <ProtectedRoute>
-              <CardsSettingsPage />
+              <Layout>
+                <CardsSettingsPage />
+              </Layout>
             </ProtectedRoute>
           }
         />
@@ -170,7 +199,9 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <SettingsPage />
+              <Layout>
+                <SettingsPage />
+              </Layout>
             </ProtectedRoute>
           }
         >
