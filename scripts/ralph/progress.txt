@@ -1,5 +1,39 @@
+## 2026-03-12 - US-008
+- Modified apps/server/src/services/echoe-note.service.ts to use normalizeNoteFields in updateNote
+- updateNote now fetches the notetype (via note[0].mid) to get ordered field names
+- Calls normalizeNoteFields({ notetypeFields, fields, richTextFields }) when fields or richTextFields are provided
+- Writes normalized.flds, normalized.sfld, normalized.csum, normalized.fldNames, normalized.fieldsJson to DB
+- Removed manual flds join (Object.values(dto.fields).join('\x1f')), cleanSortField, calculateChecksum from update path
+- Removed now-unused private methods cleanSortField() and calculateChecksum() from the service class
+- All 56 tests pass, typecheck passes
+- Files changed:
+  - apps/server/src/services/echoe-note.service.ts (modified updateNote method, removed unused private methods)
+- **Learnings for future iterations:**
+  - When updating a note, fetch notetype via note[0].mid (the note's mid column stores the notetype ID)
+  - normalizeNoteFields handles both plain fields and richTextFields — pass both from dto when available
+  - richTextFields update should be inside the fields/richTextFields branch (only set when those are provided)
+  - After US-008, cleanSortField and calculateChecksum have been fully removed from the service
+---
+
 # Ralph Progress Log
 Started: 2026年 2月15日 星期日 23时33分46秒 CST
+---
+
+## 2026-03-12 - US-007
+- Modified apps/server/src/services/echoe-note.service.ts to use normalizeNoteFields in createNote
+- Added imports: normalizeNoteFields from lib/note-field-normalizer.js, RichTextFields from types/note-fields.js
+- createNote now parses notetypeFieldDefs from notetype.flds JSON to get ordered field names
+- Calls normalizeNoteFields({ notetypeFields, fields, richTextFields }) to produce normalized output
+- Writes normalized.flds, normalized.sfld, normalized.csum, normalized.fldNames, normalized.fieldsJson to DB
+- Removed manual flds join (Object.values(dto.fields).join('\x1f')), cleanSortField, calculateChecksum from create path
+- All 56 tests pass, typecheck passes
+- Files changed:
+  - apps/server/src/services/echoe-note.service.ts (modified createNote method)
+- **Learnings for future iterations:**
+  - notetype.flds is a JSON string array of field definition objects: [{name, ord, sticky, ...}] — extract names with .map(f => f.name)
+  - dto.richTextFields in the DTO is typed as Record<string, Record<string, any>>, must cast to RichTextFields when passing to normalizeNoteFields
+  - normalizeNoteFields handles both plain-text fields and richTextFields, merging richText (via HTML conversion) over plain fields
+  - After US-007, cleanSortField and calculateChecksum remain in service (still used by updateNote — to be cleaned up in US-008)
 ---
 
 ## 2026-03-12 - US-005
