@@ -60,3 +60,16 @@
 - Use NavLink for proper routing with active state styling
 - All card management pages already exist under /cards/* routes - no need to create new pages
 - Use Array.map() to render menu items for maintainability
+---
+## 2026-03-11 - US-007
+- Verified that Start Studying bar already exists in CardsPage (cards/index.tsx)
+- Bottom bar shows when totalDue > 0 with "Total: X cards due" text
+- Clicking navigates to /cards/study route
+- No code changes needed - acceptance criteria already met
+
+**Files changed:**
+- None (already implemented)
+
+**Learnings for future iterations:**
+- The Start Studying bar is at the bottom of the deck list, conditionally rendered based on totalDue count
+- It uses deckService to get due cards count across all decks
