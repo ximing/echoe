@@ -63,3 +63,22 @@
   - Import `CanonicalFields` type from `../../types/note-fields.js` in schema files
   - Always build before generating migrations; migration generation reads from `dist/` folder
 ---
+
+## 2026-03-12 - US-006
+- What was implemented: Created `apps/server/src/lib/note-field-normalizer.ts` with the `normalizeNoteFields` function
+  - `NormalizerInput`: `{ notetypeFields: string[]; fields?: Record<string, string>; richTextFields?: RichTextFields }`
+  - `NormalizerOutput`: `{ fieldsJson: CanonicalFields; fldNames: string[]; flds: string; sfld: string; csum: number }`
+  - richTextFields converted to HTML via `serializeToHtml`, plain text for sfld via `serializeToPlainText`
+  - flds = field values joined by `\x1f` in notetypeFields order
+  - sfld = plain text of first field (strips HTML tags for plain-text inputs, uses serializeToPlainText for richText inputs)
+  - csum = `parseInt(sha1(sfld).slice(0, 8), 16)` using Node.js `crypto` module
+  - richTextFields take precedence over fields for the same key
+- Files changed:
+  - `apps/server/src/lib/note-field-normalizer.ts` (new file)
+  - `apps/server/src/__tests__/note-field-normalizer.test.ts` (new file, 12 tests)
+- **Learnings for future iterations:**
+  - For sfld computation: if first field came from richTextFields, use `serializeToPlainText` on the original doc; otherwise strip HTML tags with regex
+  - `computeCsum` uses `createHash('sha1').update(sfld, 'utf8').digest('hex')` then `parseInt(hash.slice(0, 8), 16)`
+  - normalizeNoteFields is a pure function (no DB access, no side effects) - easy to test and reuse
+  - All 56 tests pass (4 test suites) after adding 12 new tests for this module
+---
