@@ -8,6 +8,13 @@
       "when": 1773230055429,
       "tag": "0000_yummy_mister_fear",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1773242626830,
+      "tag": "0001_clear_chimera",
+      "breakpoints": true
     }
   ]
 }

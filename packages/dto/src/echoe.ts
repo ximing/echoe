@@ -297,6 +297,8 @@ export interface EchoeNoteDto {
   flags: number;
   /** Data */
   data: string;
+  /** Rich text JSON for fields (keyed by field name) */
+  richTextFields?: Record<string, Record<string, any>>;
 }
 
 export interface EchoeNoteWithCardsDto extends EchoeNoteDto {
@@ -313,6 +315,8 @@ export interface CreateEchoeNoteDto {
   fields: Record<string, string>;
   /** Tags */
   tags?: string[];
+  /** Rich text JSON for fields (keyed by field name) */
+  richTextFields?: Record<string, Record<string, any>>;
 }
 
 export interface UpdateEchoeNoteDto {
@@ -320,6 +324,8 @@ export interface UpdateEchoeNoteDto {
   fields?: Record<string, string>;
   /** Tags */
   tags?: string[];
+  /** Rich text JSON for fields (keyed by field name) */
+  richTextFields?: Record<string, Record<string, any>>;
 }
 
 // ===== Cards =====

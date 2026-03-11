@@ -18,7 +18,7 @@ export class EchoeNoteService extends Service {
   notes: EchoeNoteDto[] = [];
   decks: EchoeDeckWithCountsDto[] = [];
   currentNote: EchoeNoteDto | null = null;
-  currentCard: { cardId: number; noteId: number; note: EchoeNoteDto } | null = null;
+  currentCard: { cardId: number; noteId: number; did: number; note: EchoeNoteDto } | null = null;
   isLoading = false;
   error: string | null = null;
 
@@ -84,6 +84,7 @@ export class EchoeNoteService extends Service {
       this.currentCard = {
         cardId: response.data.id,
         noteId: response.data.nid,
+        did: response.data.did,
         note: response.data.note,
       };
       this.currentNote = response.data.note;

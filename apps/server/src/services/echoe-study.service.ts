@@ -89,19 +89,20 @@ export class EchoeStudyService {
 
       if (!noteType) continue;
 
-      // Parse fields and templates
-      const fields = JSON.parse(note.flds as string) as string[];
-      const templates = JSON.parse(noteType.tmpls as string) as any[];
+      // Parse stored field values (handle both \x1f-delimited and JSON formats)
+      const fieldValues = this.parseFieldValues(note.flds, note.fldNames, note.sfld);
+      const templates = this.safeJsonParse<any[]>(noteType.tmpls, []);
 
       // Get the template for this card
       const template = templates[card.ord] || templates[0];
       if (!template) continue;
 
-      // Get field names
-      const fieldNames = JSON.parse(noteType.flds as string) as any[];
+      // Get field names from note type definition
+      const fieldTypeDefs = this.safeJsonParse<any[]>(noteType.flds, []);
       const fieldMap: Record<string, string> = {};
-      fieldNames.forEach((f: any, idx: number) => {
-        fieldMap[f.name] = fields[idx] || '';
+      fieldTypeDefs.forEach((f: any, idx: number) => {
+        const name = f?.name || `field_${idx}`;
+        fieldMap[name] = fieldValues[idx] || '';
       });
 
       // Determine cloze ordinal - for cloze cards, templateOrd IS the cloze ordinal
@@ -230,8 +231,8 @@ export class EchoeStudyService {
             mid: note.mid,
             mod: note.mod,
             csum: note.csum,
-            tags: JSON.parse(note.tags as string || '[]'),
-            fields: JSON.parse(note.flds as string || '{}'),
+            tags: this.parseTags(note.tags),
+            fields: this.parseNoteFields(note.flds, note.fldNames, note.sfld),
           } : undefined,
         } as any,
         nextDue,
@@ -298,7 +299,7 @@ export class EchoeStudyService {
         .where(eq(echoeCards.id, dto.cardId));
 
       // Add 'leech' tag to the note if not already present
-      const currentTags = JSON.parse(note.tags as string || '[]');
+      const currentTags = this.parseTags(note.tags);
       if (!currentTags.includes('leech')) {
         currentTags.push('leech');
         await db
@@ -367,8 +368,8 @@ export class EchoeStudyService {
           mid: fullNote.mid,
           mod: fullNote.mod,
           csum: fullNote.csum,
-          tags: JSON.parse(fullNote.tags as string || '[]'),
-          fields: JSON.parse(fullNote.flds as string || '{}'),
+          tags: this.parseTags(fullNote.tags),
+          fields: this.parseNoteFields(fullNote.flds, fullNote.fldNames, fullNote.sfld),
         } : undefined,
       } as any,
       nextDue,
@@ -614,6 +615,84 @@ export class EchoeStudyService {
       reviewCount,
       totalCount: newCount + learnCount + reviewCount,
     };
+  }
+
+  /**
+   * Safely parse JSON with fallback
+   */
+  private safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+    if (!json) return fallback;
+    try {
+      return JSON.parse(json) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  /**
+   * Parse field values from storage
+   * Handles both Anki's \x1f-delimited format and legacy JSON formats
+   */
+  private parseFieldValues(flds: string | null, fldNames: string | null, sfld: string | null): string[] {
+    if (!flds) {
+      return sfld ? [sfld] : [];
+    }
+
+    // Try \x1f-delimited format first (Anki native)
+    if (flds.includes('\x1f')) {
+      return flds.split('\x1f');
+    }
+
+    // Fallback to JSON array
+    try {
+      const parsed = JSON.parse(flds);
+      if (Array.isArray(parsed)) {
+        return parsed.map(v => String(v ?? ''));
+      }
+      // JSON object: convert to array using fldNames
+      if (typeof parsed === 'object' && parsed !== null) {
+        const names = this.safeJsonParse<string[]>(fldNames, []);
+        return names.map(name => String((parsed as Record<string, unknown>)[name] ?? ''));
+      }
+    } catch {
+      // Not valid JSON
+    }
+
+    // Last resort: return as single field or split by tab
+    return flds.includes('\t') ? flds.split('\t') : [flds];
+  }
+
+  /**
+   * Parse note fields into a record (for note DTO)
+   */
+  private parseNoteFields(flds: string | null, fldNames: string | null, sfld: string | null): Record<string, string> {
+    const values = this.parseFieldValues(flds, fldNames, sfld);
+    const names = this.safeJsonParse<string[]>(fldNames, []);
+    const result: Record<string, string> = {};
+    for (let i = 0; i < Math.max(values.length, names.length); i++) {
+      const name = names[i] || `field_${i}`;
+      result[name] = values[i] || '';
+    }
+    return result;
+  }
+
+  /**
+   * Parse tags from storage
+   */
+  private parseTags(tagsJson: string | null): string[] {
+    if (!tagsJson) return [];
+    try {
+      const parsed = JSON.parse(tagsJson);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((t): t is string => typeof t === 'string');
+      }
+    } catch {
+      // Not JSON, might be space-delimited (Anki format)
+      if (typeof tagsJson === 'string') {
+        return tagsJson.trim().split(/\s+/).filter(Boolean);
+      }
+    }
+    return [];
   }
 
   /**

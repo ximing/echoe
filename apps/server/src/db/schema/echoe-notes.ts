@@ -25,6 +25,8 @@ export const echoeNotes = mysqlTable(
     csum: bigint('csum', { mode: 'number' }).notNull(), // Checksum of sort field (for duplicates)
     flags: int('flags').notNull().default(0), // Flags (1 = marked)
     data: text('data').notNull().$type<string>(), // Extra data field (JSON)
+    richTextFields: text('rich_text_fields').$type<string>(), // Rich text JSON for fields (keyed by field name)
+    fldNames: text('fld_names').$type<string>(), // JSON array of field names for mapping fields to values
   },
   (table) => ({
     guidIdx: index('guid_idx').on(table.guid),

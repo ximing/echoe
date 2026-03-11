@@ -101,14 +101,20 @@ export const Layout = view(({ children }: LayoutProps) => {
           {/* Study/Review Navigation */}
           <div className="relative">
             <button
-              onClick={() => navigate('/cards/study')}
+              onClick={() => {
+                if (dueCount > 0) {
+                  navigate('/cards/study');
+                } else {
+                  navigate('/cards');
+                }
+              }}
               className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
                 isStudyPage
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
               }`}
-              title="学习"
-              aria-label="学习"
+              title={dueCount > 0 ? '学习' : '暂无待学卡片'}
+              aria-label={dueCount > 0 ? '学习' : '暂无待学卡片'}
             >
               <Zap className="w-6 h-6" />
             </button>

@@ -13,66 +13,6 @@ pnpm workspace仓库，安装 npm 包 使用 pnpm
 同时如无必要勿增实体，不要过度设计
 </constraint>
 
-## 项目结构
-
-```
-echoe/
-├── apps/                          # 应用程序
-│   ├── server/                    # 后端服务（Node.js + Express）
-│   │   ├── src/
-│   │   │   ├── config/            # 环境和配置管理
-│   │   │   ├── constants/         # 常量定义（错误码等）
-│   │   │   ├── controllers/       # 路由控制器
-│   │   │   │   └── v1/           # API v1 版本
-│   │   │   ├── middlewares/       # Express 中间件
-│   │   │   ├── models/            # 数据模型和 schema
-│   │   │   ├── services/          # 业务逻辑服务
-│   │   │   ├── sources/           # 数据源（LanceDB 连接）
-│   │   │   ├── types/             # TypeScript 类型定义
-│   │   │   ├── utils/             # 工具函数
-│   │   │   ├── index.ts           # 入口文件
-│   │   │   ├── app.ts             # Express 应用初始化
-│   │   │   └── ioc.ts             # IOC 容器配置
-│   │   └── package.json
-│   │
-│   └── web/                       # 前端应用（React + Vite）
-│       ├── src/
-│       │   ├── App.tsx
-│       │   ├── main.tsx
-│       │   ├── assets/            # 静态资源
-│       │   └── index.css
-│       ├── public/                # 公共文件
-│       └── package.json
-│
-├── packages/                      # 公共包
-│   └── dto/                       # 数据传输对象（DTO）- 共享代码
-│       ├── src/
-│       │   ├── auth.ts            # 认证 DTO
-│       │   ├── user.ts            # 用户 DTO
-│       │   ├── memo.ts            # 笔记 DTO
-│       │   ├── response.ts        # 响应 DTO
-│       │   └── index.ts           # 统一导出
-│       ├── dist/                  # 构建输出
-│       └── package.json
-│
-├── config/                        # 共享配置
-│   ├── config-typescript/         # TypeScript 配置
-│   ├── eslint-config/             # ESLint 配置
-│   ├── jest-presets/              # Jest 预设
-│   │   ├── browser/
-│   │   └── node/
-│   └── rollup-config/             # Rollup 打包配置
-│
-
-├── .github/                       # GitHub 配置
-│   └── workflows/                 # CI/CD 工作流
-│
-├── docs/                          # 文档
-├── package.json                   # 根 workspace 配置
-├── pnpm-workspace.yaml           # pnpm workspace 配置
-├── turbo.json                     # Turbo 配置
-└── tsconfig.json                  # 根 TypeScript 配置
-```
 
 ## 核心技术栈
 
@@ -82,7 +22,7 @@ echoe/
 - **框架**: Express.js
 - **路由**: routing-controllers
 - **依赖注入**: TypeDI
-- **数据库**: 标量数据 mysql， 向量数据库 LanceDB
+- **数据库**: 标量数据 mysql
 - **向量化**: @ai-sdk/openai
 - **认证**: JWT + bcrypt
 - **构建**: TypeScript (tsc)
@@ -113,7 +53,6 @@ echoe/
 ### 数据存储
 
 - **用户数据**: mysql
-- **笔记数据**: mysql，含 embedding放在 LanceDB
 - **向量维度**: 1536 (text-embedding-3-small)
 
 ## 日志规范

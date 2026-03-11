@@ -1,6 +1,12 @@
 import { useMemo, useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import katex from 'katex';
+import { generateHTML } from '@tiptap/html';
+import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
 import { diffStrings } from '../../utils/echoe/diff';
 
 export interface CardRendererProps {
@@ -12,6 +18,8 @@ export interface CardRendererProps {
   css: string;
   /** Field values */
   fields: Record<string, string>;
+  /** Rich text JSON for fields (keyed by field name) */
+  richTextFields?: Record<string, Record<string, any>>;
   /** Which side to render */
   side: 'front' | 'back';
   /** Cloze ordinal for cloze cards (1-based) */
@@ -38,29 +46,108 @@ const ALLOWED_TAGS = [
 
 const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'class', 'id', 'width', 'height', 'style', 'controls', 'type', 'placeholder', 'data-field', 'data-text', 'data-lang'];
 
+// Tiptap extensions for rendering (same as RichTextRenderer)
+const rendererExtensions = [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3],
+    },
+  }),
+  Image.configure({
+    inline: true,
+    // Disable base64 for security - only allow remote URLs
+    allowBase64: false,
+  }),
+  Link.configure({
+    openOnClick: false,
+  }),
+  Underline,
+  Placeholder.configure({
+    placeholder: '',
+  }),
+];
+
+/**
+ * Convert Tiptap JSON to HTML string
+ */
+function jsonToHtml(json: Record<string, any>): string {
+  try {
+    return generateHTML(json, rendererExtensions);
+  } catch (error) {
+    console.error('Failed to convert JSON to HTML:', error);
+    return '';
+  }
+}
+
+/**
+ * Sanitize HTML for card rendering
+ */
+function sanitizeForCard(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ADD_ATTR: ['target'],
+  });
+}
+
 /**
  * Replace template variables {{FieldName}} with field values
+ * Supports rich text rendering if richTextFields is provided
  */
-function replaceFieldVariables(template: string, fields: Record<string, string>): string {
+function replaceFieldVariables(
+  template: string,
+  fields: Record<string, string>,
+  richTextFields?: Record<string, Record<string, any>>
+): string {
   // Match {{FieldName}} patterns
   return template.replace(/\{\{([^#/}]+)\}\}/g, (_match, fieldName) => {
     const trimmedName = fieldName.trim();
+
+    // If rich text JSON exists for this field, convert to HTML
+    if (richTextFields && richTextFields[trimmedName]) {
+      const html = jsonToHtml(richTextFields[trimmedName]);
+      return sanitizeForCard(html);
+    }
+
+    // Otherwise use plain text field value
     return fields[trimmedName] ?? '';
   });
 }
 
 /**
+ * Check if a field has content (either plain text or rich text)
+ */
+function hasFieldContent(fieldName: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, any>>): boolean {
+  const trimmedName = fieldName.trim();
+
+  // Check plain text field
+  const plainTextValue = fields[trimmedName];
+  if (plainTextValue && plainTextValue.trim() !== '') {
+    return true;
+  }
+
+  // Check rich text field
+  if (richTextFields && richTextFields[trimmedName]) {
+    const richTextJson = richTextFields[trimmedName];
+    // Check if rich text has actual content (has non-empty text nodes)
+    if (richTextJson && richTextJson.content && richTextJson.content.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Process Handlebars-style conditionals {{#FieldName}}...{{/FieldName}}
  */
-function processConditionals(template: string, fields: Record<string, string>): string {
+function processConditionals(template: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, any>>): string {
   // Positive conditional: {{#FieldName}}...{{/FieldName}}
-  // Show block only if field is non-empty
+  // Show block only if field is non-empty (plain text or rich text)
   let result = template.replace(
     /\{\{#([^{}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
     (_match, fieldName, content) => {
-      const trimmedName = fieldName.trim();
-      const fieldValue = fields[trimmedName];
-      return fieldValue && fieldValue.trim() !== '' ? content : '';
+      return hasFieldContent(fieldName, fields, richTextFields) ? content : '';
     }
   );
 
@@ -69,9 +156,7 @@ function processConditionals(template: string, fields: Record<string, string>): 
   result = result.replace(
     /\{\{\^([^{}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
     (_match, fieldName, content) => {
-      const trimmedName = fieldName.trim();
-      const fieldValue = fields[trimmedName];
-      return !fieldValue || fieldValue.trim() === '' ? content : '';
+      return !hasFieldContent(fieldName, fields, richTextFields) ? content : '';
     }
   );
 
@@ -119,6 +204,10 @@ function processCloze(template: string, _fields: Record<string, string>, side: '
  */
 function processAudio(template: string): string {
   return template.replace(/\[sound:([^\]]+)\]/g, (_, filename) => {
+    // Reject invalid filenames with path traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return ''; // Reject invalid filenames
+    }
     // URL encode the filename but keep slashes and colons
     const encodedFilename = encodeURIComponent(filename);
     return `<audio class="cards-audio" src="/api/v1/media/${encodedFilename}" controls></audio>`;
@@ -140,7 +229,7 @@ function processTts(template: string, fields: Record<string, string>): string {
     const encodedText = encodeURIComponent(text);
     const encodedLang = encodeURIComponent(langCode.trim());
 
-    return `<button class="tts-button" data-text="${encodedText}" data-lang="${encodedLang}" title="Listen">🔊</button>`;
+    return `<button class="tts-button" data-text="${escapeHtml(encodedText)}" data-lang="${escapeHtml(encodedLang)}" title="Listen">🔊</button>`;
   });
 }
 
@@ -254,6 +343,7 @@ function escapeHtml(text: string): string {
 function renderTemplate(
   template: string,
   fields: Record<string, string>,
+  richTextFields: Record<string, Record<string, any>> | undefined,
   side: 'front' | 'back',
   clozeOrdinal?: number,
   _recursionDepth = 0
@@ -269,15 +359,15 @@ function renderTemplate(
   if (side === 'back' && template.includes('{{FrontSide}}')) {
     // Render front template separately to get front content
     const frontTemplate = template.replace(/[\s\S]*\{\{FrontSide\}\}[\s\S]*/g, '');
-    const frontContent = renderTemplate(frontTemplate, fields, 'front', clozeOrdinal, _recursionDepth + 1);
+    const frontContent = renderTemplate(frontTemplate, fields, richTextFields, 'front', clozeOrdinal, _recursionDepth + 1);
     result = processFrontSide(template, frontContent);
   }
 
-  // Process conditionals
-  result = processConditionals(result, fields);
+  // Process conditionals (now supports rich text fields)
+  result = processConditionals(result, fields, richTextFields);
 
   // Process field variables
-  result = replaceFieldVariables(result, fields);
+  result = replaceFieldVariables(result, fields, richTextFields);
 
   // Process cloze deletions
   result = processCloze(result, fields, side, clozeOrdinal);
@@ -313,6 +403,7 @@ export function CardRenderer({
   afmt,
   css,
   fields,
+  richTextFields,
   side,
   clozeOrdinal,
   typedAnswers = {},
@@ -332,7 +423,7 @@ export function CardRenderer({
   // Process type-answer after sanitization
   const processedContent = useMemo(() => {
     const template = side === 'front' ? qfmt : afmt;
-    const rendered = renderTemplate(template, fields, side, clozeOrdinal);
+    const rendered = renderTemplate(template, fields, richTextFields, side, clozeOrdinal);
     const sanitized = sanitizeHtml(rendered);
 
     // Process type-answer inputs

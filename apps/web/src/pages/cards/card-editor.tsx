@@ -5,6 +5,7 @@ import { EchoeNoteService } from '../../services/echoe-note.service';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
 import { ToastService } from '../../services/toast.service';
 import { CardRenderer } from '../../components/echoe/CardRenderer';
+import { RichTextEditor } from '../../components/echoe/RichTextEditor';
 import {
   ChevronLeft,
   Save,
@@ -41,13 +42,21 @@ const CardEditorPageContent = view(() => {
 
   const [selectedNotetype, setSelectedNotetype] = useState<EchoeNoteTypeDto | null>(null);
   const [selectedDeck, setSelectedDeck] = useState<EchoeDeckWithCountsDto | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [tags, setTags] = useState<string[]>([]);
+const [fields, setFields] = useState<Record<string, string>>({});
+const [richTextFields, setRichTextFields] = useState<Record<string, Record<string, any>>>({});
+const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showSourceMode, setShowSourceMode] = useState<Record<number, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      noteService.clearCurrentNote();
+    };
+  }, []);
 
   // Load data on mount
   useEffect(() => {
@@ -67,25 +76,26 @@ const CardEditorPageContent = view(() => {
     }
   }, [parsedNoteId, parsedCardId]);
 
-  // Set initial values when note loads
+  // Set initial values when note loads (depends on both note and noteTypes being loaded)
   useEffect(() => {
-    if (noteService.currentNote && (parsedNoteId || parsedCardId)) {
+    if (noteService.currentNote && noteService.noteTypes.length > 0 && (parsedNoteId || parsedCardId)) {
       const nt = noteService.getNoteTypeById(noteService.currentNote.mid);
       if (nt) {
         setSelectedNotetype(nt);
         setFields(noteService.currentNote.fields || {});
+        setRichTextFields(noteService.currentNote.richTextFields || {});
         setTags(noteService.currentNote.tags || []);
       }
 
       // Try to find deck from card
       if (parsedCardId && noteService.currentCard) {
-        const deck = deckService.decks.find((d) => d.id === noteService.currentCard?.noteId);
+        const deck = deckService.decks.find((d) => d.id === noteService.currentCard?.did);
         if (deck) {
           setSelectedDeck(deck);
         }
       }
     }
-  }, [noteService.currentNote, parsedNoteId, parsedCardId]);
+  }, [noteService.currentNote, noteService.noteTypes, parsedNoteId, parsedCardId]);
 
   // Set default notetype on first load
   useEffect(() => {
@@ -127,6 +137,8 @@ const CardEditorPageContent = view(() => {
         newFields[fld.name] = '';
       });
       setFields(newFields);
+      // Reset rich text fields for new notetype
+      setRichTextFields({});
     }
   };
 
@@ -144,6 +156,36 @@ const CardEditorPageContent = view(() => {
       ...prev,
       [fieldName]: value,
     }));
+  };
+
+  // Check whether a rich text JSON node contains meaningful content
+  const hasRichTextContent = (node: Record<string, any> | undefined): boolean => {
+    if (!node || typeof node !== 'object') {
+      return false;
+    }
+
+    if (typeof node.text === 'string' && node.text.trim() !== '') {
+      return true;
+    }
+
+    if (node.type === 'image' && typeof node.attrs?.src === 'string' && node.attrs.src.trim() !== '') {
+      return true;
+    }
+
+    if (Array.isArray(node.content)) {
+      return node.content.some((child) => hasRichTextContent(child));
+    }
+
+    return false;
+  };
+
+  // Check whether a field has content in plain text or rich text mode
+  const hasFieldContent = (fieldName: string): boolean => {
+    if (fields[fieldName]?.trim()) {
+      return true;
+    }
+
+    return hasRichTextContent(richTextFields[fieldName]);
   };
 
   // Toggle source mode for a field
@@ -239,7 +281,7 @@ const CardEditorPageContent = view(() => {
     // Check required fields
     const requiredFields = selectedNotetype.flds.filter((f) => f.name === 'Front' || f.name === 'Back');
     for (const fld of requiredFields) {
-      if (!fields[fld.name]?.trim()) {
+      if (!hasFieldContent(fld.name)) {
         toastService.error(`Field "${fld.name}" is required`);
         return;
       }
@@ -252,6 +294,7 @@ const CardEditorPageContent = view(() => {
         const success = await noteService.updateExistingNote(parsedNoteId, {
           fields,
           tags,
+          richTextFields,
         });
         if (success) {
           toastService.success('Note updated');
@@ -266,6 +309,7 @@ const CardEditorPageContent = view(() => {
           deckId: selectedDeck.id,
           fields,
           tags,
+          richTextFields,
         });
         if (result) {
           toastService.success('Note created');
@@ -370,7 +414,7 @@ const CardEditorPageContent = view(() => {
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700'
               }`}
-              title={isSourceMode ? 'Switch to Rich Text' : 'Switch to HTML Source'}
+              title={isSourceMode ? 'Switch to Rich Text Editor' : 'Switch to HTML Source'}
             >
               {isSourceMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
@@ -385,12 +429,21 @@ const CardEditorPageContent = view(() => {
             placeholder={`Enter ${field.name} (HTML)`}
           />
         ) : (
-          <textarea
-            id={`field-${field.name}`}
-            value={fields[field.name] || ''}
-            onChange={(e) => handleFieldChange(field.name, e.target.value)}
-            className="w-full h-32 px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder={`Enter ${field.name}`}
+          <RichTextEditor
+            content={richTextFields[field.name] || fields[field.name] || ''}
+            onChange={(_html, json) => {
+              // Only store rich text JSON, not HTML in fields
+              // Fields will contain empty string for rich text fields
+              setRichTextFields((prev) => ({
+                ...prev,
+                [field.name]: json,
+              }));
+              // Also update fields with empty string to maintain the field exists
+              if (!fields[field.name]) {
+                handleFieldChange(field.name, '');
+              }
+            }}
+            minHeight="120px"
           />
         )}
         {isCloze && (
@@ -528,7 +581,7 @@ const CardEditorPageContent = view(() => {
           </div>
 
           {/* Preview */}
-          {selectedNotetype && fields['Front'] && (
+          {selectedNotetype && hasFieldContent('Front') && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">Preview</h2>
@@ -561,6 +614,7 @@ const CardEditorPageContent = view(() => {
                   afmt={getPreviewTemplate('back')}
                   css={selectedNotetype.css || ''}
                   fields={fields}
+                  richTextFields={richTextFields}
                   side={previewSide}
                 />
               </div>

@@ -2,6 +2,7 @@ import { Service } from 'typedi';
 import { eq, and, inArray, like, sql, or, desc, asc } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/transaction.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
@@ -157,9 +158,8 @@ export class EchoeNoteService {
    * Create a new note
    */
   async createNote(dto: CreateEchoeNoteDto): Promise<EchoeNoteWithCardsDto> {
+    // Get note type to determine templates (outside transaction - read only)
     const db = getDatabase();
-
-    // Get note type to determine templates
     const notetype = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.id, dto.notetypeId)).limit(1);
 
     if (notetype.length === 0) {
@@ -187,12 +187,12 @@ export class EchoeNoteService {
     const flds = Object.values(dto.fields).join('\x1f');
 
     const now = Math.floor(Date.now() / 1000);
-    const noteId = Date.now();
+    const noteId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
 
-    // Create note
-    const newNote = await db
-      .insert(echoeNotes)
-      .values({
+    // Wrap note and card creation in a transaction
+    return withTransaction(async (tx) => {
+      // MySQL insert does not support returning(); fetch the inserted note explicitly.
+      await tx.insert(echoeNotes).values({
         id: noteId,
         guid,
         mid: dto.notetypeId,
@@ -203,54 +203,63 @@ export class EchoeNoteService {
         sfld,
         csum,
         flags: 0,
-        data: '[]',
-      })
-      .returning();
-
-    // Create cards for each template
-    const createdCards: EchoeCardDto[] = [];
-
-    for (const template of templates) {
-      const cardId = Date.now() * 1000 + template.ord;
-      await db.insert(echoeCards).values({
-        id: cardId,
-        nid: noteId,
-        did: dto.deckId,
-        ord: template.ord,
-        mod: now,
-        usn: 0,
-        type: 0,
-        queue: 0,
-        due: 0,
-        ivl: 0,
-        factor: 0,
-        reps: 0,
-        lapses: 0,
-        left: 0,
+        data: '{}',
+        richTextFields: dto.richTextFields ? JSON.stringify(dto.richTextFields) : undefined,
+        fldNames: JSON.stringify(Object.keys(dto.fields)),
       });
 
-      createdCards.push({
-        id: cardId,
-        nid: noteId,
-        did: dto.deckId,
-        ord: template.ord,
-        mod: now,
-        type: 0,
-        queue: 0,
-        due: 0,
-        ivl: 0,
-        factor: 0,
-        reps: 0,
-        lapses: 0,
-        left: 0,
-        usn: 0,
-      });
-    }
+      // Create cards for each template
+      const createdCards: EchoeCardDto[] = [];
 
-    return {
-      ...this.mapNoteToDto(newNote[0]),
-      cards: createdCards,
-    };
+      for (const template of templates) {
+        const cardId = Date.now() * 1000000 + template.ord * 1000 + Math.floor(Math.random() * 1000);
+        await tx.insert(echoeCards).values({
+          id: cardId,
+          nid: noteId,
+          did: dto.deckId,
+          ord: template.ord,
+          mod: now,
+          usn: 0,
+          type: 0,
+          queue: 0,
+          due: 0,
+          ivl: 0,
+          factor: 0,
+          reps: 0,
+          lapses: 0,
+          left: 0,
+          data: '{}',
+        });
+
+        createdCards.push({
+          id: cardId,
+          nid: noteId,
+          did: dto.deckId,
+          ord: template.ord,
+          mod: now,
+          type: 0,
+          queue: 0,
+          due: 0,
+          ivl: 0,
+          factor: 0,
+          reps: 0,
+          lapses: 0,
+          left: 0,
+          usn: 0,
+        });
+      }
+
+      const insertedNote = await tx.select().from(echoeNotes).where(eq(echoeNotes.id, noteId)).limit(1);
+
+      if (insertedNote.length === 0) {
+        throw new Error(`Failed to load inserted note ${noteId}`);
+      }
+
+      return {
+        ...this.mapNoteToDto(insertedNote[0]),
+        cards: createdCards,
+      };
+    });
   }
 
   /**
@@ -282,6 +291,10 @@ export class EchoeNoteService {
 
     if (dto.tags !== undefined) {
       updates.tags = JSON.stringify(dto.tags);
+    }
+
+    if (dto.richTextFields !== undefined) {
+      updates.richTextFields = JSON.stringify(dto.richTextFields);
     }
 
     await db.update(echoeNotes).set(updates).where(eq(echoeNotes.id, id));
@@ -462,20 +475,16 @@ export class EchoeNoteService {
       const deck = row.echoeDecks;
       const notetype = row.echoeNotetypes;
 
-      // Get front field (first field from fields JSON)
+      // Get front field (first field from delimiter-separated fields)
       let front = '';
       if (note?.flds) {
-        try {
-          const fields = JSON.parse(note.flds) as Array<{ name: string; value: string }>;
-          if (fields.length > 0) {
-            // Get the first field's value and strip HTML
-            front = (fields[0]?.value || '').replace(/<[^>]*>/g, '').trim();
-            if (front.length > 100) {
-              front = front.substring(0, 100) + '...';
-            }
+        const fieldValues = (note.flds || '').split('\x1f');
+        if (fieldValues.length > 0) {
+          // Get the first field's value and strip HTML
+          front = (fieldValues[0] || '').replace(/<[^>]*>/g, '').trim();
+          if (front.length > 100) {
+            front = front.substring(0, 100) + '...';
           }
-        } catch {
-          front = note.sfld || '';
         }
       }
 
@@ -493,7 +502,7 @@ export class EchoeNoteService {
         reps: card.reps,
         lapses: card.lapses,
         front,
-        fields: note ? this.parseNoteFields(note.flds, note.sfld) : {},
+        fields: note ? this.parseNoteFields(note.flds, note.fldNames, note.sfld) : {},
         tags: note ? this.parseNoteTags(note.tags) : [],
         mid: Number(note?.mid || 0),
         notetypeName: notetype?.name || 'Unknown',
@@ -507,17 +516,18 @@ export class EchoeNoteService {
   }
 
   /**
-   * Parse note fields from JSON string
+   * Parse note fields from delimiter-separated string
    */
-  private parseNoteFields(fldsJson: string | null, sfld: string | null): Record<string, string> {
-    if (!fldsJson) {
+  private parseNoteFields(flds: string | null, fldNamesJson: string | null, sfld: string | null): Record<string, string> {
+    if (!flds) {
       return {};
     }
     try {
-      const fields = JSON.parse(fldsJson) as Array<{ name: string; value: string }>;
+      const fieldValues = flds.split('\x1f');
+      const fieldNames = this.safeJsonParse<string[]>(fldNamesJson, []);
       const result: Record<string, string> = {};
-      for (const field of fields) {
-        result[field.name] = field.value;
+      for (let i = 0; i < fieldNames.length; i++) {
+        result[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
       }
       return result;
     } catch {
@@ -560,15 +570,31 @@ export class EchoeNoteService {
       }
 
       case 'unsuspend': {
-        // Get cards to determine their type
+        // Get all cards at once to determine their types (batch query)
         const cards = await db.select().from(echoeCards).where(inArray(echoeCards.id, cardIds));
 
-        for (const card of cards) {
-          const queue = card.type === 0 ? 0 : card.type === 1 ? 1 : 2;
+        // Batch update by type
+        const type0Cards = cards.filter((c) => c.type === 0);
+        const type1Cards = cards.filter((c) => c.type === 1);
+        const type2Cards = cards.filter((c) => c.type === 2);
+
+        if (type0Cards.length > 0) {
           await db
             .update(echoeCards)
-            .set({ queue, mod: now, usn: 0 })
-            .where(eq(echoeCards.id, card.id));
+            .set({ queue: 0, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type0Cards.map((c) => c.id)));
+        }
+        if (type1Cards.length > 0) {
+          await db
+            .update(echoeCards)
+            .set({ queue: 1, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type1Cards.map((c) => c.id)));
+        }
+        if (type2Cards.length > 0) {
+          await db
+            .update(echoeCards)
+            .set({ queue: 2, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type2Cards.map((c) => c.id)));
         }
         affected = cards.length;
         break;
@@ -584,14 +610,31 @@ export class EchoeNoteService {
       }
 
       case 'unbury': {
+        // Get all cards at once to determine their types (batch query)
         const cards = await db.select().from(echoeCards).where(inArray(echoeCards.id, cardIds));
 
-        for (const card of cards) {
-          const queue = card.type === 0 ? 0 : card.type === 1 ? 1 : 2;
+        // Batch update by type
+        const type0Cards = cards.filter((c) => c.type === 0);
+        const type1Cards = cards.filter((c) => c.type === 1);
+        const type2Cards = cards.filter((c) => c.type === 2);
+
+        if (type0Cards.length > 0) {
           await db
             .update(echoeCards)
-            .set({ queue, mod: now, usn: 0 })
-            .where(eq(echoeCards.id, card.id));
+            .set({ queue: 0, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type0Cards.map((c) => c.id)));
+        }
+        if (type1Cards.length > 0) {
+          await db
+            .update(echoeCards)
+            .set({ queue: 1, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type1Cards.map((c) => c.id)));
+        }
+        if (type2Cards.length > 0) {
+          await db
+            .update(echoeCards)
+            .set({ queue: 2, mod: now, usn: 0 })
+            .where(inArray(echoeCards.id, type2Cards.map((c) => c.id)));
         }
         affected = cards.length;
         break;
@@ -633,20 +676,26 @@ export class EchoeNoteService {
         if (!payload?.tag) {
           throw new Error('tag is required for addTag action');
         }
+        // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.id, cardIds));
         const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
 
-        for (const nid of noteIds) {
-          const note = await db.select().from(echoeNotes).where(eq(echoeNotes.id, nid)).limit(1);
-          if (note.length > 0) {
-            const tags = JSON.parse(note[0].tags || '[]') as string[];
-            if (!tags.includes(payload.tag)) {
-              tags.push(payload.tag);
-              await db
-                .update(echoeNotes)
-                .set({ tags: JSON.stringify(tags), mod: now, usn: 0 })
-                .where(eq(echoeNotes.id, nid));
-            }
+        if (noteIds.length === 0) {
+          break;
+        }
+
+        // Batch query all notes at once
+        const notes = await db.select().from(echoeNotes).where(inArray(echoeNotes.id, noteIds));
+
+        // Process notes and collect updates
+        for (const note of notes) {
+          const tags = JSON.parse(note.tags || '[]') as string[];
+          if (!tags.includes(payload.tag)) {
+            tags.push(payload.tag);
+            await db
+              .update(echoeNotes)
+              .set({ tags: JSON.stringify(tags), mod: now, usn: 0 })
+              .where(eq(echoeNotes.id, Number(note.id)));
           }
         }
         affected = noteIds.length;
@@ -657,19 +706,25 @@ export class EchoeNoteService {
         if (!payload?.tag) {
           throw new Error('tag is required for removeTag action');
         }
+        // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.id, cardIds));
         const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
 
-        for (const nid of noteIds) {
-          const note = await db.select().from(echoeNotes).where(eq(echoeNotes.id, nid)).limit(1);
-          if (note.length > 0) {
-            const tags = JSON.parse(note[0].tags || '[]') as string[];
-            const filteredTags = tags.filter((t) => t !== payload.tag);
-            await db
-              .update(echoeNotes)
-              .set({ tags: JSON.stringify(filteredTags), mod: now, usn: 0 })
-              .where(eq(echoeNotes.id, nid));
-          }
+        if (noteIds.length === 0) {
+          break;
+        }
+
+        // Batch query all notes at once
+        const notes = await db.select().from(echoeNotes).where(inArray(echoeNotes.id, noteIds));
+
+        // Process notes and collect updates
+        for (const note of notes) {
+          const tags = JSON.parse(note.tags || '[]') as string[];
+          const filteredTags = tags.filter((t) => t !== payload.tag);
+          await db
+            .update(echoeNotes)
+            .set({ tags: JSON.stringify(filteredTags), mod: now, usn: 0 })
+            .where(eq(echoeNotes.id, Number(note.id)));
         }
         affected = noteIds.length;
         break;
@@ -681,26 +736,56 @@ export class EchoeNoteService {
 
   /**
    * Get all note types with field and template definitions
+   * Uses batch queries to avoid N+1 problem
    */
   async getAllNoteTypes(): Promise<EchoeNoteTypeDto[]> {
     const db = getDatabase();
 
     const notetypes = await db.select().from(echoeNotetypes).orderBy(echoeNotetypes.name);
 
+    if (notetypes.length === 0) {
+      return [];
+    }
+
+    // Batch query all templates in one call
+    const noteTypeIds = notetypes.map((nt) => Number(nt.id));
+    const allTemplates = await db
+      .select()
+      .from(echoeTemplates)
+      .where(inArray(echoeTemplates.ntid, noteTypeIds));
+
+    // Batch query all note counts in one call
+    const noteCounts = await db
+      .select({ mid: echoeNotes.mid, count: sql<number>`COUNT(*)` })
+      .from(echoeNotes)
+      .where(inArray(echoeNotes.mid, noteTypeIds))
+      .groupBy(echoeNotes.mid);
+
+    // Create a map for quick lookup
+    const templatesMap = new Map<number, typeof allTemplates>();
+    const countMap = new Map<number, number>();
+
+    for (const template of allTemplates) {
+      const ntid = Number(template.ntid);
+      if (!templatesMap.has(ntid)) {
+        templatesMap.set(ntid, []);
+      }
+      templatesMap.get(ntid)!.push(template);
+    }
+
+    for (const nc of noteCounts) {
+      countMap.set(Number(nc.mid), Number(nc.count));
+    }
+
+    // Build result
     const result: EchoeNoteTypeDto[] = [];
 
     for (const nt of notetypes) {
-      const templates = await db.select().from(echoeTemplates).where(eq(echoeTemplates.ntid, nt.id));
-
-      // Get note count for this note type
-      const noteCountResult = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(echoeNotes)
-        .where(eq(echoeNotes.mid, Number(nt.id)));
-      const noteCount = Number(noteCountResult[0]?.count || 0);
+      const ntid = Number(nt.id);
+      const templates = templatesMap.get(ntid) || [];
 
       result.push({
-        id: Number(nt.id),
+        id: ntid,
         name: nt.name,
         mod: nt.mod,
         sortf: nt.sortf,
@@ -721,7 +806,7 @@ export class EchoeNoteService {
         latexPre: nt.latexPre,
         latexPost: nt.latexPost,
         req: nt.req,
-        noteCount,
+        noteCount: countMap.get(ntid) || 0,
       });
     }
 
@@ -736,7 +821,7 @@ export class EchoeNoteService {
     const db = getDatabase();
 
     const now = Math.floor(Date.now() / 1000);
-    const noteTypeId = Date.now();
+    const noteTypeId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
 
     let fields = dto.flds;
     let templates = dto.tmpls;
@@ -818,7 +903,7 @@ export class EchoeNoteService {
     const createdTemplates: any[] = [];
     for (let i = 0; i < templates.length; i++) {
       const template = templates[i];
-      const templateId = noteTypeId * 1000 + i;
+      const templateId = noteTypeId * 1000000 + i * 1000 + Math.floor(Math.random() * 1000);
       await db.insert(echoeTemplates).values({
         id: templateId,
         ntid: noteTypeId,
@@ -925,7 +1010,7 @@ export class EchoeNoteService {
 
       for (let i = 0; i < dto.tmpls.length; i++) {
         const t = dto.tmpls[i];
-        const templateId = id * 1000 + newOrd + i;
+        const templateId = id * 1000000 + (newOrd + i) * 1000 + Math.floor(Math.random() * 1000);
         await db.insert(echoeTemplates).values({
           id: templateId,
           ntid: id,
@@ -1052,15 +1137,28 @@ export class EchoeNoteService {
   }
 
   /**
+   * Safely parse JSON with fallback
+   */
+  private safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+    if (!json) return fallback;
+    try {
+      return JSON.parse(json) as T;
+    } catch (error) {
+      console.error('Failed to parse JSON:', error);
+      return fallback;
+    }
+  }
+
+  /**
    * Map database note to DTO
    */
   private mapNoteToDto(note: any): EchoeNoteDto {
     const fields: Record<string, string> = {};
     const fieldValues = (note.flds || '').split('\x1f');
-    const fieldDefs = JSON.parse(note.flds || '[]');
+    const fieldNames = this.safeJsonParse<string[]>(note.fldNames, []);
 
-    for (let i = 0; i < fieldDefs.length; i++) {
-      fields[fieldDefs[i]?.name || `field_${i}`] = fieldValues[i] || '';
+    for (let i = 0; i < fieldNames.length; i++) {
+      fields[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
     }
 
     return {
@@ -1068,12 +1166,13 @@ export class EchoeNoteService {
       guid: note.guid,
       mid: Number(note.mid),
       mod: note.mod,
-      tags: JSON.parse(note.tags || '[]'),
+      tags: this.safeJsonParse<string[]>(note.tags, []),
       fields,
       sfld: note.sfld,
       csum: Number(note.csum),
       flags: note.flags,
       data: note.data,
+      richTextFields: note.richTextFields ? this.safeJsonParse<Record<string, any> | undefined>(note.richTextFields, undefined) : undefined,
     };
   }
 

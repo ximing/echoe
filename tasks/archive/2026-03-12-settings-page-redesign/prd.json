@@ -1,0 +1,167 @@
+{
+  "project": "echoe",
+  "branchName": "ralph/settings-page-redesign",
+  "description": "Settings Page Redesign - Convert settings to left-right panel layout, move Tags/Media/Stats to sidebar, unify theme colors, merge Card Settings into Settings",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Convert Settings page to left-right panel layout",
+      "description": "As a user, I want clicking settings menu items to show content in the right panel instead of navigating to separate pages.",
+      "acceptanceCriteria": [
+        "Settings page has two-column layout: left sidebar menu (200-250px) and right content panel",
+        "Left menu contains: Note Types, Tags, Media, Import, Duplicates, Statistics, Card Settings (merged as tabs)",
+        "Clicking left menu item renders corresponding content in right panel (no page navigation)",
+        "Active menu item highlighted with theme color",
+        "Right panel supports scrolling for long content",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add Tags as sidebar top-level navigation",
+      "description": "As a user, I want Tags accessible from the main sidebar as a top-level navigation item.",
+      "acceptanceCriteria": [
+        "Add 'Tags' navigation item to sidebar (use Tag icon from lucide-react)",
+        "Click navigates to /cards/tags route",
+        "Active state highlighted in sidebar",
+        "Tags page uses global layout (sidebar + content)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add Media as sidebar top-level navigation",
+      "description": "As a user, I want Media files accessible from the main sidebar as a top-level navigation item.",
+      "acceptanceCriteria": [
+        "Add 'Media' navigation item to sidebar (use Image icon from lucide-react)",
+        "Click navigates to /cards/media route",
+        "Active state highlighted in sidebar",
+        "Media page uses global layout (sidebar + content)",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add Statistics as sidebar top-level navigation",
+      "description": "As a user, I want Statistics accessible from the main sidebar as a top-level navigation item.",
+      "acceptanceCriteria": [
+        "Add 'Statistics' navigation item to sidebar (use BarChart3 icon from lucide-react)",
+        "Click navigates to /cards/statistics route",
+        "Active state highlighted in sidebar",
+        "Statistics page uses global layout (sidebar + content)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Apply global theme to Note Types page",
+      "description": "As a user, I want the Note Types page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Note Types page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Apply global theme to Import page",
+      "description": "As a user, I want the Import page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Import page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Apply global theme to Duplicates page",
+      "description": "As a user, I want the Duplicates page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Duplicates page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Merge Card Settings into Settings page",
+      "description": "As a user, I want Card Settings tabs integrated into the Settings page as sub-items instead of a separate page.",
+      "acceptanceCriteria": [
+        "Card Settings 5 tabs become Settings page sub-menu items under 'Card Settings'",
+        "Clicking 'Card Settings' shows tab selection in right panel",
+        "All 5 tabs content renders within Settings right panel",
+        "Remove separate Card Settings page and route",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Apply global theme to Tags page",
+      "description": "As a user, I want the Tags page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Tags page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Apply global theme to Media page",
+      "description": "As a user, I want the Media page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Media page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Apply global theme to Statistics page",
+      "description": "As a user, I want the Statistics page to use global theme colors for consistency.",
+      "acceptanceCriteria": [
+        "Statistics page buttons use global theme color (primary)",
+        "Links and interactive elements use global theme color",
+        "Page uses AppLayout component (sidebar + content area)",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
