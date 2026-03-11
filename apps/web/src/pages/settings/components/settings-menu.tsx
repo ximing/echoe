@@ -1,26 +1,8 @@
 import { NavLink } from 'react-router';
-import { User, Bot, Palette, Info, FileText, Tag, Image, Upload, Copy, BarChart3, Settings } from 'lucide-react';
+import { User, Bot, Palette, Info, Upload, Copy, BookOpen, Monitor, Volume2, Database, Layers } from 'lucide-react';
 
 export const SettingsMenu = () => {
   const cardManagementItems: Array<{ id: string; label: string; icon: React.ReactNode; to: string }> = [
-    {
-      id: 'notetypes',
-      label: '笔记类型',
-      icon: <FileText className="w-5 h-5" />,
-      to: '/settings/notetypes',
-    },
-    {
-      id: 'tags',
-      label: '标签',
-      icon: <Tag className="w-5 h-5" />,
-      to: '/settings/tags',
-    },
-    {
-      id: 'media',
-      label: '媒体文件',
-      icon: <Image className="w-5 h-5" />,
-      to: '/settings/media',
-    },
     {
       id: 'import',
       label: '导入',
@@ -34,16 +16,34 @@ export const SettingsMenu = () => {
       to: '/settings/duplicates',
     },
     {
-      id: 'statistics',
-      label: '统计数据',
-      icon: <BarChart3 className="w-5 h-5" />,
-      to: '/settings/statistics',
+      id: 'learning',
+      label: '学习设置',
+      icon: <BookOpen className="w-5 h-5" />,
+      to: '/settings/learning',
     },
     {
-      id: 'cards-settings',
-      label: '卡片设置',
-      icon: <Settings className="w-5 h-5" />,
-      to: '/settings/cards-settings',
+      id: 'display',
+      label: '显示设置',
+      icon: <Monitor className="w-5 h-5" />,
+      to: '/settings/display',
+    },
+    {
+      id: 'audio',
+      label: '音频设置',
+      icon: <Volume2 className="w-5 h-5" />,
+      to: '/settings/audio',
+    },
+    {
+      id: 'data',
+      label: '数据管理',
+      icon: <Database className="w-5 h-5" />,
+      to: '/settings/data',
+    },
+    {
+      id: 'presets',
+      label: '预设配置',
+      icon: <Layers className="w-5 h-5" />,
+      to: '/settings/presets',
     },
   ];
 
@@ -115,7 +115,7 @@ export const SettingsMenu = () => {
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
               }`
-              }
+            }
           >
             {item.icon}
             <span>{item.label}</span>

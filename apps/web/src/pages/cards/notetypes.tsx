@@ -1,12 +1,10 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { EchoeNoteService } from '../../services/echoe-note.service';
 import { ToastService } from '../../services/toast.service';
 import * as echoeApi from '../../api/echoe';
 import { CardRenderer } from '../../components/echoe/CardRenderer';
 import {
-  ArrowLeft,
   Plus,
   Copy,
   Trash2,
@@ -33,7 +31,6 @@ interface NoteTypeWithCount extends EchoeNoteTypeDto {
 const NoteTypesPageContent = view(() => {
   useService(EchoeNoteService);
   const toastService = useService(ToastService);
-  const navigate = useNavigate();
 
   // State
   const [noteTypes, setNoteTypes] = useState<NoteTypeWithCount[]>([]);
@@ -123,7 +120,7 @@ const NoteTypesPageContent = view(() => {
         { name: 'Front', ord: 0, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', mathjax: false, hidden: false },
         { name: 'Back', ord: 1, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', mathjax: false, hidden: false },
       ],
-      css: `.card {\n  font-family: arial;\n  font-size: 20px;\n  text-align: center;\n  color: black;\n  background-color: white;\n}`,
+      css: `.card {\n  font-family: arial;\n  font-size: 20px;\n  text-align: center;\n}`,
       type: 0,
       latexPre: '',
       latexPost: '',
@@ -288,19 +285,11 @@ const NoteTypesPageContent = view(() => {
   const currentTemplate = editTemplates[selectedTemplateIndex];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="h-full bg-gray-50 dark:bg-dark-900 text-gray-900 dark:text-gray-50">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/cards')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-            </button>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Note Types</h1>
-          </div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Note Types</h1>
           <button
             onClick={handleCreateNew}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -313,11 +302,11 @@ const NoteTypesPageContent = view(() => {
 
       <div className="flex h-[calc(100vh-73px)]">
         {/* Left sidebar - Note type list */}
-        <div className="w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+        <div className="w-80 border-r border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800 overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center text-gray-500">Loading...</div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading...</div>
           ) : noteTypes.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No note types yet</p>
               <button
@@ -328,12 +317,12 @@ const NoteTypesPageContent = view(() => {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            <div className="divide-y divide-gray-200 dark:divide-dark-700">
               {noteTypes.map((noteType) => (
                 <div
                   key={noteType.id}
                   onClick={() => handleSelectNoteType(noteType)}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700 ${
                     selectedNoteType?.id === noteType.id
                       ? 'bg-primary-50 dark:bg-primary-900/30 border-l-4 border-primary-600'
                       : ''
@@ -341,7 +330,7 @@ const NoteTypesPageContent = view(() => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Layout className="w-5 h-5 text-gray-400" />
+                      <Layout className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                       <span className="font-medium text-gray-900 dark:text-white">
                         {noteType.name}
                       </span>
@@ -356,13 +345,13 @@ const NoteTypesPageContent = view(() => {
                         e.stopPropagation();
                         handleClone(noteType);
                       }}
-                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-dark-600 rounded"
                       title="Clone"
                     >
-                      <Copy className="w-4 h-4 text-gray-500" />
+                      <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     </button>
                   </div>
-                  <div className="mt-1 text-sm text-gray-500">
+                  <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {noteType.noteCount || 0} notes
                   </div>
                 </div>
@@ -376,15 +365,15 @@ const NoteTypesPageContent = view(() => {
           {selectedNoteType ? (
             <>
               {/* Toolbar */}
-              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
+              <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Layout className="w-5 h-5 text-gray-400" />
+                  <Layout className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                   {isEditing ? (
                     <input
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="text-lg font-medium bg-transparent border-b border-gray-300 dark:border-gray-600 focus:border-primary-500 outline-none text-gray-900 dark:text-white"
+                      className="text-lg font-medium bg-transparent border-b border-gray-300 dark:border-dark-600 focus:border-primary-500 outline-none text-gray-900 dark:text-white"
                     />
                   ) : (
                     <span className="text-lg font-medium text-gray-900 dark:text-white">
@@ -402,7 +391,7 @@ const NoteTypesPageContent = view(() => {
                             setSelectedNoteType(null);
                           }
                         }}
-                        className="px-3 py-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        className="px-3 py-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg"
                       >
                         Cancel
                       </button>
@@ -439,9 +428,9 @@ const NoteTypesPageContent = view(() => {
 
               <div className="flex-1 overflow-hidden flex">
                 {/* Fields and Templates Panel */}
-                <div className="w-1/2 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+                <div className="w-1/2 border-r border-gray-200 dark:border-dark-700 overflow-y-auto">
                   {/* Fields Section */}
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="p-4 border-b border-gray-200 dark:border-dark-700">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-medium text-gray-900 dark:text-white">Fields</h3>
                       {isEditing && (
@@ -462,7 +451,7 @@ const NoteTypesPageContent = view(() => {
                               type="text"
                               value={field.name}
                               onChange={(e) => handleFieldNameChange(index, e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
                             />
                             <button
                               onClick={() => handleRemoveField(index)}
@@ -476,7 +465,7 @@ const NoteTypesPageContent = view(() => {
                         editFields.map((field, index) => (
                           <div
                             key={index}
-                            className="px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300"
+                            className="px-3 py-2 bg-gray-50 dark:bg-dark-700 rounded-lg text-sm text-gray-700 dark:text-gray-300"
                           >
                             {field.name}
                           </div>
@@ -509,7 +498,7 @@ const NoteTypesPageContent = view(() => {
                             className={`px-3 py-1.5 text-sm rounded-lg ${
                               selectedTemplateIndex === index
                                 ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700'
                             }`}
                           >
                             {template.name}
@@ -538,7 +527,7 @@ const NoteTypesPageContent = view(() => {
                                 type="text"
                                 value={currentTemplate.name}
                                 onChange={(e) => handleTemplateNameChange(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
                               />
                             </div>
                             <div>
@@ -549,7 +538,7 @@ const NoteTypesPageContent = view(() => {
                                 value={currentTemplate.qfmt}
                                 onChange={(e) => handleTemplateChange('qfmt', e.target.value)}
                                 rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm font-mono"
                               />
                             </div>
                             <div>
@@ -560,7 +549,7 @@ const NoteTypesPageContent = view(() => {
                                 value={currentTemplate.afmt}
                                 onChange={(e) => handleTemplateChange('afmt', e.target.value)}
                                 rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm font-mono"
                               />
                             </div>
                           </>
@@ -568,13 +557,13 @@ const NoteTypesPageContent = view(() => {
                           <>
                             <div>
                               <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Front</div>
-                              <pre className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
+                              <pre className="p-3 bg-gray-50 dark:bg-dark-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
                                 {currentTemplate.qfmt}
                               </pre>
                             </div>
                             <div>
                               <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Back</div>
-                              <pre className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
+                              <pre className="p-3 bg-gray-50 dark:bg-dark-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
                                 {currentTemplate.afmt}
                               </pre>
                             </div>
@@ -593,10 +582,10 @@ const NoteTypesPageContent = view(() => {
                           value={editCss}
                           onChange={(e) => setEditCss(e.target.value)}
                           rows={6}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm font-mono"
                         />
                       ) : (
-                        <pre className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
+                        <pre className="p-3 bg-gray-50 dark:bg-dark-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
                           {editCss}
                         </pre>
                       )}
@@ -605,10 +594,10 @@ const NoteTypesPageContent = view(() => {
                 </div>
 
                 {/* Preview Panel */}
-                <div className="w-1/2 bg-gray-100 dark:bg-gray-900 overflow-y-auto">
+                <div className="w-1/2 bg-gray-100 dark:bg-dark-900 overflow-y-auto">
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-4">
-                      <Eye className="w-5 h-5 text-gray-400" />
+                      <Eye className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                       <h3 className="font-medium text-gray-900 dark:text-white">Preview</h3>
                     </div>
 
@@ -626,7 +615,7 @@ const NoteTypesPageContent = view(() => {
                               onChange={(e) =>
                                 setPreviewFields({ ...previewFields, [field.name]: e.target.value })
                               }
-                              className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                              className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-800 text-gray-900 dark:text-white text-sm"
                             />
                           </div>
                         ))}
@@ -635,8 +624,8 @@ const NoteTypesPageContent = view(() => {
 
                     {/* Card Preview */}
                     <div className="space-y-4">
-                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm overflow-hidden">
+                        <div className="px-4 py-2 bg-gray-50 dark:bg-dark-700 border-b border-gray-200 dark:border-dark-600">
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
                             {currentTemplate?.name || 'Card'} - Front
                           </span>
@@ -653,11 +642,11 @@ const NoteTypesPageContent = view(() => {
                       </div>
 
                       <div className="flex justify-center">
-                        <ChevronRight className="w-6 h-6 text-gray-400 rotate-90" />
+                        <ChevronRight className="w-6 h-6 text-gray-400 dark:text-gray-500 rotate-90" />
                       </div>
 
-                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm overflow-hidden">
+                        <div className="px-4 py-2 bg-gray-50 dark:bg-dark-700 border-b border-gray-200 dark:border-dark-600">
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
                             {currentTemplate?.name || 'Card'} - Back
                           </span>
@@ -678,7 +667,7 @@ const NoteTypesPageContent = view(() => {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
               <div className="text-center">
                 <Layout className="w-16 h-16 mx-auto mb-4 opacity-30" />
                 <p>Select a note type to view or edit</p>
@@ -691,7 +680,7 @@ const NoteTypesPageContent = view(() => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Delete Note Type
             </h3>
@@ -714,7 +703,7 @@ const NoteTypesPageContent = view(() => {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg"
               >
                 Cancel
               </button>

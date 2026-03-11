@@ -1,11 +1,9 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
 import * as echoeApi from '../../api/echoe';
 import type { EchoeMediaDto } from '../../api/echoe';
 import {
-  ArrowLeft,
   Search,
   Image,
   Music,
@@ -20,7 +18,6 @@ export default function MediaPage() {
 
 const MediaPageContent = view(() => {
   const toastService = useService(ToastService);
-  const navigate = useNavigate();
 
   // State
   const [mediaFiles, setMediaFiles] = useState<EchoeMediaDto[]>([]);
@@ -135,16 +132,10 @@ const MediaPageContent = view(() => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/cards')}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          </button>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Media Manager</h1>
           <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
             {mediaFiles.length} files ({totalSizeFormatted})
@@ -153,7 +144,7 @@ const MediaPageContent = view(() => {
       </div>
 
       {/* Stats bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-2 flex items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">Used:</span>
           <span className="text-sm font-medium text-green-600 dark:text-green-400">{usedCount}</span>
@@ -166,7 +157,7 @@ const MediaPageContent = view(() => {
         <button
           onClick={handleCheckUnused}
           disabled={checkingUnused}
-          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 disabled:opacity-50"
         >
           {checkingUnused ? (
             <>
@@ -196,7 +187,7 @@ const MediaPageContent = view(() => {
             placeholder="Search media files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
       </div>
@@ -221,10 +212,10 @@ const MediaPageContent = view(() => {
               <div
                 key={file.id}
                 onClick={() => setSelectedFile(file)}
-                className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border rounded-lg cursor-pointer transition-colors ${
+                className={`flex items-center gap-3 p-3 bg-white dark:bg-dark-800 border rounded-lg cursor-pointer transition-colors ${
                   selectedFile?.id === file.id
                     ? 'border-primary-500 ring-2 ring-primary-500/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    : 'border-gray-200 dark:border-dark-700 hover:border-gray-300 dark:hover:border-dark-600'
                 }`}
               >
                 {getFileIcon(file.mimeType)}
@@ -254,14 +245,14 @@ const MediaPageContent = view(() => {
       {/* Delete Confirmation Dialog */}
       {isDeleteDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-md mx-4">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Delete Unused Files
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Are you sure you want to delete {unusedFiles.length > 0 ? unusedFiles.length : mediaFiles.filter((f) => !f.usedInCards).length} unused file(s)? This action cannot be undone.
             </p>
-            <div className="max-h-48 overflow-y-auto mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded text-sm">
+            <div className="max-h-48 overflow-y-auto mb-4 p-2 bg-gray-100 dark:bg-dark-700 rounded text-sm">
               {(unusedFiles.length > 0 ? unusedFiles : mediaFiles.filter((f) => !f.usedInCards).map((f) => f.filename)).map((filename) => (
                 <div key={filename} className="text-gray-700 dark:text-gray-300 truncate">
                   {filename}
@@ -271,7 +262,7 @@ const MediaPageContent = view(() => {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setIsDeleteDialogOpen(false)}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg"
               >
                 Cancel
               </button>

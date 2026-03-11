@@ -4,7 +4,7 @@ import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { EchoeDeckService } from '../services/echoe-deck.service';
-import { Sun, Moon, LogOut, Settings, Zap, Layers, Search, Plus, Tag, Image, BarChart3 } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, Zap, Layers, Search, Plus, FileText, Tag, Image, BarChart3 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
 import { isElectron, isMacOS } from '../electron/isElectron';
@@ -27,10 +27,11 @@ export const Layout = view(({ children }: LayoutProps) => {
   const isStudyPage = location.pathname.startsWith('/cards/study');
   const isMyDecksPage = location.pathname === '/cards';
   const isBrowseCardsPage = location.pathname.startsWith('/cards/browser');
+  const isNoteTypesPage = location.pathname.startsWith('/cards/notetypes');
   const isSettingsPage = location.pathname.startsWith('/settings');
-  const isTagsPage = location.pathname.startsWith('/settings/tags');
-  const isMediaPage = location.pathname.startsWith('/settings/media');
-  const isStatsPage = location.pathname.startsWith('/settings/statistics');
+  const isTagsPage = location.pathname.startsWith('/cards/tags');
+  const isMediaPage = location.pathname.startsWith('/cards/media');
+  const isStatsPage = location.pathname.startsWith('/cards/stats');
 
   // Check if FAB should be shown (on /cards or /cards/study/* routes)
   const showFab = location.pathname === '/cards' || location.pathname.startsWith('/cards/study');
@@ -146,9 +147,23 @@ export const Layout = view(({ children }: LayoutProps) => {
             <Search className="w-6 h-6" />
           </button>
 
+          {/* Note Types Navigation */}
+          <button
+            onClick={() => navigate('/cards/notetypes')}
+            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+              isNoteTypesPage
+                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+            }`}
+            title="笔记类型"
+            aria-label="笔记类型"
+          >
+            <FileText className="w-6 h-6" />
+          </button>
+
           {/* Tags Navigation */}
           <button
-            onClick={() => navigate('/settings/tags')}
+            onClick={() => navigate('/cards/tags')}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
               isTagsPage
                 ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
@@ -162,7 +177,7 @@ export const Layout = view(({ children }: LayoutProps) => {
 
           {/* Media Navigation */}
           <button
-            onClick={() => navigate('/settings/media')}
+            onClick={() => navigate('/cards/media')}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
               isMediaPage
                 ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
@@ -176,7 +191,7 @@ export const Layout = view(({ children }: LayoutProps) => {
 
           {/* Statistics Navigation */}
           <button
-            onClick={() => navigate('/settings/statistics')}
+            onClick={() => navigate('/cards/stats')}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
               isStatsPage
                 ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'

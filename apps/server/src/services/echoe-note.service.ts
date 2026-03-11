@@ -1027,15 +1027,25 @@ export class EchoeNoteService {
    */
   private async getDeckAndSubdeckIds(id: number): Promise<number[]> {
     const db = getDatabase();
-    const result: number[] = [id];
 
-    const subDecks = await db
-      .select()
+    const deck = await db
+      .select({ name: echoeDecks.name })
       .from(echoeDecks)
-      .where(sql`${echoeDecks.name} LIKE ${`${id}::%`}%`);
+      .where(eq(echoeDecks.id, id))
+      .limit(1);
 
-    for (const deck of subDecks) {
-      result.push(Number(deck.id));
+    if (deck.length === 0) {
+      return [];
+    }
+
+    const result: number[] = [id];
+    const subDecks = await db
+      .select({ id: echoeDecks.id })
+      .from(echoeDecks)
+      .where(like(echoeDecks.name, `${deck[0].name}::%`));
+
+    for (const subDeck of subDecks) {
+      result.push(Number(subDeck.id));
     }
 
     return result;

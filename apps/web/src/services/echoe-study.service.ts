@@ -1,4 +1,5 @@
-import { Service } from '@rabjs/react';
+import { Service, resolve } from '@rabjs/react';
+import { ToastService } from './toast.service';
 import {
   getStudyQueue,
   submitReview as apiSubmitReview,
@@ -91,6 +92,15 @@ export class EchoeStudyService extends Service {
       }
 
       const response = await getStudyQueue(deckId);
+      // Check if response is valid
+      if (!response.data) {
+        const errorMsg = (response as any).msg || 'Failed to load study queue';
+        this.error = errorMsg;
+        resolve(ToastService).show(errorMsg, { type: 'error' });
+        this.queue = [];
+        this.isLoading = false;
+        return;
+      }
       this.queue = response.data;
       this.currentIndex = 0;
       this.isShowingAnswer = false;
@@ -107,6 +117,8 @@ export class EchoeStudyService extends Service {
       this.cardStartTime = Date.now();
     } catch (err) {
       this.error = 'Failed to load study queue';
+      this.queue = [];
+      resolve(ToastService).show('Failed to load study queue', { type: 'error' });
       console.error('Load queue error:', err);
     } finally {
       this.isLoading = false;

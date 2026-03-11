@@ -1,11 +1,9 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
 import * as echoeApi from '../../api/echoe';
 import type { EchoeTagDto } from '../../api/echoe';
 import {
-  ArrowLeft,
   Search,
   Edit3,
   Trash2,
@@ -21,7 +19,6 @@ export default function TagsPage() {
 
 const TagsPageContent = view(() => {
   const toastService = useService(ToastService);
-  const navigate = useNavigate();
 
   // State
   const [tags, setTags] = useState<EchoeTagDto[]>([]);
@@ -164,17 +161,11 @@ const TagsPageContent = view(() => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-900 transition-colors">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/cards')}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Tag Manager</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Tag Manager</h1>
           <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
             {tags.length} tags
           </span>
@@ -190,7 +181,7 @@ const TagsPageContent = view(() => {
             placeholder="Search tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg text-gray-900 dark:text-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
       </div>
@@ -211,7 +202,7 @@ const TagsPageContent = view(() => {
             {filteredTags.map((tag) => (
               <div
                 key={tag.name}
-                className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg"
+                className="flex items-center gap-3 p-3 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg"
               >
                 {editingTag === tag.name ? (
                   <>
@@ -221,7 +212,7 @@ const TagsPageContent = view(() => {
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={handleKeyPress}
                       autoFocus
-                      className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="flex-1 px-2 py-1 bg-gray-100 dark:bg-dark-700 border border-gray-300 dark:border-dark-600 rounded text-gray-900 dark:text-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <button
                       onClick={handleSaveRename}
@@ -239,7 +230,7 @@ const TagsPageContent = view(() => {
                 ) : (
                   <>
                     <Tag className="w-4 h-4 text-gray-400" />
-                    <span className="flex-1 text-gray-900 dark:text-white font-medium">
+                    <span className="flex-1 text-gray-900 dark:text-gray-50 font-medium">
                       {tag.name}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -247,14 +238,14 @@ const TagsPageContent = view(() => {
                     </span>
                     <button
                       onClick={() => handleStartRename(tag)}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-dark-700"
                       title="Rename"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleStartMerge(tag)}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-dark-700"
                       title="Merge into another tag"
                     >
                       <Merge className="w-4 h-4" />
@@ -262,7 +253,7 @@ const TagsPageContent = view(() => {
                     <button
                       onClick={() => handleDelete(tag)}
                       disabled={tag.count > 0}
-                      className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                      className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-dark-700 ${
                         tag.count > 0
                           ? 'text-gray-300 cursor-not-allowed'
                           : 'text-gray-400 hover:text-red-600 dark:hover:text-red-400'
@@ -282,8 +273,8 @@ const TagsPageContent = view(() => {
       {/* Merge Dialog */}
       {isMergeDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">
               Merge Tag
             </h2>
             <div className="space-y-4">
@@ -295,7 +286,7 @@ const TagsPageContent = view(() => {
                   type="text"
                   value={mergeSource}
                   disabled
-                  className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-500 dark:text-gray-400"
+                  className="w-full px-3 py-2 bg-gray-100 dark:bg-dark-700 border border-gray-300 dark:border-dark-600 rounded text-gray-500 dark:text-gray-400"
                 />
               </div>
               <div>
@@ -307,7 +298,7 @@ const TagsPageContent = view(() => {
                   value={mergeTarget}
                   onChange={(e) => setMergeTarget(e.target.value)}
                   placeholder="Enter target tag name"
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 rounded text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -317,7 +308,7 @@ const TagsPageContent = view(() => {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setIsMergeDialogOpen(false)}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg"
               >
                 Cancel
               </button>

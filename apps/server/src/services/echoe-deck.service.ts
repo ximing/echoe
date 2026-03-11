@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, like, sql } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
@@ -321,12 +321,25 @@ export class EchoeDeckService {
    */
   async getDeckAndSubdeckIds(id: number): Promise<number[]> {
     const db = getDatabase();
+
+    const deck = await db
+      .select({ name: echoeDecks.name })
+      .from(echoeDecks)
+      .where(eq(echoeDecks.id, id))
+      .limit(1);
+
+    if (deck.length === 0) {
+      return [];
+    }
+
     const result: number[] = [id];
+    const subDecks = await db
+      .select({ id: echoeDecks.id })
+      .from(echoeDecks)
+      .where(like(echoeDecks.name, `${deck[0].name}::%`));
 
-    const subDecks = await db.select().from(echoeDecks).where(sql`${echoeDecks.name} LIKE ${`${id}::%`}%`);
-
-    for (const deck of subDecks) {
-      result.push(Number(deck.id));
+    for (const subDeck of subDecks) {
+      result.push(Number(subDeck.id));
     }
 
     return result;

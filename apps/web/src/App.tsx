@@ -6,7 +6,6 @@ import StudyPage from './pages/cards/study';
 import CardEditorPage from './pages/cards/card-editor';
 import CardBrowserPage from './pages/cards/browser';
 import StatsPage from './pages/cards/stats';
-import CardsSettingsPage from './pages/cards/settings';
 import NoteTypesPage from './pages/cards/notetypes';
 import TagsPage from './pages/cards/tags';
 import MediaPage from './pages/cards/media';
@@ -18,6 +17,11 @@ import { AccountSettings } from './pages/settings/components/account-settings';
 import { ModelSettings } from './pages/settings/components/model-settings';
 import { ThemeSettings } from './pages/settings/components/theme-settings';
 import { About } from './pages/settings/components/about';
+import { LearningSettings } from './pages/settings/components/learning-settings';
+import { DisplaySettings } from './pages/settings/components/display-settings';
+import { AudioSettings } from './pages/settings/components/audio-settings';
+import { DataSettings } from './pages/settings/components/data-settings';
+import { PresetSettings } from './pages/settings/components/preset-settings';
 import NotFoundPage from './pages/not-found';
 import { ProtectedRoute } from './components/protected-route';
 import { Layout } from './components/layout';
@@ -186,16 +190,6 @@ function App() {
           }
         />
         <Route
-          path="/cards/settings"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <CardsSettingsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/settings"
           element={
             <ProtectedRoute>
@@ -211,13 +205,13 @@ function App() {
           <Route path="theme" element={<ThemeSettings />} />
           <Route path="about" element={<About />} />
           {/* Card Management - rendered in Settings right panel */}
-          <Route path="notetypes" element={<NoteTypesPage />} />
-          <Route path="tags" element={<TagsPage />} />
-          <Route path="media" element={<MediaPage />} />
           <Route path="import" element={<CsvImportPage />} />
           <Route path="duplicates" element={<DuplicatesPage />} />
-          <Route path="statistics" element={<StatsPage />} />
-          <Route path="cards-settings" element={<CardsSettingsPage />} />
+          <Route path="learning" element={<LearningSettings />} />
+          <Route path="display" element={<DisplaySettings />} />
+          <Route path="audio" element={<AudioSettings />} />
+          <Route path="data" element={<DataSettings />} />
+          <Route path="presets" element={<PresetSettings />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

@@ -279,15 +279,15 @@ const CardBrowserPageContent = view(() => {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-semibold text-gray-900">Card Browser</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Card Browser</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/cards/cards/new')}
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+              className="px-3 py-1.5 bg-primary-600 dark:bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
             >
               Add Cards
             </button>
@@ -307,7 +307,7 @@ const CardBrowserPageContent = view(() => {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-4 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-9 pr-4 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
 
@@ -318,7 +318,7 @@ const CardBrowserPageContent = view(() => {
               setDeckFilter(e.target.value ? Number(e.target.value) : undefined);
               setPage(1);
             }}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All Decks</option>
             {decks.map((deck) => (
@@ -336,7 +336,7 @@ const CardBrowserPageContent = view(() => {
                 setSortField(e.target.value as SortField);
                 setPage(1);
               }}
-              className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-2 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -346,7 +346,7 @@ const CardBrowserPageContent = view(() => {
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-100"
+              className="p-1.5 border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-dark-700"
               title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
             >
               {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -365,8 +365,8 @@ const CardBrowserPageContent = view(() => {
               }}
               className={`px-3 py-1 text-xs rounded-full transition-colors ${
                 statusFilter === chip.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-primary-600 dark:bg-primary-500 text-white'
+                  : 'bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-600'
               }`}
             >
               {chip.label}
@@ -377,35 +377,35 @@ const CardBrowserPageContent = view(() => {
 
       {/* Bulk action bar */}
       {selectedCards.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-between">
-          <span className="text-sm text-blue-800">
+        <div className="bg-primary-50 dark:bg-primary-900/20 border-b border-primary-200 dark:border-primary-800 px-4 py-2 flex items-center justify-between">
+          <span className="text-sm text-primary-800 dark:text-primary-300">
             {selectedCards.size} card{selectedCards.size > 1 ? 's' : ''} selected
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleBulkSuspend}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-dark-600"
             >
               <Pause className="w-3 h-3" />
               Suspend
             </button>
             <button
               onClick={handleBulkUnsuspend}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-dark-600"
             >
               <Play className="w-3 h-3" />
               Unsuspend
             </button>
             <button
               onClick={handleBulkForget}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-dark-600"
             >
               <RotateCcw className="w-3 h-3" />
               Forget
             </button>
             <button
               onClick={handleBulkDelete}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 border border-red-300 text-red-700 rounded hover:bg-red-100"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 rounded hover:bg-red-100 dark:hover:bg-red-900/30"
             >
               <Trash2 className="w-3 h-3" />
               Delete
@@ -417,14 +417,14 @@ const CardBrowserPageContent = view(() => {
       {/* Card list */}
       <div className="flex-1 overflow-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr className="text-left text-xs text-gray-500 uppercase">
+          <thead className="bg-gray-50 dark:bg-dark-800 sticky top-0">
+            <tr className="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
               <th className="px-4 py-2 w-8">
                 <input
                   type="checkbox"
                   checked={selectedCards.size === cards.length && cards.length > 0}
                   onChange={toggleSelectAll}
-                  className="rounded border-gray-300"
+                  className="rounded border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700"
                 />
               </th>
               <th className="px-4 py-2">Front</th>
@@ -435,16 +435,16 @@ const CardBrowserPageContent = view(() => {
               <th className="px-4 py-2">Ease</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : cards.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   No cards found
                 </td>
               </tr>
@@ -454,9 +454,9 @@ const CardBrowserPageContent = view(() => {
                 return (
                   <tr
                     key={card.id}
-                    className={`hover:bg-gray-50 cursor-pointer ${
-                      selectedCards.has(card.id) ? 'bg-blue-50' : ''
-                    } ${selectedCard?.card.id === card.id ? 'bg-blue-100' : ''}`}
+                    className={`hover:bg-gray-50 dark:hover:bg-dark-800 cursor-pointer ${
+                      selectedCards.has(card.id) ? 'bg-primary-50 dark:bg-primary-900/20' : ''
+                    } ${selectedCard?.card.id === card.id ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
                     onClick={() => {
                       setSelectedCard({
                         card,
@@ -471,16 +471,16 @@ const CardBrowserPageContent = view(() => {
                         type="checkbox"
                         checked={selectedCards.has(card.id)}
                         onChange={() => toggleSelectCard(card.id)}
-                        className="rounded border-gray-300"
+                        className="rounded border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700"
                       />
                     </td>
                     <td className="px-4 py-2 max-w-xs">
-                      <div className="truncate" title={card.front}>
+                      <div className="truncate text-gray-900 dark:text-white" title={card.front}>
                         {card.front || '(empty)'}
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-sm">{card.deckName}</td>
-                    <td className="px-4 py-2 text-sm">{formatDueDate(card)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{card.deckName}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{formatDueDate(card)}</td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1 flex-wrap">
                         <span
@@ -495,8 +495,8 @@ const CardBrowserPageContent = view(() => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-sm">{card.ivl > 0 ? `${card.ivl}d` : '-'}</td>
-                    <td className="px-4 py-2 text-sm">{(card.factor / 1000).toFixed(1)}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{card.ivl > 0 ? `${card.ivl}d` : '-'}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{(card.factor / 1000).toFixed(1)}</td>
                   </tr>
                 );
               })
@@ -506,25 +506,25 @@ const CardBrowserPageContent = view(() => {
       </div>
 
       {/* Pagination */}
-      <div className="bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-between">
-        <span className="text-sm text-gray-600">
+      <div className="bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700 px-4 py-2 flex items-center justify-between">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
           Showing {cards.length} of {total} cards
         </span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page === 1}
-            className="px-2 py-1 text-sm border border-gray-300 rounded disabled:opacity-50"
+            className="px-2 py-1 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
           >
             Previous
           </button>
-          <span className="text-sm">
+          <span className="text-sm text-gray-600 dark:text-gray-400">
             Page {page} of {totalPages || 1}
           </span>
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page >= totalPages}
-            className="px-2 py-1 text-sm border border-gray-300 rounded disabled:opacity-50"
+            className="px-2 py-1 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
           >
             Next
           </button>
@@ -533,12 +533,12 @@ const CardBrowserPageContent = view(() => {
 
       {/* Detail Panel */}
       {showDetailPanel && selectedCard && (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-lg flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h2 className="font-semibold">Card Details</h2>
+        <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-dark-800 shadow-lg flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-dark-700">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Card Details</h2>
             <button
               onClick={() => setShowDetailPanel(false)}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-dark-700 rounded text-gray-600 dark:text-gray-300"
             >
               <X className="w-5 h-5" />
             </button>
@@ -547,46 +547,46 @@ const CardBrowserPageContent = view(() => {
           <div className="flex-1 overflow-auto p-4 space-y-4">
             {/* Card info */}
             <div>
-              <h3 className="text-xs uppercase text-gray-500 font-medium mb-2">Info</h3>
+              <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Info</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Card ID:</span>
-                  <span>{selectedCard.card.id}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Card ID:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Note ID:</span>
-                  <span>{selectedCard.card.nid}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Note ID:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.nid}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Deck:</span>
-                  <span>{selectedCard.card.deckName}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Deck:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.deckName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Type:</span>
-                  <span>{selectedCard.card.notetypeName}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Type:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.notetypeName}</span>
                 </div>
               </div>
             </div>
 
             {/* Scheduling */}
             <div>
-              <h3 className="text-xs uppercase text-gray-500 font-medium mb-2">Scheduling</h3>
+              <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Scheduling</h3>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Interval:</span>
-                  <span>{selectedCard.card.ivl}d</span>
+                  <span className="text-gray-600 dark:text-gray-400">Interval:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.ivl}d</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Ease:</span>
-                  <span>{(selectedCard.card.factor / 1000).toFixed(1)}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Ease:</span>
+                  <span className="text-gray-900 dark:text-white">{(selectedCard.card.factor / 1000).toFixed(1)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Reviews:</span>
-                  <span>{selectedCard.card.reps}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Reviews:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.reps}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Lapses:</span>
-                  <span>{selectedCard.card.lapses}</span>
+                  <span className="text-gray-600 dark:text-gray-400">Lapses:</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.lapses}</span>
                 </div>
               </div>
             </div>
@@ -594,12 +594,12 @@ const CardBrowserPageContent = view(() => {
             {/* Tags */}
             {selectedCard.card.tags.length > 0 && (
               <div>
-                <h3 className="text-xs uppercase text-gray-500 font-medium mb-2">Tags</h3>
+                <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Tags</h3>
                 <div className="flex flex-wrap gap-1">
                   {selectedCard.card.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 text-xs bg-gray-100 rounded-full"
+                      className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-full"
                     >
                       {tag}
                     </span>
@@ -610,8 +610,8 @@ const CardBrowserPageContent = view(() => {
 
             {/* Front field preview */}
             <div>
-              <h3 className="text-xs uppercase text-gray-500 font-medium mb-2">Front</h3>
-              <div className="p-2 bg-gray-50 rounded text-sm">
+              <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Front</h3>
+              <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
                 {selectedCard.card.fields['Front'] || '(empty)'}
               </div>
             </div>
@@ -619,8 +619,8 @@ const CardBrowserPageContent = view(() => {
             {/* Back field preview */}
             {selectedCard.card.fields['Back'] && (
               <div>
-                <h3 className="text-xs uppercase text-gray-500 font-medium mb-2">Back</h3>
-                <div className="p-2 bg-gray-50 rounded text-sm">
+                <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Back</h3>
+                <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
                   {selectedCard.card.fields['Back']}
                 </div>
               </div>
@@ -628,17 +628,17 @@ const CardBrowserPageContent = view(() => {
           </div>
 
           {/* Actions */}
-          <div className="border-t p-4 space-y-2">
+          <div className="border-t border-gray-200 dark:border-dark-700 p-4 space-y-2">
             <button
               onClick={() => navigate(`/cards/cards/${selectedCard.card.nid}/edit`)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600"
             >
               <Edit className="w-4 h-4" />
               Edit Note
             </button>
             <button
               onClick={() => navigate(`/cards/study?deckId=${selectedCard.card.did}`)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-dark-600"
             >
               <Play className="w-4 h-4" />
               Study This Deck
