@@ -97,3 +97,16 @@
   - To reconstruct `fields` map: `split('\x1f')` and zip with notetype field names array
   - If notetype is not found in the map (e.g., missing or parse error), use empty `notetypeFields = []` — normalizer handles gracefully
 ---
+
+## 2026-03-12 - US-010
+- What was implemented: Verified CSV import pipeline already satisfies all acceptance criteria via the `noteService.createNote()` path
+  - `EchoeCsvImportService.execute()` calls `this.noteService.createNote({ notetypeId, deckId, fields, tags })` for each row
+  - `EchoeNoteService.createNote()` fetches notetype field definitions and calls `normalizeNoteFields()` internally
+  - `fieldsJson` (and `flds`, `sfld`, `csum`) are all set from the normalizer output during note creation
+  - No manual flds concatenation or csum calculation existed in the CSV service
+- Files changed: `tasks/prd.json` (marked US-010 passes: true)
+- **Learnings for future iterations:**
+  - CSV import delegates to `noteService.createNote()` which already uses the normalizer — no direct normalizer call needed in the CSV service
+  - The CSV service is clean: it builds `fields: Record<string, string>` from column mapping and passes it to `createNote`
+  - All acceptance criteria for US-010 were already satisfied by the US-007 refactor of `createNote`
+---
