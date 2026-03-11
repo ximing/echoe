@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
+import { EchoeDeckService } from '../services/echoe-deck.service';
 import { Sun, Moon, LogOut, Settings, Zap, Layers, Search } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
@@ -15,7 +16,9 @@ interface LayoutProps {
 export const Layout = view(({ children }: LayoutProps) => {
   const authService = useService(AuthService);
   const themeService = useService(ThemeService);
+  const deckService = useService(EchoeDeckService);
   const navigate = useNavigate();
+  const dueCount = deckService.getTotalDue();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -89,18 +92,25 @@ export const Layout = view(({ children }: LayoutProps) => {
         {/* Navigation Section */}
         <nav className="flex flex-col items-center gap-2 flex-shrink-0">
           {/* Study/Review Navigation */}
-          <button
-            onClick={() => navigate('/cards/study')}
-            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
-              isStudyPage
-                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
-            }`}
-            title="学习"
-            aria-label="学习"
-          >
-            <Zap className="w-6 h-6" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => navigate('/cards/study')}
+              className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+                isStudyPage
+                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+              }`}
+              title="学习"
+              aria-label="学习"
+            >
+              <Zap className="w-6 h-6" />
+            </button>
+            {dueCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-xs font-semibold rounded-full">
+                {dueCount > 99 ? '99+' : dueCount}
+              </span>
+            )}
+          </div>
 
           {/* My Decks Navigation */}
           <button
