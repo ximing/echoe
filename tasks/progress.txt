@@ -82,3 +82,18 @@
   - normalizeNoteFields is a pure function (no DB access, no side effects) - easy to test and reuse
   - All 56 tests pass (4 test suites) after adding 12 new tests for this module
 ---
+
+## 2026-03-12 - US-009
+- What was implemented: Modified `apps/server/src/services/echoe-import.service.ts` to use `normalizeNoteFields` in the .apkg import pipeline
+  - Added `buildNotetypeFieldsMap()` helper: reads `notetypes` table from source SQLite DB, parses JSON field definitions, returns `Map<mid, string[]>` of field names
+  - In `importNotes()`: for each note row, splits `flds` by `\x1f`, zips with notetype field names, calls `normalizeNoteFields({ notetypeFields, fields })`
+  - Both insert (new notes) and update (existing notes by GUID) now write `fieldsJson` and `fldNames` from the normalizer output
+  - `flds`, `sfld`, `csum` are also sourced from normalizer (consistent with creation/update paths)
+- Files changed:
+  - `apps/server/src/services/echoe-import.service.ts` (modified)
+- **Learnings for future iterations:**
+  - Anki's `notetypes.flds` is a JSON array of field definition objects: `[{ name: string, ord: number, ... }]`
+  - .apkg import notes have `flds` as `\x1f`-separated values in the same order as notetype field definitions
+  - To reconstruct `fields` map: `split('\x1f')` and zip with notetype field names array
+  - If notetype is not found in the map (e.g., missing or parse error), use empty `notetypeFields = []` — normalizer handles gracefully
+---
