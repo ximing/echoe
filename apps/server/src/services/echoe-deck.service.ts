@@ -581,8 +581,11 @@ export class EchoeDeckService {
           ? await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.id, noteData.mid)).limit(1)
           : [];
 
-        // Parse fields
-        const fields = noteData?.flds ? JSON.parse(noteData.flds as string) : {};
+        // Parse fields from fieldsJson (primary source)
+        const fields: Record<string, string> =
+          noteData?.fieldsJson && typeof noteData.fieldsJson === 'object' && Object.keys(noteData.fieldsJson).length > 0
+            ? (noteData.fieldsJson as Record<string, string>)
+            : {};
         const front = fields['Front'] || fields['front'] || Object.values(fields)[0] || '';
 
         return {

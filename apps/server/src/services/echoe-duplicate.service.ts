@@ -15,6 +15,7 @@ interface NoteRecord {
   csum: number;
   flags: number;
   data: string;
+  fieldsJson?: Record<string, string> | null;
 }
 
 @Service()
@@ -60,21 +61,23 @@ export class EchoeDuplicateService {
   }
 
   /**
-   * Extract field value from note's flds string by field index
+   * Extract field value from note's fieldsJson by field name or index
    */
-  private getFieldValue(flds: string, fieldIndex: number): string {
-    const fields = flds.split('\t');
-    return fields[fieldIndex] || '';
+  private getFieldValue(note: NoteRecord, fieldName: string): string {
+    if (note.fieldsJson && typeof note.fieldsJson === 'object') {
+      return note.fieldsJson[fieldName] || '';
+    }
+    return '';
   }
 
   /**
    * Find exact duplicate notes (case-insensitive match)
    */
-  findExactDuplicates(notes: NoteRecord[], fieldIndex: number): DuplicateGroupDto[] {
+  findExactDuplicates(notes: NoteRecord[], fieldName: string): DuplicateGroupDto[] {
     const groups: Map<string, NoteRecord[]> = new Map();
 
     for (const note of notes) {
-      const fieldValue = this.getFieldValue(note.flds, fieldIndex).toLowerCase();
+      const fieldValue = this.getFieldValue(note, fieldName).toLowerCase();
       if (!fieldValue) continue;
 
       const existing = groups.get(fieldValue) || [];
@@ -100,11 +103,11 @@ export class EchoeDuplicateService {
    */
   findSimilarDuplicates(
     notes: NoteRecord[],
-    fieldIndex: number,
+    fieldName: string,
     threshold: number
   ): DuplicateGroupDto[] {
     if (threshold >= 1.0) {
-      return this.findExactDuplicates(notes, fieldIndex);
+      return this.findExactDuplicates(notes, fieldName);
     }
 
     const processed = new Set<number>();
@@ -113,7 +116,7 @@ export class EchoeDuplicateService {
     for (let i = 0; i < notes.length; i++) {
       if (processed.has(notes[i].id)) continue;
 
-      const currentValue = this.getFieldValue(notes[i].flds, fieldIndex);
+      const currentValue = this.getFieldValue(notes[i], fieldName);
       if (!currentValue) continue;
 
       const group: NoteRecord[] = [notes[i]];
@@ -122,7 +125,7 @@ export class EchoeDuplicateService {
       for (let j = i + 1; j < notes.length; j++) {
         if (processed.has(notes[j].id)) continue;
 
-        const compareValue = this.getFieldValue(notes[j].flds, fieldIndex);
+        const compareValue = this.getFieldValue(notes[j], fieldName);
         if (!compareValue) continue;
 
         const similarity = this.levenshteinSimilarity(currentValue, compareValue);
@@ -173,18 +176,18 @@ export class EchoeDuplicateService {
 
     const notetype = notetypes[0];
     const fields = JSON.parse(notetype.flds as string) as Array<{ name: string }>;
-    const fieldIndex = fields.findIndex((f) => f.name === fieldName);
+    const fieldExists = fields.some((f) => f.name === fieldName);
 
-    if (fieldIndex === -1) {
+    if (!fieldExists) {
       logger.warn(`Field ${fieldName} not found in notetype ${notetypeId}`);
       return [];
     }
 
-    // Find duplicates based on threshold
+    // Find duplicates based on threshold using fieldsJson
     if (threshold >= 1.0) {
-      return this.findExactDuplicates(notes, fieldIndex);
+      return this.findExactDuplicates(notes, fieldName);
     } else {
-      return this.findSimilarDuplicates(notes, fieldIndex, threshold);
+      return this.findSimilarDuplicates(notes, fieldName, threshold);
     }
   }
 
@@ -238,16 +241,18 @@ export class EchoeDuplicateService {
    * Map note record to DTO
    */
   private mapNoteToDto(note: NoteRecord): EchoeNoteDto {
+    const fields: Record<string, string> =
+      note.fieldsJson && typeof note.fieldsJson === 'object' && Object.keys(note.fieldsJson).length > 0
+        ? note.fieldsJson
+        : {};
+
     return {
       id: Number(note.id),
       guid: note.guid,
       mid: Number(note.mid),
       mod: note.mod,
       tags: note.tags ? JSON.parse(note.tags) : [],
-      fields: note.flds.split('\t').reduce((acc, val, idx) => {
-        acc[`field_${idx}`] = val;
-        return acc;
-      }, {} as Record<string, string>),
+      fields,
       sfld: note.sfld,
       csum: Number(note.csum),
       flags: note.flags,

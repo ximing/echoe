@@ -110,3 +110,23 @@
   - The CSV service is clean: it builds `fields: Record<string, string>` from column mapping and passes it to `createNote`
   - All acceptance criteria for US-010 were already satisfied by the US-007 refactor of `createNote`
 ---
+
+## 2026-03-12 - US-011
+- What was implemented: Converged all read paths to use `fieldsJson` as primary source for the `fields` DTO field
+  - `echoe-note.service.ts`: `mapNoteToDto` now reads directly from `note.fieldsJson`; `parseNoteFields` updated to accept `fieldsJson` + `sfld`; `getCards` uses `fieldsJson` for `front` and `fields`
+  - `echoe-study.service.ts`: `getQueue` now builds `fieldMap` directly from `note.fieldsJson` (no more `parseFieldValues`); `parseNoteFields` updated to use `fieldsJson`; removed `parseFieldValues` method entirely
+  - `echoe-duplicate.service.ts`: `NoteRecord` interface now includes `fieldsJson`; `getFieldValue` now takes `note` + `fieldName` (not `flds` + `fieldIndex`); `findExactDuplicates`/`findSimilarDuplicates` take `fieldName` string; `mapNoteToDto` uses `fieldsJson`; `findDuplicates` passes `fieldName` directly
+  - `echoe-deck.service.ts`: sample card fields now read from `note.fieldsJson` instead of `JSON.parse(note.flds)`
+  - Updated test: `anki-duplicate.service.test.ts` updated to use `fieldName` strings and `fieldsJson` in test fixtures
+- Files changed:
+  - `apps/server/src/services/echoe-note.service.ts`
+  - `apps/server/src/services/echoe-study.service.ts`
+  - `apps/server/src/services/echoe-duplicate.service.ts`
+  - `apps/server/src/services/echoe-deck.service.ts`
+  - `apps/server/src/__tests__/anki-duplicate.service.test.ts`
+- **Learnings for future iterations:**
+  - `fieldsJson` is the Drizzle field name for the `fields_json` MySQL column — always use `note.fieldsJson` in service code
+  - `parseFieldValues` (flds.split pattern) is now fully removed from read paths — only the import service still reads raw `flds` to reconstruct `fieldsJson` during import
+  - The duplicate service now uses field names (strings) instead of field indices for deduplication — more robust and aligned with `fieldsJson`
+  - All 56 tests pass after the refactor
+---

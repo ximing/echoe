@@ -494,17 +494,13 @@ export class EchoeNoteService {
       const deck = row.echoeDecks;
       const notetype = row.echoeNotetypes;
 
-      // Get front field (first field from delimiter-separated fields)
+      // Get front field from fieldsJson (primary source)
+      const noteFields = note ? this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld) : {};
       let front = '';
-      if (note?.flds) {
-        const fieldValues = (note.flds || '').split('\x1f');
-        if (fieldValues.length > 0) {
-          // Get the first field's value and strip HTML
-          front = (fieldValues[0] || '').replace(/<[^>]*>/g, '').trim();
-          if (front.length > 100) {
-            front = front.substring(0, 100) + '...';
-          }
-        }
+      const firstFieldValue = Object.values(noteFields)[0] || '';
+      front = firstFieldValue.replace(/<[^>]*>/g, '').trim();
+      if (front.length > 100) {
+        front = front.substring(0, 100) + '...';
       }
 
       return {
@@ -521,7 +517,7 @@ export class EchoeNoteService {
         reps: card.reps,
         lapses: card.lapses,
         front,
-        fields: note ? this.parseNoteFields(note.flds, note.fldNames, note.sfld) : {},
+        fields: noteFields,
         tags: note ? this.parseNoteTags(note.tags) : [],
         mid: Number(note?.mid || 0),
         notetypeName: notetype?.name || 'Unknown',
@@ -535,23 +531,13 @@ export class EchoeNoteService {
   }
 
   /**
-   * Parse note fields from delimiter-separated string
+   * Parse note fields, preferring fieldsJson as primary source
    */
-  private parseNoteFields(flds: string | null, fldNamesJson: string[] | string | null, sfld: string | null): Record<string, string> {
-    if (!flds) {
-      return {};
+  private parseNoteFields(fieldsJson: Record<string, string> | null | undefined, sfld: string | null): Record<string, string> {
+    if (fieldsJson && typeof fieldsJson === 'object' && Object.keys(fieldsJson).length > 0) {
+      return fieldsJson;
     }
-    try {
-      const fieldValues = flds.split('\x1f');
-      const fieldNames = Array.isArray(fldNamesJson) ? fldNamesJson : this.safeJsonParse<string[]>(fldNamesJson, []);
-      const result: Record<string, string> = {};
-      for (let i = 0; i < fieldNames.length; i++) {
-        result[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
-      }
-      return result;
-    } catch {
-      return { Front: sfld || '' };
-    }
+    return sfld ? { Front: sfld } : {};
   }
 
   /**
@@ -1172,13 +1158,11 @@ export class EchoeNoteService {
    * Map database note to DTO
    */
   private mapNoteToDto(note: any): EchoeNoteDto {
-    const fields: Record<string, string> = {};
-    const fieldValues = (note.flds || '').split('\x1f');
-    const fieldNames: string[] = Array.isArray(note.fldNames) ? note.fldNames : this.safeJsonParse<string[]>(note.fldNames, []);
-
-    for (let i = 0; i < fieldNames.length; i++) {
-      fields[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
-    }
+    // Prefer fieldsJson (primary structured storage) over legacy flds split
+    const fields: Record<string, string> =
+      note.fieldsJson && typeof note.fieldsJson === 'object' && Object.keys(note.fieldsJson).length > 0
+        ? (note.fieldsJson as Record<string, string>)
+        : {};
 
     return {
       id: Number(note.id),

@@ -89,21 +89,17 @@ export class EchoeStudyService {
 
       if (!noteType) continue;
 
-      // Parse stored field values (handle both \x1f-delimited and JSON formats)
-      const fieldValues = this.parseFieldValues(note.flds, note.fldNames, note.sfld);
       const templates = this.safeJsonParse<any[]>(noteType.tmpls, []);
 
       // Get the template for this card
       const template = templates[card.ord] || templates[0];
       if (!template) continue;
 
-      // Get field names from note type definition
-      const fieldTypeDefs = this.safeJsonParse<any[]>(noteType.flds, []);
-      const fieldMap: Record<string, string> = {};
-      fieldTypeDefs.forEach((f: any, idx: number) => {
-        const name = f?.name || `field_${idx}`;
-        fieldMap[name] = fieldValues[idx] || '';
-      });
+      // Build field map from fieldsJson (primary source)
+      const fieldMap: Record<string, string> =
+        note.fieldsJson && typeof note.fieldsJson === 'object' && Object.keys(note.fieldsJson).length > 0
+          ? (note.fieldsJson as Record<string, string>)
+          : {};
 
       // Determine cloze ordinal - for cloze cards, templateOrd IS the cloze ordinal
       const clozeOrdinal = noteType.type === 1 ? card.ord + 1 : 0;
@@ -232,7 +228,7 @@ export class EchoeStudyService {
             mod: note.mod,
             csum: note.csum,
             tags: this.parseTags(note.tags),
-            fields: this.parseNoteFields(note.flds, note.fldNames, note.sfld),
+            fields: this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
           } : undefined,
         } as any,
         nextDue,
@@ -369,7 +365,7 @@ export class EchoeStudyService {
           mod: fullNote.mod,
           csum: fullNote.csum,
           tags: this.parseTags(fullNote.tags),
-          fields: this.parseNoteFields(fullNote.flds, fullNote.fldNames, fullNote.sfld),
+          fields: this.parseNoteFields(fullNote.fieldsJson as Record<string, string> | null, fullNote.sfld),
         } : undefined,
       } as any,
       nextDue,
@@ -630,50 +626,13 @@ export class EchoeStudyService {
   }
 
   /**
-   * Parse field values from storage
-   * Handles both Anki's \x1f-delimited format and legacy JSON formats
+   * Parse note fields into a record, preferring fieldsJson as primary source
    */
-  private parseFieldValues(flds: string | null, fldNames: string[] | string | null, sfld: string | null): string[] {
-    if (!flds) {
-      return sfld ? [sfld] : [];
+  private parseNoteFields(fieldsJson: Record<string, string> | null | undefined, sfld: string | null): Record<string, string> {
+    if (fieldsJson && typeof fieldsJson === 'object' && Object.keys(fieldsJson).length > 0) {
+      return fieldsJson;
     }
-
-    // Try \x1f-delimited format first (Anki native)
-    if (flds.includes('\x1f')) {
-      return flds.split('\x1f');
-    }
-
-    // Fallback to JSON array
-    try {
-      const parsed = JSON.parse(flds);
-      if (Array.isArray(parsed)) {
-        return parsed.map(v => String(v ?? ''));
-      }
-      // JSON object: convert to array using fldNames
-      if (typeof parsed === 'object' && parsed !== null) {
-        const names = Array.isArray(fldNames) ? fldNames : this.safeJsonParse<string[]>(fldNames, []);
-        return names.map(name => String((parsed as Record<string, unknown>)[name] ?? ''));
-      }
-    } catch {
-      // Not valid JSON
-    }
-
-    // Last resort: return as single field or split by tab
-    return flds.includes('\t') ? flds.split('\t') : [flds];
-  }
-
-  /**
-   * Parse note fields into a record (for note DTO)
-   */
-  private parseNoteFields(flds: string | null, fldNames: string[] | string | null, sfld: string | null): Record<string, string> {
-    const values = this.parseFieldValues(flds, fldNames, sfld);
-    const names = Array.isArray(fldNames) ? fldNames : this.safeJsonParse<string[]>(fldNames, []);
-    const result: Record<string, string> = {};
-    for (let i = 0; i < Math.max(values.length, names.length); i++) {
-      const name = names[i] || `field_${i}`;
-      result[name] = values[i] || '';
-    }
-    return result;
+    return sfld ? { Front: sfld } : {};
   }
 
   /**

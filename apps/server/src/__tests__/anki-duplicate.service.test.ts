@@ -39,14 +39,12 @@ describe('EchoeDuplicateService', () => {
   describe('findExactDuplicates', () => {
     it('should group notes with identical field values', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\tWorld' },
-        { id: 2, sfld: 'Hello', flds: 'Hello\tThere' },
-        { id: 3, sfld: 'Goodbye', flds: 'Goodbye\tWorld' },
+        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, sfld: 'Hello', flds: 'Hello\x1fThere', fieldsJson: { Front: 'Hello', Back: 'There' } },
+        { id: 3, sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
       ];
 
-      // Front field is at index 0, so value is "Hello" for first two
-      const fieldIndex = 0;
-      const result = service.findExactDuplicates(notes as any, fieldIndex);
+      const result = service.findExactDuplicates(notes as any, 'Front');
 
       expect(result.length).toBe(1);
       expect(result[0].notes.length).toBe(2);
@@ -54,21 +52,19 @@ describe('EchoeDuplicateService', () => {
 
     it('should return empty array when no duplicates', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\tWorld' },
-        { id: 2, sfld: 'Goodbye', flds: 'Goodbye\tWorld' },
+        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
       ];
 
-      const fieldIndex = 0;
-      const result = service.findExactDuplicates(notes as any, fieldIndex);
+      const result = service.findExactDuplicates(notes as any, 'Front');
 
       expect(result.length).toBe(0);
     });
 
     it('should handle single note', () => {
-      const notes = [{ id: 1, sfld: 'Hello', flds: 'Hello\tWorld' }];
+      const notes = [{ id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } }];
 
-      const fieldIndex = 0;
-      const result = service.findExactDuplicates(notes as any, fieldIndex);
+      const result = service.findExactDuplicates(notes as any, 'Front');
 
       expect(result.length).toBe(0);
     });
@@ -77,15 +73,14 @@ describe('EchoeDuplicateService', () => {
   describe('findSimilarDuplicates', () => {
     it('should find notes above threshold', () => {
       const notes = [
-        { id: 1, sfld: 'Hello World', flds: 'Hello World\tTest' },
-        { id: 2, sfld: 'Hello World', flds: 'Hello World\tAnother' },
-        { id: 3, sfld: 'Hello Worrld', flds: 'Hello Worrld\tTest' },
-        { id: 4, sfld: 'Goodbye', flds: 'Goodbye\tTest' },
+        { id: 1, sfld: 'Hello World', flds: 'Hello World\x1fTest', fieldsJson: { Front: 'Hello World', Back: 'Test' } },
+        { id: 2, sfld: 'Hello World', flds: 'Hello World\x1fAnother', fieldsJson: { Front: 'Hello World', Back: 'Another' } },
+        { id: 3, sfld: 'Hello Worrld', flds: 'Hello Worrld\x1fTest', fieldsJson: { Front: 'Hello Worrld', Back: 'Test' } },
+        { id: 4, sfld: 'Goodbye', flds: 'Goodbye\x1fTest', fieldsJson: { Front: 'Goodbye', Back: 'Test' } },
       ];
 
-      const fieldIndex = 0;
       const threshold = 0.8;
-      const result = service.findSimilarDuplicates(notes as any, fieldIndex, threshold);
+      const result = service.findSimilarDuplicates(notes as any, 'Front', threshold);
 
       // Notes 1 and 2 are identical (1.0)
       // Notes 1 and 3 are similar (~0.92)
@@ -95,13 +90,12 @@ describe('EchoeDuplicateService', () => {
 
     it('should return empty when threshold is too high', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\tWorld' },
-        { id: 2, sfld: 'Hallo', flds: 'Hallo\tWorld' },
+        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, sfld: 'Hallo', flds: 'Hallo\x1fWorld', fieldsJson: { Front: 'Hallo', Back: 'World' } },
       ];
 
-      const fieldIndex = 0;
       const threshold = 1.0; // Only exact matches
-      const result = service.findSimilarDuplicates(notes as any, fieldIndex, threshold);
+      const result = service.findSimilarDuplicates(notes as any, 'Front', threshold);
 
       expect(result.length).toBe(0);
     });
