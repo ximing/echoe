@@ -4,8 +4,10 @@ import {
   int,
   varchar,
   text,
+  json,
   index,
 } from 'drizzle-orm/mysql-core';
+import type { CanonicalFields } from '../../types/note-fields.js';
 
 /**
  * Notes table - stores flashcard content (notes)
@@ -27,6 +29,7 @@ export const echoeNotes = mysqlTable(
     data: text('data').notNull().$type<string>(), // Extra data field (JSON)
     richTextFields: text('rich_text_fields').$type<string>(), // Rich text JSON for fields (keyed by field name)
     fldNames: text('fld_names').$type<string>(), // JSON array of field names for mapping fields to values
+    fieldsJson: json('fields_json').$type<CanonicalFields>().notNull().default({}), // Primary structured field storage (field name → plain text value)
   },
   (table) => ({
     guidIdx: index('guid_idx').on(table.guid),

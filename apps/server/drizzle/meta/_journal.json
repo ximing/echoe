@@ -15,6 +15,13 @@
       "when": 1773242626830,
       "tag": "0001_clear_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773247997721,
+      "tag": "0002_sleepy_tyrannus",
+      "breakpoints": true
     }
   ]
 }
