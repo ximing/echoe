@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
-import { Sun, Moon, LogOut, Settings, Zap, Layers } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, Zap, Layers, Search } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
 import { isElectron, isMacOS } from '../electron/isElectron';
@@ -21,8 +21,9 @@ export const Layout = view(({ children }: LayoutProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Check active routes
-  const isHomePage = location.pathname === '/home';
-  const isCardsPage = location.pathname.startsWith('/cards');
+  const isStudyPage = location.pathname.startsWith('/cards/study');
+  const isMyDecksPage = location.pathname === '/cards';
+  const isBrowseCardsPage = location.pathname.startsWith('/cards/browser');
   const isSettingsPage = location.pathname.startsWith('/settings');
 
   // Close menu when clicking outside
@@ -47,10 +48,6 @@ export const Layout = view(({ children }: LayoutProps) => {
     setIsMenuOpen(false);
     authService.logout();
     navigate('/auth', { replace: true });
-  };
-
-  const handleMemoClick = () => {
-    navigate(`/home`, { replace: true });
   };
 
   const userName = authService.user?.nickname || authService.user?.email?.split('@')[0] || 'User';
@@ -91,32 +88,46 @@ export const Layout = view(({ children }: LayoutProps) => {
 
         {/* Navigation Section */}
         <nav className="flex flex-col items-center gap-2 flex-shrink-0">
-          {/* Home Navigation */}
+          {/* Study/Review Navigation */}
           <button
-            onClick={handleMemoClick}
+            onClick={() => navigate('/cards/study')}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
-              isHomePage
+              isStudyPage
                 ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
             }`}
-            title="首页"
-            aria-label="首页"
+            title="学习"
+            aria-label="学习"
           >
             <Zap className="w-6 h-6" />
           </button>
 
-          {/* Cards Navigation */}
+          {/* My Decks Navigation */}
           <button
             onClick={() => navigate('/cards')}
             className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
-              isCardsPage
+              isMyDecksPage
                 ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
             }`}
-            title="闪卡"
-            aria-label="闪卡"
+            title="我的卡组"
+            aria-label="我的卡组"
           >
             <Layers className="w-6 h-6" />
+          </button>
+
+          {/* Browse Cards Navigation */}
+          <button
+            onClick={() => navigate('/cards/browser')}
+            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+              isBrowseCardsPage
+                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+            }`}
+            title="浏览卡片"
+            aria-label="浏览卡片"
+          >
+            <Search className="w-6 h-6" />
           </button>
         </nav>
 

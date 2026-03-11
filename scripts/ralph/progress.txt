@@ -345,3 +345,18 @@ Started: 2026年 2月15日 星期日 23时33分46秒 CST
   - The Layout provides a 70px left sidebar that wraps the main content area
   - ProtectedRoute wraps Layout, not the other way around (order: ProtectedRoute > Layout > Page)
 ---
+
+## 2026-03-11 - US-002
+- Added Browse Cards navigation item to sidebar in Layout component
+- Sidebar now contains: Study/Review (Zap), My Decks (Layers), Browse Cards (Search)
+- Updated route detection: isStudyPage, isMyDecksPage, isBrowseCardsPage
+- Removed unused handleMemoClick function (no /home route exists)
+- TypeScript typecheck passes, build passes
+- Files changed:
+  - apps/web/src/components/layout.tsx (modified)
+- **Learnings for future iterations:**
+  - The sidebar navigation uses route-based highlighting with location.pathname.startsWith()
+  - isMyDecksPage specifically checks for exact '/cards' path, not startsWith('/cards')
+  - Browse Cards route is '/cards/browser' which is a separate page from My Decks
+  - No /home route exists in App.tsx - /cards serves as the main entry point
+---
