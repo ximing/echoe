@@ -149,7 +149,7 @@ const StatsPageContent = view(() => {
           <select
             value={selectedDeckId || ''}
             onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All Decks</option>
             {decks.map((deck) => (
@@ -162,7 +162,7 @@ const StatsPageContent = view(() => {
           <select
             value={historyDays}
             onChange={(e) => setHistoryDays(Number(e.target.value))}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value={7}>Last 7 days</option>
             <option value={14}>Last 14 days</option>
@@ -173,7 +173,7 @@ const StatsPageContent = view(() => {
           <select
             value={forecastDays}
             onChange={(e) => setForecastDays(Number(e.target.value))}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value={7}>Next 7 days</option>
             <option value={14}>Next 14 days</option>

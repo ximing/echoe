@@ -210,6 +210,14 @@ function App() {
           <Route path="models" element={<ModelSettings />} />
           <Route path="theme" element={<ThemeSettings />} />
           <Route path="about" element={<About />} />
+          {/* Card Management - rendered in Settings right panel */}
+          <Route path="notetypes" element={<NoteTypesPage />} />
+          <Route path="tags" element={<TagsPage />} />
+          <Route path="media" element={<MediaPage />} />
+          <Route path="import" element={<CsvImportPage />} />
+          <Route path="duplicates" element={<DuplicatesPage />} />
+          <Route path="statistics" element={<StatsPage />} />
+          <Route path="cards-settings" element={<CardsSettingsPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

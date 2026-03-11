@@ -4,7 +4,7 @@ import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { EchoeDeckService } from '../services/echoe-deck.service';
-import { Sun, Moon, LogOut, Settings, Zap, Layers, Search, Plus } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, Zap, Layers, Search, Plus, Tag, Image, BarChart3 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
 import { isElectron, isMacOS } from '../electron/isElectron';
@@ -28,6 +28,9 @@ export const Layout = view(({ children }: LayoutProps) => {
   const isMyDecksPage = location.pathname === '/cards';
   const isBrowseCardsPage = location.pathname.startsWith('/cards/browser');
   const isSettingsPage = location.pathname.startsWith('/settings');
+  const isTagsPage = location.pathname.startsWith('/settings/tags');
+  const isMediaPage = location.pathname.startsWith('/settings/media');
+  const isStatsPage = location.pathname.startsWith('/settings/statistics');
 
   // Check if FAB should be shown (on /cards or /cards/study/* routes)
   const showFab = location.pathname === '/cards' || location.pathname.startsWith('/cards/study');
@@ -141,6 +144,48 @@ export const Layout = view(({ children }: LayoutProps) => {
             aria-label="浏览卡片"
           >
             <Search className="w-6 h-6" />
+          </button>
+
+          {/* Tags Navigation */}
+          <button
+            onClick={() => navigate('/settings/tags')}
+            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+              isTagsPage
+                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+            }`}
+            title="标签"
+            aria-label="标签"
+          >
+            <Tag className="w-6 h-6" />
+          </button>
+
+          {/* Media Navigation */}
+          <button
+            onClick={() => navigate('/settings/media')}
+            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+              isMediaPage
+                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+            }`}
+            title="媒体文件"
+            aria-label="媒体文件"
+          >
+            <Image className="w-6 h-6" />
+          </button>
+
+          {/* Statistics Navigation */}
+          <button
+            onClick={() => navigate('/settings/statistics')}
+            className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+              isStatsPage
+                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
+            }`}
+            title="统计数据"
+            aria-label="统计数据"
+          >
+            <BarChart3 className="w-6 h-6" />
           </button>
         </nav>
 
