@@ -32,3 +32,17 @@
 - The EchoeDeckService provides getTotalDue() method which aggregates due cards from all decks
 - Badge updates reactively because it's computed on each render using the service
 - Red badge with white text follows the standard attention-grabbing pattern
+---
+## 2026-03-11 - US-005
+- Removed header buttons from CardsPage (Browse Cards, Statistics, Note Types, Tags, Media, Settings, Duplicates, Import, Custom Study Deck)
+- Kept deck list and bottom "Start Studying" bar
+- Cleaned up unused imports (BarChart3, Tag, Image, Copy, Search)
+- Functions are now accessible via sidebar or settings
+
+**Files changed:**
+- apps/web/src/pages/cards/index.tsx (removed header button bar, cleaned up imports)
+
+**Learnings for future iterations:**
+- When removing UI elements, always check and clean up unused imports
+- The header buttons that were removed: Browse Cards, Statistics, Note Types, Tags, Media, Settings, Duplicates, Import, Custom Study Deck
+- Functions should be accessible via sidebar navigation or Settings page

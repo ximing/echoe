@@ -14,15 +14,10 @@ import {
   Settings,
   Trash2,
   Layers,
-  Search,
-  BarChart3,
   BookOpen,
   Filter,
   RotateCcw,
   Trash,
-  Tag,
-  Image,
-  Copy,
 } from 'lucide-react';
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
 
@@ -264,88 +259,11 @@ const CardsPageContent = view(() => {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-dark-700">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/cards/browser')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Search className="w-4 h-4" />
-            Browse Cards
-          </button>
-          <button
-            onClick={() => navigate('/cards/stats')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <BarChart3 className="w-4 h-4" />
-            Statistics
-          </button>
-          <button
-            onClick={() => navigate('/cards/notetypes')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Layers className="w-4 h-4" />
-            Note Types
-          </button>
-          <button
-            onClick={() => navigate('/cards/tags')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Tag className="w-4 h-4" />
-            Tags
-          </button>
-          <button
-            onClick={() => navigate('/cards/media')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Image className="w-4 h-4" />
-            Media
-          </button>
-          <button
-            onClick={() => navigate('/cards/settings')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </button>
-          <button
-            onClick={() => navigate('/cards/duplicates')}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Copy className="w-4 h-4" />
-            Duplicates
-          </button>
-          <button
-            onClick={handleImport}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Import
-          </button>
-          <button
-            onClick={() => setIsFilteredDeckOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-          >
-            <Filter className="w-4 h-4" />
-            Custom Study Deck
-          </button>
-          <button
-            onClick={() => {
-              setSelectedDeck(null);
-              setIsCreateDialogOpen(true);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Create Deck
-          </button>
-        </div>
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-700">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
+        </p>
       </div>
 
       {/* Deck List */}
