@@ -1,0 +1,75 @@
+## Codebase Patterns
+- The Layout component wraps all protected routes and provides the sidebar navigation
+- Use location.pathname.startsWith() for route matching in Layout
+- FAB (Floating Action Button) should be fixed positioned in Layout component, not in individual pages
+
+## 2026-03-11 - US-004
+- Implemented FAB (Floating Action Button) component in Layout
+- FAB shows on /cards and /cards/study/* routes
+- Circular shape with primary color background (bg-primary-600), Plus icon, and shadow
+- Positioned fixed bottom-right (bottom-6 right-6)
+- Clicking navigates to /cards/cards/new for creating new cards
+
+**Files changed:**
+- apps/web/src/components/layout.tsx (added Plus icon import, showFab route check, and FAB button)
+
+**Learnings for future iterations:**
+- Use route checking with location.pathname === '/' or startsWith() for conditional UI
+- FAB should be positioned in Layout component to be accessible across all relevant routes
+- Navigate to /cards/cards/new for creating new cards (card editor page)
+---
+## 2026-03-11 - US-003
+- Implemented due count badge in sidebar navigation
+- Badge shows total due cards across all decks (newCount + learnCount + reviewCount)
+- Red badge displays in top-right corner of Study nav item
+- Shows "99+" when count exceeds 99
+- Uses existing EchoeDeckService.getTotalDue() method for reactive updates
+
+**Files changed:**
+- apps/web/src/components/layout.tsx (added EchoeDeckService import, dueCount calculation, and badge rendering)
+
+**Learnings for future iterations:**
+- The EchoeDeckService provides getTotalDue() method which aggregates due cards from all decks
+- Badge updates reactively because it's computed on each render using the service
+- Red badge with white text follows the standard attention-grabbing pattern
+---
+## 2026-03-11 - US-005
+- Removed header buttons from CardsPage (Browse Cards, Statistics, Note Types, Tags, Media, Settings, Duplicates, Import, Custom Study Deck)
+- Kept deck list and bottom "Start Studying" bar
+- Cleaned up unused imports (BarChart3, Tag, Image, Copy, Search)
+- Functions are now accessible via sidebar or settings
+
+**Files changed:**
+- apps/web/src/pages/cards/index.tsx (removed header button bar, cleaned up imports)
+
+**Learnings for future iterations:**
+- When removing UI elements, always check and clean up unused imports
+- The header buttons that were removed: Browse Cards, Statistics, Note Types, Tags, Media, Settings, Duplicates, Import, Custom Study Deck
+- Functions should be accessible via sidebar navigation or Settings page
+---
+## 2026-03-11 - US-006
+- Added Card Management section to Settings menu with links to: Note Types, Tags, Media, Import, Duplicates, Statistics, Card Settings
+- Added new icons (FileText, Tag, Image, Upload, Copy, BarChart3, Settings) from lucide-react
+- Card Management section appears at top of settings menu with a divider separating from general settings
+- Links navigate to existing /cards/* routes (already defined in App.tsx)
+
+**Files changed:**
+- apps/web/src/pages/settings/components/settings-menu.tsx (added Card Management section with 7 menu items)
+
+**Learnings for future iterations:**
+- Use NavLink for proper routing with active state styling
+- All card management pages already exist under /cards/* routes - no need to create new pages
+- Use Array.map() to render menu items for maintainability
+---
+## 2026-03-11 - US-007
+- Verified that Start Studying bar already exists in CardsPage (cards/index.tsx)
+- Bottom bar shows when totalDue > 0 with "Total: X cards due" text
+- Clicking navigates to /cards/study route
+- No code changes needed - acceptance criteria already met
+
+**Files changed:**
+- None (already implemented)
+
+**Learnings for future iterations:**
+- The Start Studying bar is at the bottom of the deck list, conditionally rendered based on totalDue count
+- It uses deckService to get due cards count across all decks

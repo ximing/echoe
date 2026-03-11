@@ -1,0 +1,111 @@
+{
+  "project": "echoe",
+  "branchName": "ralph/echoe-navigation-redesign",
+  "description": "echoe Navigation & Layout Redesign - Refactor to use Layout component, add sidebar navigation, FAB for card creation, and move secondary features to settings",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Wrap routes with Layout component",
+      "description": "As a developer, I need to wrap all internal routes with the Layout component so that the sidebar navigation becomes functional.",
+      "acceptanceCriteria": [
+        "Modify App.tsx to wrap /cards/* and /settings routes with Layout component",
+        "Layout component receives current path for navigation highlighting",
+        "Routes structure: <Route path=\"/cards\" element={<Layout><CardsPage /></Layout>} />",
+        "Remove unused pages that duplicate the Layout-less version",
+        "Typecheck and lint pass",
+        "Verify: visit /cards, /cards/browser, /settings - all should have left sidebar"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add Browse Cards to sidebar navigation",
+      "description": "As a user, I want to access Browse Cards from the sidebar so that I can find it easily.",
+      "acceptanceCriteria": [
+        "Modify Layout component to add Search icon navigation item for Browse Cards",
+        "Sidebar should contain: Study/Review (Zap), My Decks (Layers), Browse Cards (Search)",
+        "Current page navigation item highlighted with background color",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add due count badge to Study navigation",
+      "description": "As a user, I want to see how many cards are due for review so I know my study load.",
+      "acceptanceCriteria": [
+        "Add badge showing due card count next to Study nav item in sidebar",
+        "Badge shows total due across all decks",
+        "Badge color: red background for attention",
+        "Badge updates when navigating to the page",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create Floating Action Button component",
+      "description": "As a user, I want a prominent button to create new cards so I can quickly add content.",
+      "acceptanceCriteria": [
+        "Create FAB component with: circular shape, primary color background, Plus icon, shadow",
+        "Position: fixed bottom-right with appropriate margin",
+        "Only show on /cards and /cards/study/* routes",
+        "Click opens create card dialog (reuse logic from cards/index.tsx)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Remove header buttons from CardsPage",
+      "description": "As a user, I want a cleaner interface without all the buttons piled in the header.",
+      "acceptanceCriteria": [
+        "Remove top header button bar from cards/index.tsx",
+        "Keep deck list and bottom 'Start Studying' bar",
+        "Functions (Browse Cards, Statistics, Note Types, etc.) now accessible via sidebar or settings",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Add Card Management submenu to Settings",
+      "description": "As a user, I want secondary features accessible from Settings so the main navigation stays clean.",
+      "acceptanceCriteria": [
+        "Add 'Card Management' section in Settings page",
+        "Include links: Note Types, Tags, Media, Import, Duplicates, Statistics, Card Settings",
+        "Use existing Settings layout structure",
+        "Keep context menu access from deck list for these features",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Preserve Start Studying bar on CardsPage",
+      "description": "As a user, I want a quick way to start studying from the deck list page.",
+      "acceptanceCriteria": [
+        "Keep bottom bar on /cards showing 'Start Studying' when cards are due",
+        "Bar shows total due count",
+        "Click navigates to /cards/study",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
