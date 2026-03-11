@@ -279,24 +279,41 @@ export class EchoeNoteService {
     const now = Math.floor(Date.now() / 1000);
     const updates: any = { mod: now, usn: 0 };
 
-    if (dto.fields !== undefined) {
-      const flds = Object.values(dto.fields).join('\x1f');
-      updates.flds = flds;
+    if (dto.fields !== undefined || dto.richTextFields !== undefined) {
+      // Fetch notetype to get ordered field names
+      const notetype = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(eq(echoeNotetypes.id, note[0].mid))
+        .limit(1);
 
-      // Update sort field from first field
-      const firstFieldKey = Object.keys(dto.fields)[0];
-      updates.sfld = this.cleanSortField(dto.fields[firstFieldKey] || '');
+      if (notetype.length === 0) {
+        throw new Error(`Note type ${note[0].mid} not found`);
+      }
 
-      // Recalculate checksum
-      updates.csum = this.calculateChecksum(updates.sfld);
+      const notetypeFieldDefs = JSON.parse(notetype[0].flds) as Array<{ name: string; ord?: number }>;
+      const notetypeFields = notetypeFieldDefs.map((f) => f.name);
+
+      // Normalize all field values using the unified normalizer
+      const normalized = normalizeNoteFields({
+        notetypeFields,
+        fields: dto.fields,
+        richTextFields: dto.richTextFields as RichTextFields | undefined,
+      });
+
+      updates.flds = normalized.flds;
+      updates.sfld = normalized.sfld;
+      updates.csum = normalized.csum;
+      updates.fldNames = normalized.fldNames;
+      updates.fieldsJson = normalized.fieldsJson;
+
+      if (dto.richTextFields !== undefined) {
+        updates.richTextFields = dto.richTextFields;
+      }
     }
 
     if (dto.tags !== undefined) {
       updates.tags = JSON.stringify(dto.tags);
-    }
-
-    if (dto.richTextFields !== undefined) {
-      updates.richTextFields = dto.richTextFields;
     }
 
     await db.update(echoeNotes).set(updates).where(eq(echoeNotes.id, id));
@@ -1212,24 +1229,4 @@ export class EchoeNoteService {
     return guid;
   }
 
-  /**
-   * Clean sort field (remove formatting)
-   */
-  private cleanSortField(value: string): string {
-    // Remove HTML tags, trim, and truncate
-    return value.replace(/<[^>]*>/g, '').trim().substring(0, 191);
-  }
-
-  /**
-   * Calculate checksum (simple hash)
-   */
-  private calculateChecksum(value: string): number {
-    let hash = 0;
-    for (let i = 0; i < value.length; i++) {
-      const char = value.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return Math.abs(hash);
-  }
 }
