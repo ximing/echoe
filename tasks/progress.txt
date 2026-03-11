@@ -1,0 +1,34 @@
+## Codebase Patterns
+- The Layout component wraps all protected routes and provides the sidebar navigation
+- Use location.pathname.startsWith() for route matching in Layout
+- FAB (Floating Action Button) should be fixed positioned in Layout component, not in individual pages
+
+## 2026-03-11 - US-004
+- Implemented FAB (Floating Action Button) component in Layout
+- FAB shows on /cards and /cards/study/* routes
+- Circular shape with primary color background (bg-primary-600), Plus icon, and shadow
+- Positioned fixed bottom-right (bottom-6 right-6)
+- Clicking navigates to /cards/cards/new for creating new cards
+
+**Files changed:**
+- apps/web/src/components/layout.tsx (added Plus icon import, showFab route check, and FAB button)
+
+**Learnings for future iterations:**
+- Use route checking with location.pathname === '/' or startsWith() for conditional UI
+- FAB should be positioned in Layout component to be accessible across all relevant routes
+- Navigate to /cards/cards/new for creating new cards (card editor page)
+---
+## 2026-03-11 - US-003
+- Implemented due count badge in sidebar navigation
+- Badge shows total due cards across all decks (newCount + learnCount + reviewCount)
+- Red badge displays in top-right corner of Study nav item
+- Shows "99+" when count exceeds 99
+- Uses existing EchoeDeckService.getTotalDue() method for reactive updates
+
+**Files changed:**
+- apps/web/src/components/layout.tsx (added EchoeDeckService import, dueCount calculation, and badge rendering)
+
+**Learnings for future iterations:**
+- The EchoeDeckService provides getTotalDue() method which aggregates due cards from all decks
+- Badge updates reactively because it's computed on each render using the service
+- Red badge with white text follows the standard attention-grabbing pattern

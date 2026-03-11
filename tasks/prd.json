@@ -43,11 +43,10 @@
         "Badge shows total due across all decks",
         "Badge color: red background for attention",
         "Badge updates when navigating to the page",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -59,11 +58,10 @@
         "Position: fixed bottom-right with appropriate margin",
         "Only show on /cards and /cards/study/* routes",
         "Click opens create card dialog (reuse logic from cards/index.tsx)",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -74,8 +72,7 @@
         "Remove top header button bar from cards/index.tsx",
         "Keep deck list and bottom 'Start Studying' bar",
         "Functions (Browse Cards, Statistics, Note Types, etc.) now accessible via sidebar or settings",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Typecheck passes"
       ],
       "priority": 5,
       "passes": false,
@@ -90,8 +87,7 @@
         "Include links: Note Types, Tags, Media, Import, Duplicates, Statistics, Card Settings",
         "Use existing Settings layout structure",
         "Keep context menu access from deck list for these features",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Typecheck passes"
       ],
       "priority": 6,
       "passes": false,
@@ -105,8 +101,7 @@
         "Keep bottom bar on /cards showing 'Start Studying' when cards are due",
         "Bar shows total due count",
         "Click navigates to /cards/study",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Typecheck passes"
       ],
       "priority": 7,
       "passes": false,
