@@ -8,4 +8,4 @@ echoe is a full-stack AI-powered note-taking and knowledge management system. It
 
 ## 测试环境账号密码
 账号： echoe@test.com
-密码： test123
+密码： aaaaaa
