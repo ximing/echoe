@@ -1,9 +1,9 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { EchoeStudyService } from '../../../services/echoe-study.service';
-import { ToastService } from '../../../services/toast.service';
-import { diffStrings } from '../../../utils/echoe/diff';
+import { EchoeStudyService } from '../../services/echoe-study.service';
+import { ToastService } from '../../services/toast.service';
+import { diffStrings } from '../../utils/echoe/diff';
 import {
   ChevronLeft,
   MoreVertical,

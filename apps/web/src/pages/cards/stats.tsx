@@ -16,8 +16,8 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { EchoeStatsService } from '../../../services/echoe-stats.service';
-import { getDecks } from '../../../api/echoe';
+import { EchoeStatsService } from '../../services/echoe-stats.service';
+import { getDecks } from '../../api/echoe';
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
 import { ArrowLeft, RefreshCw, Calendar, Clock, TrendingUp, Layers } from 'lucide-react';
 

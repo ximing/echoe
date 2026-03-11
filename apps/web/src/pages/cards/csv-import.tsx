@@ -1,10 +1,10 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { ToastService } from '../../../services/toast.service';
-import { EchoeCsvImportService } from '../../../services/echoe-csv-import.service';
-import { EchoeNoteService } from '../../../services/echoe-note.service';
-import { EchoeDeckService } from '../../../services/echoe-deck.service';
+import { ToastService } from '../../services/toast.service';
+import { EchoeCsvImportService } from '../../services/echoe-csv-import.service';
+import { EchoeNoteService } from '../../services/echoe-note.service';
+import { EchoeDeckService } from '../../services/echoe-deck.service';
 import {
   ArrowLeft,
   Upload,

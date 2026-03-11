@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { observer } from '@rabjs/react';
 import { useNavigate } from 'react-router';
-import { echoeSettingsService } from '../../../services/echoe-settings.service';
-import { toast } from '../../../services/toast.service';
+import { echoeSettingsService } from '../../services/echoe-settings.service';
+import { toast } from '../../services/toast.service';
 
 const SettingsPage = observer(() => {
   const navigate = useNavigate();

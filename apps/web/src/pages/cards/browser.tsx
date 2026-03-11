@@ -1,7 +1,7 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ToastService } from '../../../services/toast.service';
+import { ToastService } from '../../services/toast.service';
 import {
   Search,
   ChevronDown,
@@ -14,7 +14,7 @@ import {
   Edit,
 } from 'lucide-react';
 import type { EchoeCardListItemDto, EchoeDeckWithCountsDto } from '@echoe/dto';
-import { getDecks, bulkCardOperation, getCards } from '../../../api/echoe';
+import { getDecks, bulkCardOperation, getCards } from '../../api/echoe';
 
 type FilterStatus = 'all' | 'new' | 'learn' | 'review' | 'suspended' | 'buried' | 'leech';
 type SortField = 'added' | 'due' | 'mod';

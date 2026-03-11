@@ -1,8 +1,8 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ToastService } from '../../../services/toast.service';
-import * as echoeApi from '../../../api/echoe';
+import { ToastService } from '../../services/toast.service';
+import * as echoeApi from '../../api/echoe';
 import type { EchoeNoteTypeDto, FindDuplicatesDto, DuplicateGroupDto } from '@echoe/dto';
 import {
   ArrowLeft,

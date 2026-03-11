@@ -1,10 +1,10 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { EchoeNoteService } from '../../../services/echoe-note.service';
-import { ToastService } from '../../../services/toast.service';
-import * as echoeApi from '../../../api/echoe';
-import { CardRenderer } from '../../../components/echoe/CardRenderer';
+import { EchoeNoteService } from '../../services/echoe-note.service';
+import { ToastService } from '../../services/toast.service';
+import * as echoeApi from '../../api/echoe';
+import { CardRenderer } from '../../components/echoe/CardRenderer';
 import {
   ArrowLeft,
   Plus,

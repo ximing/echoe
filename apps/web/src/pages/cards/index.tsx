@@ -1,9 +1,9 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { EchoeDeckService } from '../../../services/echoe-deck.service';
-import { ToastService } from '../../../services/toast.service';
-import * as echoeApi from '../../../api/echoe';
+import { EchoeDeckService } from '../../services/echoe-deck.service';
+import { ToastService } from '../../services/toast.service';
+import * as echoeApi from '../../api/echoe';
 import {
   Plus,
   Upload,
