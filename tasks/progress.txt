@@ -130,3 +130,17 @@
   - The duplicate service now uses field names (strings) instead of field indices for deduplication — more robust and aligned with `fieldsJson`
   - All 56 tests pass after the refactor
 ---
+
+## 2026-03-12 - US-012
+- What was implemented: Aligned frontend card editor submission contract so `richTextFields` always includes all notetype field keys
+  - Added `EMPTY_PROSEMIRROR_DOC` constant: `{ type: 'doc', content: [{ type: 'paragraph' }] }` — used for fields not yet edited in rich text mode
+  - Added `buildCompleteRichTextFields()` function: iterates all notetype fields, skips source-mode fields (backend uses `fields[name]` for those), assigns `richTextFields[name] ?? EMPTY_PROSEMIRROR_DOC` for all rich-text fields
+  - Modified `handleSave` to call `buildCompleteRichTextFields()` and pass the result as `richTextFields` to both `createNewNote` and `updateExistingNote`
+  - Browser verification confirmed: POST `/api/v1/notes` request body contains `richTextFields` with both `Front` and `Back` keys; response 200 with `fields` containing rendered HTML `<p>Test Front Content</p>` and `<p>Test Back Content</p>`
+- Files changed:
+  - `apps/web/src/pages/cards/card-editor.tsx`
+- **Learnings for future iterations:**
+  - The `buildCompleteRichTextFields()` pattern is the correct way to ensure all field keys are present before submission
+  - Source-mode fields are excluded from `richTextFields` — the backend uses `fields[name]` (plain HTML string) for those
+  - The existing `hasFieldContent` validation still works correctly: it checks `richTextFields[fieldName]` for content, which will be undefined for unedited fields (not the empty doc, since `buildCompleteRichTextFields` is only called in `handleSave`)
+---

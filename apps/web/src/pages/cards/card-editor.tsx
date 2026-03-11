@@ -271,6 +271,25 @@ const [tags, setTags] = useState<string[]>([]);
     handleFieldChange(fieldName, newValue);
   };
 
+  // Empty ProseMirror document used for fields not yet edited in rich text mode
+  const EMPTY_PROSEMIRROR_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
+
+  // Build complete richTextFields ensuring all notetype field keys are present.
+  // Fields in source mode (HTML textarea) are excluded so the backend uses fields[name] instead.
+  // Unedited rich-text fields get an empty ProseMirror doc so the backend can process them uniformly.
+  const buildCompleteRichTextFields = (): Record<string, Record<string, any>> => {
+    if (!selectedNotetype) return richTextFields;
+    const complete: Record<string, Record<string, any>> = {};
+    for (const fld of selectedNotetype.flds) {
+      if (showSourceMode[fld.ord]) {
+        // Field is in source mode — skip; backend will use fields[fld.name] as plain HTML
+        continue;
+      }
+      complete[fld.name] = richTextFields[fld.name] ?? EMPTY_PROSEMIRROR_DOC;
+    }
+    return complete;
+  };
+
   // Handle save
   const handleSave = async () => {
     if (!selectedNotetype || !selectedDeck) {
@@ -287,6 +306,8 @@ const [tags, setTags] = useState<string[]>([]);
       }
     }
 
+    const completeRichTextFields = buildCompleteRichTextFields();
+
     setIsSaving(true);
     try {
       if (parsedNoteId) {
@@ -294,7 +315,7 @@ const [tags, setTags] = useState<string[]>([]);
         const success = await noteService.updateExistingNote(parsedNoteId, {
           fields,
           tags,
-          richTextFields,
+          richTextFields: completeRichTextFields,
         });
         if (success) {
           toastService.success('Note updated');
@@ -309,7 +330,7 @@ const [tags, setTags] = useState<string[]>([]);
           deckId: selectedDeck.id,
           fields,
           tags,
-          richTextFields,
+          richTextFields: completeRichTextFields,
         });
         if (result) {
           toastService.success('Note created');
