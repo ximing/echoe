@@ -7,7 +7,7 @@ import {
   json,
   index,
 } from 'drizzle-orm/mysql-core';
-import type { CanonicalFields } from '../../types/note-fields.js';
+import type { CanonicalFields, RichTextFields } from '../../types/note-fields.js';
 
 /**
  * Notes table - stores flashcard content (notes)
@@ -27,8 +27,8 @@ export const echoeNotes = mysqlTable(
     csum: bigint('csum', { mode: 'number' }).notNull(), // Checksum of sort field (for duplicates)
     flags: int('flags').notNull().default(0), // Flags (1 = marked)
     data: text('data').notNull().$type<string>(), // Extra data field (JSON)
-    richTextFields: text('rich_text_fields').$type<string>(), // Rich text JSON for fields (keyed by field name)
-    fldNames: text('fld_names').$type<string>(), // JSON array of field names for mapping fields to values
+    richTextFields: json('rich_text_fields').$type<RichTextFields>(), // Rich text JSON for fields (keyed by field name → ProseMirror doc)
+    fldNames: json('fld_names').$type<string[]>(), // JSON array of field names for mapping fields to values
     fieldsJson: json('fields_json').$type<CanonicalFields>().notNull().default({}), // Primary structured field storage (field name → plain text value)
   },
   (table) => ({

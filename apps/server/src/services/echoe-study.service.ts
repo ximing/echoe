@@ -633,7 +633,7 @@ export class EchoeStudyService {
    * Parse field values from storage
    * Handles both Anki's \x1f-delimited format and legacy JSON formats
    */
-  private parseFieldValues(flds: string | null, fldNames: string | null, sfld: string | null): string[] {
+  private parseFieldValues(flds: string | null, fldNames: string[] | string | null, sfld: string | null): string[] {
     if (!flds) {
       return sfld ? [sfld] : [];
     }
@@ -651,7 +651,7 @@ export class EchoeStudyService {
       }
       // JSON object: convert to array using fldNames
       if (typeof parsed === 'object' && parsed !== null) {
-        const names = this.safeJsonParse<string[]>(fldNames, []);
+        const names = Array.isArray(fldNames) ? fldNames : this.safeJsonParse<string[]>(fldNames, []);
         return names.map(name => String((parsed as Record<string, unknown>)[name] ?? ''));
       }
     } catch {
@@ -665,9 +665,9 @@ export class EchoeStudyService {
   /**
    * Parse note fields into a record (for note DTO)
    */
-  private parseNoteFields(flds: string | null, fldNames: string | null, sfld: string | null): Record<string, string> {
+  private parseNoteFields(flds: string | null, fldNames: string[] | string | null, sfld: string | null): Record<string, string> {
     const values = this.parseFieldValues(flds, fldNames, sfld);
-    const names = this.safeJsonParse<string[]>(fldNames, []);
+    const names = Array.isArray(fldNames) ? fldNames : this.safeJsonParse<string[]>(fldNames, []);
     const result: Record<string, string> = {};
     for (let i = 0; i < Math.max(values.length, names.length); i++) {
       const name = names[i] || `field_${i}`;

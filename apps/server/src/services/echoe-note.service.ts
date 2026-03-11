@@ -204,8 +204,8 @@ export class EchoeNoteService {
         csum,
         flags: 0,
         data: '{}',
-        richTextFields: dto.richTextFields ? JSON.stringify(dto.richTextFields) : undefined,
-        fldNames: JSON.stringify(Object.keys(dto.fields)),
+        richTextFields: dto.richTextFields ?? undefined,
+        fldNames: Object.keys(dto.fields),
       });
 
       // Create cards for each template
@@ -294,7 +294,7 @@ export class EchoeNoteService {
     }
 
     if (dto.richTextFields !== undefined) {
-      updates.richTextFields = JSON.stringify(dto.richTextFields);
+      updates.richTextFields = dto.richTextFields;
     }
 
     await db.update(echoeNotes).set(updates).where(eq(echoeNotes.id, id));
@@ -518,13 +518,13 @@ export class EchoeNoteService {
   /**
    * Parse note fields from delimiter-separated string
    */
-  private parseNoteFields(flds: string | null, fldNamesJson: string | null, sfld: string | null): Record<string, string> {
+  private parseNoteFields(flds: string | null, fldNamesJson: string[] | string | null, sfld: string | null): Record<string, string> {
     if (!flds) {
       return {};
     }
     try {
       const fieldValues = flds.split('\x1f');
-      const fieldNames = this.safeJsonParse<string[]>(fldNamesJson, []);
+      const fieldNames = Array.isArray(fldNamesJson) ? fldNamesJson : this.safeJsonParse<string[]>(fldNamesJson, []);
       const result: Record<string, string> = {};
       for (let i = 0; i < fieldNames.length; i++) {
         result[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
@@ -1155,7 +1155,7 @@ export class EchoeNoteService {
   private mapNoteToDto(note: any): EchoeNoteDto {
     const fields: Record<string, string> = {};
     const fieldValues = (note.flds || '').split('\x1f');
-    const fieldNames = this.safeJsonParse<string[]>(note.fldNames, []);
+    const fieldNames: string[] = Array.isArray(note.fldNames) ? note.fldNames : this.safeJsonParse<string[]>(note.fldNames, []);
 
     for (let i = 0; i < fieldNames.length; i++) {
       fields[fieldNames[i] || `field_${i}`] = fieldValues[i] || '';
@@ -1172,7 +1172,7 @@ export class EchoeNoteService {
       csum: Number(note.csum),
       flags: note.flags,
       data: note.data,
-      richTextFields: note.richTextFields ? this.safeJsonParse<Record<string, any> | undefined>(note.richTextFields, undefined) : undefined,
+      richTextFields: note.richTextFields ?? undefined,
     };
   }
 
