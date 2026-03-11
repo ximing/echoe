@@ -1,3 +1,48 @@
 ## Note 字段模型重构 Progress
 
+## Codebase Patterns
+- Server types live in `apps/server/src/types/` directory
+- DTO types live in `packages/dto/src/echoe.ts` and exported from `packages/dto/src/index.ts`
+- Drizzle schema files in `apps/server/src/db/schema/` must be exported from `schema/index.ts`
+- Always build (`pnpm build`) before generating migrations - drizzle-kit reads from dist/ folder
+- `getDatabase()` singleton from `connection.ts` is used for all DB access
+- TypeDI `@Service()` decorator on all service classes
+- Note fields stored as `flds` (joined by `\x1f`), `fldNames` (JSON array), `sfld` (sort field), `csum` (checksum)
+- Server lib modules live in `apps/server/src/lib/` directory
+- `@tiptap/core`'s `generateHTML` requires DOM; use `jsdom@20` (CJS-compatible) as polyfill in Node.js. jsdom v28+ uses ESM and is incompatible with the current CommonJS jest config
+- Jest tests use CommonJS transform (ts-jest with `module: 'commonjs'`); ESM node_modules will fail unless `transformIgnorePatterns` is updated
+
+---
+
+## 2026-03-12 - US-001
+- What was implemented: Created `apps/server/src/types/note-fields.ts` with canonical TypeScript types for the note field model refactor
+  - `CanonicalFields`: `Record<string, string>` - primary storage for note fields in `fields_json` column
+  - `ProseMirrorNode` and `ProseMirrorMark`: interfaces mirroring ProseMirror's JSON node structure
+  - `ProseMirrorJsonDoc`: root document type (type: 'doc') with full JSDoc
+  - `RichTextFields`: `Record<string, ProseMirrorJsonDoc>` - frontend-to-backend rich text submission
+  - `NoteCompatibilityProjection`: `{ flds: string; sfld: string; csum: number }` - Anki compatibility
+- Files changed: `apps/server/src/types/note-fields.ts` (new file)
+- **Learnings for future iterations:**
+  - Types placed in `apps/server/src/types/` (server-side only, not shared via dto package) since they are only needed on the server
+  - `ProseMirrorJsonDoc` extends `ProseMirrorNode` with `type: 'doc'` discriminant for type safety
+  - Typecheck passes with `pnpm tsc --noEmit` from `apps/server/`
+---
+
+## 2026-03-12 - US-002
+- What was implemented: Created `apps/server/src/lib/prosemirror-serializer.ts` with server-side ProseMirror JSON → HTML/plaintext serialization
+  - `serializeToHtml(doc: ProseMirrorJsonDoc): string` - converts ProseMirror JSON to HTML using `@tiptap/core`'s `generateHTML`
+  - `serializeToPlainText(doc: ProseMirrorJsonDoc): string` - converts ProseMirror JSON to plain text using `generateText`
+  - Uses `jsdom@20` to polyfill DOM globals required by prosemirror-model's DOMSerializer in Node.js
+  - Supports: paragraph, text, bold, italic, underline, heading, bulletList, orderedList, listItem, codeBlock, blockquote, hardBreak
+- Files changed:
+  - `apps/server/src/lib/prosemirror-serializer.ts` (new file)
+  - `apps/server/src/__tests__/prosemirror-serializer.test.ts` (new file, 11 tests)
+  - `apps/server/package.json` (added @tiptap/* extensions and jsdom@20)
+  - `pnpm-lock.yaml` (updated)
+- **Learnings for future iterations:**
+  - `@tiptap/core`'s `generateHTML` internally calls `document.implementation.createHTMLDocument()` via `prosemirror-model`'s DOMSerializer - it needs a real DOM even in Node.js
+  - Solution: polyfill `globalThis.window`, `document`, `DocumentFragment`, `Element`, `HTMLElement`, `Node` from a jsdom instance at module load time
+  - jsdom@20 is CJS-compatible and works with the current jest CommonJS transform; jsdom@28+ uses ESM and breaks jest
+  - `generateText` from `@tiptap/core` does NOT need a DOM - it works purely in Node.js
+  - All 45 tests pass after this change
 ---
