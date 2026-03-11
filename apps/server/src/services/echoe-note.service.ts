@@ -11,6 +11,8 @@ import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
+import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
+import type { RichTextFields } from '../types/note-fields.js';
 
 import type {
   EchoeNoteDto,
@@ -166,25 +168,24 @@ export class EchoeNoteService {
       throw new Error(`Note type ${dto.notetypeId} not found`);
     }
 
-    // Parse templates
+    // Parse templates and extract ordered field names from notetype definition
     const templates = JSON.parse(notetype[0].tmpls) as Array<{ ord: number; name: string }>;
+    const notetypeFieldDefs = JSON.parse(notetype[0].flds) as Array<{ name: string; ord?: number }>;
+    const notetypeFields = notetypeFieldDefs.map((f) => f.name);
+
+    // Normalize all field values using the unified normalizer
+    const normalized = normalizeNoteFields({
+      notetypeFields,
+      fields: dto.fields,
+      richTextFields: dto.richTextFields as RichTextFields | undefined,
+    });
 
     // Generate GUID (40 char hex string)
     const guid = this.generateGuid();
 
-    // Generate sort field from first field
-    const firstFieldKey = Object.keys(dto.fields)[0];
-    const sfld = this.cleanSortField(dto.fields[firstFieldKey] || '');
-
-    // Calculate checksum
-    const csum = this.calculateChecksum(sfld);
-
     // Build tags JSON
     const tags = dto.tags || [];
     const tagsJson = JSON.stringify(tags);
-
-    // Join fields with \x1f
-    const flds = Object.values(dto.fields).join('\x1f');
 
     const now = Math.floor(Date.now() / 1000);
     const noteId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
@@ -199,13 +200,14 @@ export class EchoeNoteService {
         mod: now,
         usn: 0,
         tags: tagsJson,
-        flds,
-        sfld,
-        csum,
+        flds: normalized.flds,
+        sfld: normalized.sfld,
+        csum: normalized.csum,
         flags: 0,
         data: '{}',
         richTextFields: dto.richTextFields ?? undefined,
-        fldNames: Object.keys(dto.fields),
+        fldNames: normalized.fldNames,
+        fieldsJson: normalized.fieldsJson,
       });
 
       // Create cards for each template
