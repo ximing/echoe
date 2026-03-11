@@ -2,6 +2,25 @@
 Started: 2026年 2月15日 星期日 23时33分46秒 CST
 ---
 
+## 2026-03-12 - US-005
+- Created apps/server/scripts/backfill-fields-json.ts
+- Script reads all echoe_notes, parses flds (\x1f-separated) and fldNames (JSON array from json column)
+- Combines them into Record<string, string> and writes to fields_json
+- Skips notes where fields_json is already non-empty (idempotent)
+- Handles edge cases: null fldNames, string fldNames fallback, no field names but has field values (uses generic field_N keys)
+- Outputs summary: total, succeeded, skipped, failed counts
+- Exits with code 1 if any failures, 0 otherwise
+- All 45 tests pass, typecheck passes
+- Files changed:
+  - apps/server/scripts/backfill-fields-json.ts (new)
+- **Learnings for future iterations:**
+  - Scripts in apps/server/scripts/ use `pnpm tsx scripts/filename.ts` pattern (same as validate-data-integrity.ts)
+  - Drizzle json() columns return parsed objects directly (not strings) — no need to JSON.parse when reading
+  - Still add string fallback in case column returns raw string (defensive coding for backfill scripts)
+  - For backfill scripts, always check if data is already populated before updating (idempotency)
+  - Use `sql\`${table.column} = ${value}\`` for WHERE clause in update when eq() may have type issues
+---
+
 ## 2026-03-08 - SR US-009
 - Added `getDueCardsForAllSREnabledUsers()` to SpacedRepetitionService: queries all SR-enabled users, fetches their due cards (nextReviewAt <= now), groups by userId with srDailyLimit
 - Added `registerSpacedRepetitionPushTask()` to SchedulerService: registers daily 08:00 cron task
@@ -359,4 +378,24 @@ Started: 2026年 2月15日 星期日 23时33分46秒 CST
   - isMyDecksPage specifically checks for exact '/cards' path, not startsWith('/cards')
   - Browse Cards route is '/cards/browser' which is a separate page from My Decks
   - No /home route exists in App.tsx - /cards serves as the main entry point
+---
+
+## 2026-03-12 - US-004
+- Updated echoe-notes.ts schema: changed `richTextFields` from `text().$type<string>()` to `json().$type<RichTextFields>()`, and `fldNames` from `text().$type<string>()` to `json().$type<string[]>()`
+- Generated Drizzle migration 0003_careless_cerise.sql with data conversion UPDATEs (JSON_VALID checks) before ALTER TABLE statements
+- Updated echoe-note.service.ts: removed JSON.stringify/parse calls for richTextFields and fldNames (Drizzle now handles JSON serialization automatically)
+- Updated echoe-study.service.ts: updated parseFieldValues and parseNoteFields to accept `string[] | string | null` for fldNames parameter
+- All 45 tests pass, typecheck passes, migration runs successfully
+- Files changed:
+  - apps/server/src/db/schema/echoe-notes.ts (text → json for richTextFields and fldNames)
+  - apps/server/drizzle/0003_careless_cerise.sql (new migration with data conversion logic)
+  - apps/server/drizzle/meta/_journal.json (updated)
+  - apps/server/drizzle/meta/0003_snapshot.json (new)
+  - apps/server/src/services/echoe-note.service.ts (removed JSON.stringify/parse for json columns)
+  - apps/server/src/services/echoe-study.service.ts (updated fldNames type handling)
+- **Learnings for future iterations:**
+  - When changing a Drizzle column from `text` to `json`, Drizzle auto-handles JSON serialization/deserialization — remove all manual JSON.stringify/parse for those fields in service layer
+  - The generated migration only has ALTER TABLE; manually prepend UPDATE statements with JSON_VALID() checks for data conversion before the ALTER
+  - Drizzle migrator is inherently idempotent via __drizzle_migrations table — each migration runs exactly once
+  - After changing column type, update all method signatures that pass the column value to accept the new type (e.g., `string[] | string | null` for backward compat during transition)
 ---
