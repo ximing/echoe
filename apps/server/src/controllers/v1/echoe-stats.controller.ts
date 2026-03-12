@@ -84,4 +84,34 @@ export class EchoeStatsController {
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }
+
+  /**
+   * GET /api/v1/stats/streak
+   * Get the user's consecutive learning streak in days
+   */
+  @Get('/streak')
+  async getStreak() {
+    try {
+      const streak = await this.echoeStatsService.getStreak();
+      return ResponseUtil.success({ streak });
+    } catch (error) {
+      logger.error('Get streak error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * GET /api/v1/stats/maturity/batch
+   * Get maturity distribution for all decks in a single request
+   */
+  @Get('/maturity/batch')
+  async getMaturityBatch() {
+    try {
+      const result = await this.echoeStatsService.getMaturityBatch();
+      return ResponseUtil.success(result);
+    } catch (error) {
+      logger.error('Get maturity batch error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
 }
