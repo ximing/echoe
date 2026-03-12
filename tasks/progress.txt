@@ -110,3 +110,20 @@
   - `MaturityBatchDeck` from `../../api/echoe` has `deckId`, `new`, `learning`, `young`, `mature` fields
   - `useGrid = decks.length <= 4` drives grid vs list layout selection
 ---
+
+## 2026-03-12 - US-010
+- Implemented 统计趋势图表区 (Statistics Charts Zone) in `apps/web/src/pages/dashboard/index.tsx`
+- Left: LineChart (recharts) showing study history with X=date (MM-DD), Y=review count, custom Tooltip showing count + time spent
+- Left: 7天/30天 toggle buttons call `dashboardService.loadHistory(days)` to refetch
+- Right: BarChart showing 14-day forecast with today's bar highlighted in primary color (#6366F1), others in gray
+- Both charts use `ThemeService.isDark()` for dark mode chart styling (grid, axis, tooltip colors)
+- Data comes from `dashboardService.history` and `dashboardService.forecast` (already loaded by `loadAll()` on mount)
+- No extra API requests needed — data is pre-loaded by `EchoeDashboardService.loadAll()`
+- Typecheck passes (`tsc --noEmit` clean)
+- Files changed: `apps/web/src/pages/dashboard/index.tsx`
+- **Learnings for future iterations:**
+  - recharts `formatter` prop type requires `(value: ValueType | undefined)` — don't annotate as `number` directly
+  - Use `content` prop (custom render function) instead of `formatter` when tooltip needs multiple data fields
+  - `ThemeService.isDark()` from `../../services/theme.service` provides dark mode state for chart styling
+  - `Cell` component from recharts allows per-bar color control in BarChart
+---
