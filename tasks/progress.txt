@@ -30,3 +30,14 @@
   - `echoeCards.did` is `bigint({ mode: 'number' })` so it's a JS number directly
   - Grouping in memory (Map) is simpler than SQL GROUP BY with CASE WHEN for this use case
 ---
+
+## 2026-03-12 - US-003
+- Added `GET /streak` and `GET /maturity/batch` endpoints to `EchoeStatsController`
+- `/streak` calls `echoeStatsService.getStreak()` and returns `{ streak: number }`
+- `/maturity/batch` calls `echoeStatsService.getMaturityBatch()` and returns `{ decks: [...] }`
+- Files changed: `apps/server/src/controllers/v1/echoe-stats.controller.ts`
+- **Learnings for future iterations:**
+  - Stats controller is at `apps/server/src/controllers/v1/echoe-stats.controller.ts` (not `stats.controller.ts` as mentioned in PRD)
+  - Uses `@JsonController('/api/v1/stats')` decorator from `routing-controllers`
+  - Pattern: wrap service call in try/catch, return `ResponseUtil.success(data)` or `ResponseUtil.error(ErrorCode.DB_ERROR)`
+---
