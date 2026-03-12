@@ -2,8 +2,21 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { view, useService } from '@rabjs/react';
 import { Flame, Loader2 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
 import { EchoeDashboardService } from '../../services/echoe-dashboard.service';
+import { ThemeService } from '../../services/theme.service';
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
 import type { MaturityBatchDeck } from '../../api/echoe';
 
@@ -89,6 +102,7 @@ export const DashboardPage = view(() => {
   const navigate = useNavigate();
   const deckService = useService(EchoeDeckService);
   const dashboardService = useService(EchoeDashboardService);
+  const themeService = useService(ThemeService);
 
   useEffect(() => {
     deckService.loadDecks();
@@ -104,6 +118,30 @@ export const DashboardPage = view(() => {
   const streak = dashboardService.streak;
   const decks = deckService.decks;
   const useGrid = decks.length <= 4;
+
+  const isDark = themeService.isDark();
+  const chartStyles = {
+    grid: isDark ? '#374151' : '#E5E7EB',
+    axis: isDark ? '#9CA3AF' : '#6B7280',
+    tooltipBg: isDark ? '#1F2937' : '#FFFFFF',
+    tooltipBorder: isDark ? '#374151' : '#E5E7EB',
+    tooltipText: isDark ? '#F9FAFB' : '#111827',
+  };
+
+  // History chart data: show MM-DD dates
+  const historyData = dashboardService.history.map((d) => ({
+    date: d.date.slice(5),
+    count: d.count,
+    timeSpent: d.timeSpent,
+  }));
+
+  // Forecast chart data: highlight today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const forecastData = dashboardService.forecast.map((d) => ({
+    date: d.date.slice(5),
+    dueCount: d.dueCount,
+    isToday: d.date === todayStr,
+  }));
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -183,6 +221,118 @@ export const DashboardPage = view(() => {
           </div>
         </div>
       )}
+
+      {/* Zone 3: Statistics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Study History Line Chart */}
+        <div className="bg-white dark:bg-dark-800 rounded-xl border border-gray-100 dark:border-dark-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">学习历史</h2>
+            <div className="flex gap-1">
+              <button
+                onClick={() => dashboardService.loadHistory(7)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  dashboardService.historyDays === 7
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-600'
+                }`}
+              >
+                7天
+              </button>
+              <button
+                onClick={() => dashboardService.loadHistory(30)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  dashboardService.historyDays === 30
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-600'
+                }`}
+              >
+                30天
+              </button>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={historyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chartStyles.grid} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: chartStyles.axis }}
+                interval="preserveStartEnd"
+              />
+              <YAxis tick={{ fontSize: 11, fill: chartStyles.axis }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: chartStyles.tooltipBg,
+                  border: `1px solid ${chartStyles.tooltipBorder}`,
+                  borderRadius: '8px',
+                  color: chartStyles.tooltipText,
+                  fontSize: 12,
+                }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const d = payload[0].payload as { count: number; timeSpent: number };
+                  const ms = d.timeSpent;
+                  const mins = Math.floor(ms / 60000);
+                  const secs = Math.floor((ms % 60000) / 1000);
+                  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                  return (
+                    <div style={{ backgroundColor: chartStyles.tooltipBg, border: `1px solid ${chartStyles.tooltipBorder}`, borderRadius: 8, padding: '8px 12px', color: chartStyles.tooltipText, fontSize: 12 }}>
+                      <div style={{ marginBottom: 4 }}>{`日期: ${label}`}</div>
+                      <div>{`复习数: ${d.count}`}</div>
+                      <div>{`用时: ${timeStr}`}</div>
+                    </div>
+                  );
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#6366F1"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Right: Forecast Bar Chart */}
+        <div className="bg-white dark:bg-dark-800 rounded-xl border border-gray-100 dark:border-dark-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">14天预测</h2>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={forecastData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chartStyles.grid} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: chartStyles.axis }}
+                interval="preserveStartEnd"
+              />
+              <YAxis tick={{ fontSize: 11, fill: chartStyles.axis }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: chartStyles.tooltipBg,
+                  border: `1px solid ${chartStyles.tooltipBorder}`,
+                  borderRadius: '8px',
+                  color: chartStyles.tooltipText,
+                  fontSize: 12,
+                }}
+                formatter={(value) => [value, '预计到期']}
+                labelFormatter={(label) => `日期: ${label}`}
+              />
+              <Bar dataKey="dueCount" radius={[3, 3, 0, 0]}>
+                {forecastData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.isToday ? '#6366F1' : isDark ? '#4B5563' : '#D1D5DB'}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 });
