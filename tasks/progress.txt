@@ -207,3 +207,17 @@
   - Media manifest is a JSON file at "media" with numeric ID -> filename mapping
   - The export creates Standard Anki format by default, legacy format available via format=legacy query param
   - col.json contains models (notetypes), decks, dconf (deck config), and conf (collection config)
+---
+
+## 2026-03-12 21:00 - US-014
+- Updated getMaturity to use stability instead of ivl for maturity classification
+- Updated getMaturityBatch to use stability instead of ivl
+- Added calculateRetrievability helper with formula R(t,S) = (1 + t/(9S))^(-1)
+- Maturity classification: new (lastReview=0 or stability=0), learning (0<stability<21), young (21<=stability<90), mature (stability>=21)
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use stability for maturity: stability >= 21 days = mature, stability < 21 = learning/young
+  - Retrievability formula: R(t,S) = (1 + t/(9S))^(-1), where t = days since last review, S = stability
+  - New cards: lastReview = 0 OR stability = 0
+  - The calculateRetrievability method can be used by other services for difficulty calculations
