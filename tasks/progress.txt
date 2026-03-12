@@ -94,3 +94,19 @@
 - Browser verified: renders correctly with due counts, streak, and disabled completion button
 - Files changed: `apps/web/src/pages/dashboard/index.tsx`
 ---
+
+## 2026-03-12 - US-009
+- Implemented 卡片集列表区 (Deck List Zone) in `apps/web/src/pages/dashboard/index.tsx`
+- Added `parseDeckName()` to split `::` names into last segment + depth level for indentation display
+- Added `MaturityBar` component: 4-color segment bar (new/learning/young/mature) with proportional widths
+- Added `DeckCard` component: name + depth indent, three badges (blue/orange/green), maturity bar, study button
+- Grid layout (2 cols) for ≤4 decks, list layout (1 col) for >4 decks
+- "学习此卡片集" button → `/cards/study/:deckId` when due > 0; "已完成 ✓" disabled when due = 0
+- Reuses `EchoeDeckService.decks` and `EchoeDashboardService.maturityBatch` (no extra requests)
+- Typecheck passes
+- Files changed: `apps/web/src/pages/dashboard/index.tsx`
+- **Learnings for future iterations:**
+  - `EchoeDeckWithCountsDto` from `@echoe/dto` has `id`, `name`, `newCount`, `learnCount`, `reviewCount` fields
+  - `MaturityBatchDeck` from `../../api/echoe` has `deckId`, `new`, `learning`, `young`, `mature` fields
+  - `useGrid = decks.length <= 4` drives grid vs list layout selection
+---
