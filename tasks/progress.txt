@@ -17,11 +17,11 @@
 | US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [x] |
 | US-006 | Implement deck recursive aggregation for stats | [x] |
 | US-007 | Fix Undo to restore complete card state | [x] |
-| US-008 | Add APKG import page and fix import entry point | [ ] |
-| US-009 | Redesign Flashcards list page with grid layout | [ ] |
-| US-010 | Add search, sort, and collapsible hierarchy | [ ] |
-| US-011 | Update frontend study page to use server rating preview | [ ] |
-| US-012 | Implement Standard Anki APKG import | [ ] |
+| US-008 | Add APKG import page and fix import entry point | [x] |
+| US-009 | Redesign Flashcards list page with grid layout | [x] |
+| US-010 | Add search, sort, and collapsible hierarchy | [x] |
+| US-011 | Update frontend study page to use server rating preview | [x] |
+| US-012 | Implement Standard Anki APKG import | [x] |
 | US-013 | Implement Standard Anki APKG export | [ ] |
 | US-014 | Refactor stats service to use FSRS stability | [ ] |
 
@@ -127,3 +127,66 @@
   - API response returns ImportResultDto directly in response.data (axios interceptor unwraps)
   - Routes under /cards use Layout wrapper with ProtectedRoute
 ---
+
+## 2026-03-12 17:00 - US-009
+- Redesigned Flashcards list page with responsive grid layout
+- Grid columns: 1 (mobile), 2 (sm), 3 (lg), 4 (xl)
+- Added mastery progress bar showing matureCount/totalCount percentage
+- Added color-coded badges: New (blue), Learning (yellow), Review (green), Done (gray)
+- Added last studied time with relative format ("5m ago", "2h ago", etc.)
+- Used custom DOM events for context menu handling on grid cards
+- Verified in browser - grid displays deck cards correctly
+
+**Learnings for future iterations:**
+  - Use Tailwind grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 for responsive columns
+  - EchoeDeckWithCountsDto has matureCount, difficultCount, averageRetrievability, lastStudiedAt from FSRS
+  - Mastery % = (matureCount / totalCount) * 100
+  - Context menu on grid items needs custom DOM events since grid cards don't have direct React handlers
+---
+
+## 2026-03-12 17:30 - US-010
+- Added search input with real-time filtering of deck names
+- Added sort dropdown: Due count (default), Name A-Z, Last studied
+- Added collapse/expand arrows for parent decks with children
+- Child decks already have left border for visual hierarchy from US-009
+- Collapse state managed by EchoeDeckService (toggleExpanded, isExpanded)
+- Verified in browser - search filters and sort work correctly
+
+**Learnings for future iterations:**
+  - Use getFilteredAndSortedDecks() helper to combine filtering and sorting
+  - sortBy options: 'due' (most due first), 'name' (alphabetical), 'lastStudied' (most recent first)
+  - toggleExpanded/isExpanded methods already exist in EchoeDeckService
+  - Child deck indentation uses pl-4 and border-l-2 for visual hierarchy
+
+---
+
+## 2026-03-12 18:00 - US-011
+- Added getStudyOptions API function in echoe.ts to call GET /api/v1/study/options?cardId=...
+- Added currentCardOptions property to EchoeStudyService to store rating previews
+- Added fetchStudyOptions() method to fetch options when showing answer
+- Updated getNextIntervalText() to use server-provided intervals when available, fall back to local heuristics
+- Added clearing of currentCardOptions when moving to next card
+- Rating buttons now display FSRS-calculated intervals from server instead of local estimation
+
+**Learnings for future iterations:**
+  - RatingOptionDto contains rating, label, interval, due, stability, difficulty
+  - getStudyOptions API returns StudyOptionsDto with cardId and options array
+  - Current card options are cleared when moving to next card (submit, bury, forget)
+  - Pre-existing web build errors unrelated to this change
+
+---
+
+## 2026-03-12 19:00 - US-012
+- Implemented Standard Anki APKG import with auto-detection
+- Added detectPackageType() method that checks for col.json (Standard Anki) vs custom tables (Echoe Legacy)
+- Added importStandardAnki() with col.json parsing for models and decks
+- Added parseMediaManifest() to map numeric filenames to real names
+- Added FSRS field backfill: stability from ivl, difficulty from factor, lastReview from mod time
+- Added importMediaFromStandardAnki() with media manifest mapping
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Standard Anki packages use col.json for metadata, legacy Echoe uses custom SQLite tables
+  - Media 2.0 manifest is a JSON file at "media" with numeric ID -> filename mapping
+  - FSRS fields are backfilled from card state: stability = ivl (or 1), difficulty = factor/1000 (or 2.5)
+  - Revlog entries include pre-review snapshot for undo: preStability from lastIvl, preLastReview calculated

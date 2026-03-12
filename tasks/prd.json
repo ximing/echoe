@@ -137,8 +137,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Grid layout implemented with responsive columns, mastery progress bar, color-coded badges, and last studied time"
     },
     {
       "id": "US-010",
@@ -154,8 +154,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Search, sort, and collapse/expand implemented. Child decks use left border for visual hierarchy."
     },
     {
       "id": "US-011",
@@ -169,8 +169,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Rating preview API integrated. Server-calculated intervals displayed under rating buttons. Falls back to local heuristics if API unavailable."
     },
     {
       "id": "US-012",
@@ -185,8 +185,8 @@
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Standard Anki APKG import implemented with auto-detection, col.json parsing, media manifest mapping, and FSRS field backfill"
     },
     {
       "id": "US-013",
