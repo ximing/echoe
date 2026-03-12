@@ -4,7 +4,7 @@ import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { EchoeDeckService } from '../services/echoe-deck.service';
-import { Sun, Moon, LogOut, Settings, Zap, Layers, Search, Plus, FileText, Tag, Image, BarChart3 } from 'lucide-react';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Layers, Search, Plus, FileText, Tag, Image, BarChart3 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
 import { isElectron, isMacOS } from '../electron/isElectron';
@@ -25,6 +25,7 @@ export const Layout = view(({ children }: LayoutProps) => {
 
   // Check active routes
   const isStudyPage = location.pathname.startsWith('/cards/study');
+  const isDashboardPage = location.pathname.startsWith('/dashboard');
   const isMyDecksPage = location.pathname === '/cards';
   const isBrowseCardsPage = location.pathname.startsWith('/cards/browser');
   const isNoteTypesPage = location.pathname.startsWith('/cards/notetypes');
@@ -98,25 +99,19 @@ export const Layout = view(({ children }: LayoutProps) => {
 
         {/* Navigation Section */}
         <nav className="flex flex-col items-center gap-2 flex-shrink-0">
-          {/* Study/Review Navigation */}
+          {/* Dashboard Navigation */}
           <div className="relative">
             <button
-              onClick={() => {
-                if (dueCount > 0) {
-                  navigate('/cards/study');
-                } else {
-                  navigate('/cards');
-                }
-              }}
+              onClick={() => navigate('/dashboard')}
               className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
-                isStudyPage
+                isDashboardPage
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-800'
               }`}
-              title={dueCount > 0 ? '学习' : '暂无待学卡片'}
-              aria-label={dueCount > 0 ? '学习' : '暂无待学卡片'}
+              title="仪表盘"
+              aria-label="仪表盘"
             >
-              <Zap className="w-6 h-6" />
+              <LayoutDashboard className="w-6 h-6" />
             </button>
             {dueCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-xs font-semibold rounded-full">
