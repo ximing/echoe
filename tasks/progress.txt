@@ -22,7 +22,7 @@
 | US-010 | Add search, sort, and collapsible hierarchy | [x] |
 | US-011 | Update frontend study page to use server rating preview | [x] |
 | US-012 | Implement Standard Anki APKG import | [x] |
-| US-013 | Implement Standard Anki APKG export | [ ] |
+| US-013 | Implement Standard Anki APKG export | [x] |
 | US-014 | Refactor stats service to use FSRS stability | [ ] |
 
 ---
@@ -190,3 +190,20 @@
   - Media 2.0 manifest is a JSON file at "media" with numeric ID -> filename mapping
   - FSRS fields are backfilled from card state: stability = ivl (or 1), difficulty = factor/1000 (or 2.5)
   - Revlog entries include pre-review snapshot for undo: preStability from lastIvl, preLastReview calculated
+---
+
+## 2026-03-12 20:00 - US-013
+- Implemented Standard Anki APKG export with format parameter (anki/legacy, defaults to anki)
+- Added exportStandardAnki() method that generates col.json with models, decks, and dconf
+- Added media manifest mapping (numeric ID -> filename) for Standard Anki packages
+- Added createStandardAnkiSchema(), exportModelsForStandardAnki(), generateColJson() methods
+- Added getDeckConfigForStandardAnki() with default Anki scheduling settings
+- Added addMediaToZipStandardAnki() with media manifest
+- Updated controller to accept format query parameter
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Standard Anki packages use col.json for collection metadata, collection.db for SQLite database
+  - Media manifest is a JSON file at "media" with numeric ID -> filename mapping
+  - The export creates Standard Anki format by default, legacy format available via format=legacy query param
+  - col.json contains models (notetypes), decks, dconf (deck config), and conf (collection config)
