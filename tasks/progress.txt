@@ -4,7 +4,7 @@
 
 | ID | Title | Status |
 |----|-------|--------|
-| US-001 | Add FSRS fields to echoe_cards table | [ ] |
+| US-001 | Add FSRS fields to echoe_cards table | [x] |
 | US-002 | Fix elapsed_days calculation in FSRS scheduling | [ ] |
 | US-003 | Persist FSRS state on review | [ ] |
 | US-004 | Add rating preview API endpoint | [ ] |
@@ -23,4 +23,16 @@
 
 ## Execution Log
 
-<!-- Ralph will append execution notes here -->
+## 2026-03-12 11:38 - US-001
+- Added stability, difficulty, last_review columns to echoe_cards table in schema
+- Added three new indexes: did_queue_due_idx, did_last_review_idx, did_stability_idx
+- Generated migration 0004_huge_sentinel.sql and ran successfully
+- Server typecheck passes
+
+**Learnings for future iterations:**
+  - Always build server before generating migrations (drizzle-kit reads from dist/)
+  - Use double() for FSRS DOUBLE columns in Drizzle schema
+  - Migration runs automatically on server startup or can be run manually with pnpm migrate
+  - Server build passes even if web app has type errors (separate packages)
+---
+
