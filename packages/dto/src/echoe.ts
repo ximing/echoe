@@ -558,6 +558,28 @@ export interface StudyCountsDto {
   totalCount: number;
 }
 
+export interface RatingOptionDto {
+  /** Rating: 1=Again, 2=Hard, 3=Good, 4=Easy */
+  rating: 1 | 2 | 3 | 4;
+  /** Rating label */
+  label: string;
+  /** Next interval in days */
+  interval: number;
+  /** Next due time (Unix timestamp in milliseconds) */
+  due: number;
+  /** Next stability */
+  stability: number;
+  /** Next difficulty */
+  difficulty: number;
+}
+
+export interface StudyOptionsDto {
+  /** Card ID */
+  cardId: number;
+  /** All rating options */
+  options: RatingOptionDto[];
+}
+
 export interface UndoResultDto {
   /** Whether undo was successful */
   success: boolean;

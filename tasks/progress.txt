@@ -6,8 +6,8 @@
 |----|-------|--------|
 | US-001 | Add FSRS fields to echoe_cards table | [x] |
 | US-002 | Fix elapsed_days calculation in FSRS scheduling | [x] |
-| US-003 | Persist FSRS state on review | [ ] |
-| US-004 | Add rating preview API endpoint | [ ] |
+| US-003 | Persist FSRS state on review | [x] |
+| US-004 | Add rating preview API endpoint | [x] |
 | US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [ ] |
 | US-006 | Implement deck recursive aggregation for stats | [ ] |
 | US-007 | Fix Undo to restore complete card state | [ ] |
@@ -47,4 +47,18 @@
   - elapsed_days should represent actual time since last review, not the interval
   - For new cards (lastReview = 0), use elapsed_days = 0 to let FSRS calculate initial values
   - The schema field is `lastReview` (camelCase) which maps to `last_review` in database
+---
+
+## 2026-03-12 13:45 - US-004
+- Added GET /api/v1/study/options?cardId=... endpoint
+- Added RatingOptionDto and StudyOptionsDto to DTO package
+- Added getOptions method to echoe-study.service.ts
+- Uses FSRS getSchedulingOptions to compute all 4 rating outcomes
+- Returns interval, due time, stability, and difficulty for each rating
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use card.stability if available, fallback to card.factor/1000 for backward compatibility
+  - The getSchedulingOptions method already exists in FSRSService - reuse it
+  - Rating values: 1=Again, 2=Hard, 3=Good, 4=Easy
 ---

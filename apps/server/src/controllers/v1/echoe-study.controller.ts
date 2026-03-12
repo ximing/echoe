@@ -12,6 +12,7 @@ import type {
   StudyCountsDto,
   BuryCardsDto,
   ForgetCardsDto,
+  StudyOptionsDto,
 } from '@echoe/dto';
 
 @Service()
@@ -139,6 +140,28 @@ export class EchoeStudyController {
       return ResponseUtil.success(counts);
     } catch (error) {
       logger.error('Get counts error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * GET /api/v1/study/options
+   * Get scheduling options for a card (preview of all rating outcomes)
+   */
+  @Get('/options')
+  async getOptions(@QueryParam('cardId') cardId: number) {
+    try {
+      if (!cardId) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
+      }
+
+      const options = await this.echoeStudyService.getOptions(cardId);
+      return ResponseUtil.success(options);
+    } catch (error) {
+      logger.error('Get options error:', error);
+      if (error instanceof Error && error.message.includes('not found')) {
+        return ResponseUtil.error(ErrorCode.NOT_FOUND);
+      }
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }

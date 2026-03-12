@@ -14,6 +14,8 @@ import type {
   StudyCountsDto,
   UndoResultDto,
   BuryCardsDto,
+  StudyOptionsDto,
+  RatingOptionDto,
 } from '@echoe/dto';
 
 @Service()
@@ -622,6 +624,97 @@ export class EchoeStudyService {
       learnCount,
       reviewCount,
       totalCount: newCount + learnCount + reviewCount,
+    };
+  }
+
+  /**
+   * Get scheduling options for a card (preview of all rating outcomes)
+   */
+  async getOptions(cardId: number): Promise<StudyOptionsDto> {
+    const db = getDatabase();
+    const now = new Date();
+
+    // Get the card
+    const card = await db.query.echoeCards.findFirst({
+      where: eq(echoeCards.id, cardId),
+    });
+
+    if (!card) {
+      throw new Error('Card not found');
+    }
+
+    // Get the deck
+    const deck = await db.query.echoeDecks.findFirst({
+      where: eq(echoeDecks.id, card.did),
+    });
+
+    if (!deck) {
+      throw new Error('Deck not found');
+    }
+
+    // Get deck config
+    const deckConfig = await db.query.echoeDeckConfig.findFirst({
+      where: eq(echoeDeckConfig.id, deck.conf),
+    });
+
+    // Build FSRS config from deck config
+    const fsrsConfig = this.getFSRSConfig(deckConfig);
+
+    // Calculate elapsed_days since last review
+    const dayMs = 24 * 60 * 60 * 1000;
+    const elapsedDays = card.lastReview && card.lastReview > 0
+      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
+      : 0;
+
+    // Create FSRS card input from database card
+    const fsCardInput = {
+      due: new Date(card.due),
+      stability: card.stability || card.factor / 1000, // Use stability if available, fallback to factor
+      difficulty: card.difficulty || 0, // Will be calculated by FSRS
+      elapsed_days: elapsedDays,
+      scheduled_days: card.ivl,
+      learning_steps: card.left,
+      reps: card.reps,
+      lapses: card.lapses,
+      state: card.type as State,
+      last_review: undefined,
+    };
+
+    // Get all scheduling options using FSRS
+    const schedulingOutput = this.fsrsService.getSchedulingOptions(
+      fsCardInput,
+      now,
+      fsrsConfig
+    );
+
+    // Build rating labels
+    const ratingLabels: Record<number, string> = {
+      1: 'Again',
+      2: 'Hard',
+      3: 'Good',
+      4: 'Easy',
+    };
+
+    // Build options array
+    const options: RatingOptionDto[] = [];
+
+    for (const rating of [1, 2, 3, 4] as const) {
+      const output = schedulingOutput[rating];
+      if (output) {
+        options.push({
+          rating,
+          label: ratingLabels[rating],
+          interval: output.interval,
+          due: output.nextDue.getTime(),
+          stability: output.stability,
+          difficulty: output.difficulty,
+        });
+      }
+    }
+
+    return {
+      cardId,
+      options,
     };
   }
 
