@@ -452,6 +452,32 @@ export const getForecast = (deckId?: number, days?: number) => {
   );
 };
 
+export interface MaturityBatchDeck {
+  deckId: number;
+  new: number;
+  learning: number;
+  young: number;
+  mature: number;
+}
+
+/**
+ * Get user's consecutive learning day streak
+ */
+export const getStreak = (): Promise<{ code: number; data: { streak: number } }> => {
+  return request.get<unknown, { code: number; data: { streak: number } }>(
+    '/api/v1/stats/streak'
+  );
+};
+
+/**
+ * Get maturity distribution for all decks in one request
+ */
+export const getMaturityBatch = (): Promise<{ code: number; data: { decks: MaturityBatchDeck[] } }> => {
+  return request.get<unknown, { code: number; data: { decks: MaturityBatchDeck[] } }>(
+    '/api/v1/stats/maturity/batch'
+  );
+};
+
 // ===== Global Settings =====
 
 /**
