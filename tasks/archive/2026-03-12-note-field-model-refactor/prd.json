@@ -1,0 +1,197 @@
+{
+  "project": "echoe",
+  "branchName": "ralph/note-field-model-refactor",
+  "description": "Note 字段模型重构 - 以 JSON 作为业务主存储，统一字段标准化模块，后端同构富文本转换",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "定义统一字段类型系统",
+      "description": "As a developer, I want canonical TypeScript types for note fields so that all layers of the system share a common contract.",
+      "acceptanceCriteria": [
+        "在 packages/dto 或 apps/server/src/types 中定义 CanonicalFields 类型: Record<string, string>",
+        "定义 ProseMirrorJsonDoc 类型（参考 Tiptap 类型定义，表示 ProseMirror JSON 文档结构）",
+        "定义 RichTextFields 类型: Record<string, ProseMirrorJsonDoc>",
+        "定义 NoteCompatibilityProjection 类型: { flds: string; sfld: string; csum: number }",
+        "每个类型有 JSDoc 注释说明语义",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "服务端 ProseMirror JSON → HTML 序列化模块",
+      "description": "As a developer, I want a server-side module that converts ProseMirror JSON to HTML and plain text so that rich text fields can be processed without frontend preprocessing.",
+      "acceptanceCriteria": [
+        "新建 apps/server/src/lib/prosemirror-serializer.ts",
+        "使用 @tiptap/core 的 generateHTML 函数在 Node.js 环境执行 JSON → HTML 转换（无需 DOM）",
+        "导出 serializeToHtml(doc: ProseMirrorJsonDoc): string 函数",
+        "导出 serializeToPlainText(doc: ProseMirrorJsonDoc): string 函数（去除 HTML 标签，用于 sfld）",
+        "支持节点类型：paragraph, text, bold, italic, underline, heading, bulletList, orderedList, listItem, codeBlock, blockquote, hardBreak",
+        "单元测试覆盖：纯文本段落、加粗/斜体文本、列表、代码块、空文档",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "数据库迁移 — 新增 fields_json 列",
+      "description": "As a developer, I need to add a fields_json JSON column to echoe_notes so that field data has a typed, structured primary storage.",
+      "acceptanceCriteria": [
+        "生成 Drizzle 迁移文件，为 echoe_notes 添加 fields_json 列（MySQL JSON 类型，NOT NULL，默认 '{}'）",
+        "Drizzle schema 文件同步更新，fields_json 字段类型为 json('fields_json')",
+        "pnpm migrate 成功执行",
+        "迁移文件可重复执行（幂等）",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "数据库迁移 — 升级 rich_text_fields 和 fld_names 为 JSON 类型",
+      "description": "As a developer, I need rich_text_fields and fld_names to be MySQL JSON columns so that they have proper type enforcement and eliminate manual string parsing.",
+      "acceptanceCriteria": [
+        "生成 Drizzle 迁移文件，将 rich_text_fields 从 text 升级为 MySQL JSON 类型",
+        "生成 Drizzle 迁移文件，将 fld_names 从 text 升级为 MySQL JSON 类型",
+        "迁移包含数据转换逻辑：将现有 text 值解析并重新存储为 JSON（rich_text_fields 解析为对象，fld_names 解析为数组）",
+        "Drizzle schema 同步更新",
+        "pnpm migrate 成功执行",
+        "迁移文件可重复执行（幂等）",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "数据回填脚本 — 从 flds + fld_names 填充 fields_json",
+      "description": "As a developer, I need a backfill script that populates fields_json from existing flds and fld_names data so that existing notes have valid primary field storage.",
+      "acceptanceCriteria": [
+        "新建脚本 apps/server/scripts/backfill-fields-json.ts",
+        "脚本逻辑：读取每条 note 的 flds（\\x1f 分隔）和 fld_names，组合为 Record<string, string> 写入 fields_json",
+        "脚本幂等：对 fields_json 已有非空值的 note 默认跳过",
+        "脚本执行完成后输出统计：总数、成功数、跳过数、失败数",
+        "脚本可通过 ts-node 或 pnpm tsx 执行",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "服务端字段标准化模块 NoteFieldNormalizer",
+      "description": "As a developer, I want a single normalizeNoteFields function that accepts raw field inputs and produces all derived field values so that all write paths share one consistent implementation.",
+      "acceptanceCriteria": [
+        "新建 apps/server/src/lib/note-field-normalizer.ts",
+        "导出函数 normalizeNoteFields(input: NormalizerInput): NormalizerOutput",
+        "NormalizerInput: { notetypeFields: string[]; fields?: Record<string, string>; richTextFields?: RichTextFields }",
+        "NormalizerOutput: { fieldsJson: CanonicalFields; fldNames: string[]; flds: string; sfld: string; csum: number }",
+        "若提供 richTextFields，通过 prosemirror-serializer 转换为 HTML，合并到 fields",
+        "flds = 字段值以 \\x1f 连接（按 notetypeFields 顺序）",
+        "sfld = 第一个字段的纯文本（serializeToPlainText 处理）",
+        "csum = Anki 兼容 checksum：parseInt(sha1(sfld).slice(0, 8), 16)，使用 Node.js crypto 模块",
+        "单元测试覆盖：纯文本字段输入、富文本字段输入、混合输入、空字段处理、多字段顺序验证",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "改造 Note 创建链路接入标准化模块",
+      "description": "As a developer, I want the note creation API to use NoteFieldNormalizer so that all created notes have consistent fields_json, flds, sfld, and csum values.",
+      "acceptanceCriteria": [
+        "POST /api/v1/notes 处理器调用 normalizeNoteFields",
+        "写入数据库时同时设置 fields_json、fld_names、flds、sfld、csum",
+        "删除或替换原有手动拼接 flds 或手动计算 csum 的代码",
+        "通过 curl 创建一条 note 后，数据库中 fields_json 非空且与 flds 内容一致",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "改造 Note 更新链路接入标准化模块",
+      "description": "As a developer, I want the note update API to use NoteFieldNormalizer so that all updated notes maintain consistent field data.",
+      "acceptanceCriteria": [
+        "PUT /api/v1/notes/:id 处理器调用 normalizeNoteFields",
+        "写入时同步更新 fields_json、fld_names、flds、sfld、csum",
+        "删除或替换原有手动拼接 flds 或手动计算 csum 的代码",
+        "多次更新同一 note 后，fields_json 与 flds/sfld/csum 保持一致",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "改造 .apkg 导入链路接入标准化模块",
+      "description": "As a developer, I want the .apkg import pipeline to use NoteFieldNormalizer so that imported notes have consistent field storage.",
+      "acceptanceCriteria": [
+        ".apkg 导入处理器调用 normalizeNoteFields",
+        "导入后每条 note 的 fields_json 非空",
+        "删除或替换原有手动拼接 flds 或手动计算 csum 的代码",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "改造 CSV 导入链路接入标准化模块",
+      "description": "As a developer, I want the CSV import pipeline to use NoteFieldNormalizer so that CSV-imported notes have consistent field storage.",
+      "acceptanceCriteria": [
+        "CSV 导入处理器调用 normalizeNoteFields",
+        "导入后每条 note 的 fields_json 非空",
+        "删除或替换原有手动拼接 flds 或手动计算 csum 的代码",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "收敛读取链路 — 优先读取 fields_json",
+      "description": "As a developer, I want all read paths to use fields_json as the primary source for the fields DTO field so that there is one consistent reading strategy.",
+      "acceptanceCriteria": [
+        "mapNoteToDto（或等效映射函数）优先从 fields_json 构建 DTO 的 fields 字段",
+        "getQueue 和 getCard 等学习相关查询使用 fields_json",
+        "去重逻辑使用 fields_json 或 csum（不再依赖字符串 split）",
+        "删除所有散落的 JSON.parse(flds) 和 flds.split('\\x1f') 兜底逻辑",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "前端编辑器提交契约对齐",
+      "description": "As a frontend developer, I want the card editor to reliably submit richTextFields with complete field keys so that the backend can perform rich text conversion without ambiguity.",
+      "acceptanceCriteria": [
+        "卡片编辑器提交时，richTextFields 包含 notetype 所有字段的 key（空字段提交空 ProseMirror 文档 JSON）",
+        "不再需要前端提交转换后的 HTML fields（后端同构处理）",
+        "编辑器保存后，通过 Network 面板确认请求体中 richTextFields 结构正确且所有字段 key 存在",
+        "创建/编辑卡片后可正常学习渲染",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
