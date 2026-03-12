@@ -23,6 +23,8 @@ export interface ExportOptions {
   deckId?: number;
   /** Whether to include scheduling data */
   includeScheduling: boolean;
+  /** Export format: 'anki' (Standard Anki) or 'legacy' (Echoe format) - defaults to 'anki' */
+  format?: 'anki' | 'legacy';
 }
 
 export interface ExportResult {
@@ -40,8 +42,100 @@ export class EchoeExportService {
    * Export a deck to .apkg format
    */
   async exportApkg(options: ExportOptions): Promise<ExportResult> {
-    const { deckId, includeScheduling } = options;
+    const { deckId, includeScheduling, format = 'anki' } = options;
 
+    if (format === 'legacy') {
+      return this.exportLegacyApkg(deckId, includeScheduling);
+    }
+
+    return this.exportStandardAnki(deckId, includeScheduling);
+  }
+
+  /**
+   * Export in Standard Anki format (col.json based)
+   */
+  private async exportStandardAnki(deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
+    // Create a temporary SQLite database
+    const tempDb = new Database(':memory:');
+
+    try {
+      // Create schema in the temp database
+      this.createStandardAnkiSchema(tempDb);
+
+      // Get deck(s) to export
+      const decksToExport = await this.getDecksToExport(deckId);
+      if (decksToExport.length === 0) {
+        throw new Error('No decks found to export');
+      }
+
+      // Get all deck IDs including sub-decks
+      const deckIds = this.getAllDeckIds(decksToExport);
+
+      // Get notes in the deck(s)
+      const notes = await this.getNotesInDecks(deckIds);
+
+      // Export notetypes (as models in col.json)
+      const models = await this.exportModelsForStandardAnki(tempDb, notes);
+
+      // Export decks
+      const decks = await this.exportDecksForStandardAnki(tempDb, decksToExport);
+
+      // Get deck config
+      const dconf = this.getDeckConfigForStandardAnki();
+
+      // Export notes
+      await this.exportNotes(tempDb, notes);
+
+      // Export cards
+      const cardCount = await this.exportCards(tempDb, notes, includeScheduling);
+
+      // Export revlog if scheduling is included
+      if (includeScheduling) {
+        await this.exportRevlog(tempDb, notes);
+      }
+
+      // Export media files
+      const mediaFiles = await this.getMediaFilesForExport(notes);
+
+      logger.info(`Exported: ${notes.length} notes, ${cardCount} cards, ${mediaFiles.size} media files`);
+
+      // Get the SQLite buffer
+      const sqliteBuffer = (tempDb as any).export();
+
+      // Create the zip file
+      const zip = new JSZip();
+
+      // Add collection.db (Standard Anki uses .db extension)
+      zip.file('collection.db', sqliteBuffer);
+
+      // Add col.json
+      const colJson = this.generateColJson(models, decks, dconf);
+      zip.file('col.json', JSON.stringify(colJson));
+
+      // Add media manifest and files
+      await this.addMediaToZipStandardAnki(zip, notes, mediaFiles);
+
+      // Generate the final .apkg buffer
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+      // Generate filename
+      const deckName = deckId
+        ? decksToExport.find((d) => d.id === deckId)?.name || 'deck'
+        : 'all_decks';
+      const sanitizedName = deckName.replace(/[^a-zA-Z0-9_]/g, '_');
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `${sanitizedName}_${date}.apkg`;
+
+      return { buffer, filename };
+    } finally {
+      tempDb.close();
+    }
+  }
+
+  /**
+   * Export in Legacy Echoe format (collection.anki21 based)
+   */
+  private async exportLegacyApkg(deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
     // Create a temporary SQLite database
     const tempDb = new Database(':memory:');
 
@@ -358,6 +452,387 @@ export class EchoeExportService {
          VALUES (1, ?, ?, ?, 213, 0, -1, 0, '{}', '{}', '{}', '{}', '{}')`
       )
       .run(now, now, now);
+  }
+
+  /**
+   * Create Standard Anki schema in temp database
+   */
+  private createStandardAnkiSchema(db: Database.Database) {
+    // Collection table - Standard Anki format
+    db.exec(`
+      CREATE TABLE col (
+        id INTEGER PRIMARY KEY,
+        crt INTEGER NOT NULL,
+        mod INTEGER NOT NULL,
+        scm INTEGER NOT NULL,
+        ver INTEGER NOT NULL,
+        dty INTEGER NOT NULL,
+        usn INTEGER NOT NULL,
+        ls INTEGER NOT NULL,
+        conf TEXT NOT NULL,
+        models TEXT NOT NULL,
+        decks TEXT NOT NULL,
+        dconf TEXT NOT NULL,
+        tags TEXT NOT NULL
+      );
+    `);
+
+    // Notes table - Standard Anki format
+    db.exec(`
+      CREATE TABLE notes (
+        id INTEGER PRIMARY KEY,
+        guid TEXT NOT NULL,
+        mid INTEGER NOT NULL,
+        mod INTEGER NOT NULL,
+        usn INTEGER NOT NULL,
+        tags TEXT NOT NULL,
+        flds TEXT NOT NULL,
+        sfld TEXT NOT NULL,
+        csum INTEGER NOT NULL,
+        flags INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX idx_notes_guid ON notes(guid);
+      CREATE INDEX idx_notes_mid ON notes(mid);
+      CREATE INDEX idx_notes_usn ON notes(usn);
+    `);
+
+    // Cards table - Standard Anki format
+    db.exec(`
+      CREATE TABLE cards (
+        id INTEGER PRIMARY KEY,
+        nid INTEGER NOT NULL,
+        did INTEGER NOT NULL,
+        ord INTEGER NOT NULL,
+        mod INTEGER NOT NULL,
+        usn INTEGER NOT NULL,
+        type INTEGER NOT NULL,
+        queue INTEGER NOT NULL,
+        due INTEGER NOT NULL,
+        ivl INTEGER NOT NULL,
+        factor INTEGER NOT NULL,
+        reps INTEGER NOT NULL,
+        lapses INTEGER NOT NULL,
+        left INTEGER NOT NULL,
+        odue INTEGER NOT NULL,
+        odid INTEGER NOT NULL,
+        flags INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX idx_cards_nid ON cards(nid);
+      CREATE INDEX idx_cards_did ON cards(did);
+      CREATE INDEX idx_cards_usn ON cards(usn);
+      CREATE INDEX idx_cards_queue ON cards(queue);
+      CREATE INDEX idx_cards_due ON cards(due);
+    `);
+
+    // Revlog table - Standard Anki format
+    db.exec(`
+      CREATE TABLE revlog (
+        id INTEGER PRIMARY KEY,
+        cid INTEGER NOT NULL,
+        usn INTEGER NOT NULL,
+        ease INTEGER NOT NULL,
+        ivl INTEGER NOT NULL,
+        lastIvl INTEGER NOT NULL,
+        factor INTEGER NOT NULL,
+        time INTEGER NOT NULL,
+        type INTEGER NOT NULL
+      );
+      CREATE INDEX idx_revlog_cid ON revlog(cid);
+      CREATE INDEX idx_revlog_usn ON revlog(usn);
+    `);
+
+    // Insert default collection
+    const now = Math.floor(Date.now() / 1000);
+    db
+      .prepare(
+        `INSERT INTO col (id, crt, mod, scm, ver, dty, usn, ls, conf, models, decks, dconf, tags)
+         VALUES (1, ?, ?, ?, 213, 0, -1, 0, '{}', '{}', '{}', '{}', '{}')`
+      )
+      .run(now, now, now);
+  }
+
+  /**
+   * Export models (notetypes) for Standard Anki format and return models JSON
+   */
+  private async exportModelsForStandardAnki(
+    tempDb: Database.Database,
+    notes: { mid: number }[]
+  ): Promise<Record<number, any>> {
+    if (notes.length === 0) return {};
+
+    const db = getDatabase();
+
+    // Get unique notetype IDs used by the notes
+    const notetypeIds = [...new Set(notes.map((n) => n.mid))];
+
+    if (notetypeIds.length === 0) return {};
+
+    // Get notetypes from database
+    const notetypes = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(inArray(echoeNotetypes.id, notetypeIds));
+
+    // Build models JSON for col.json
+    const models: Record<number, any> = {};
+
+    for (const nt of notetypes) {
+      // Parse the notetype fields and templates
+      let tmpls = [];
+      let flds = [];
+      try {
+        tmpls = typeof nt.tmpls === 'string' ? JSON.parse(nt.tmpls) : nt.tmpls;
+        flds = typeof nt.flds === 'string' ? JSON.parse(nt.flds) : nt.flds;
+      } catch {
+        tmpls = [];
+        flds = [];
+      }
+
+      // Convert to Standard Anki model format
+      const model: any = {
+        id: nt.id,
+        name: nt.name,
+        type: nt.type || 0,
+        mod: nt.mod || Math.floor(Date.now() / 1000),
+        usn: -1,
+        sortf: nt.sortf || 0,
+        did: nt.did || null,
+        tmpls: tmpls,
+        flds: flds,
+        css: nt.css || '',
+        req: typeof nt.req === 'string' ? JSON.parse(nt.req) : nt.req || [],
+      };
+
+      // Add LaTeX config
+      if (nt.latexPre) {
+        (model as any).latexPre = nt.latexPre;
+      }
+      if (nt.latexPost) {
+        (model as any).latexPost = nt.latexPost;
+      }
+
+      models[nt.id] = model;
+    }
+
+    return models;
+  }
+
+  /**
+   * Export decks for Standard Anki format and return decks JSON
+   */
+  private async exportDecksForStandardAnki(
+    tempDb: Database.Database,
+    decks: { id: number; name: string; conf: number; mod: number; desc: string; dyn: number; collapsed: number }[]
+  ): Promise<Record<number, any>> {
+    const decksJson: Record<number, any> = {};
+    const now = Math.floor(Date.now() / 1000);
+
+    for (const deck of decks) {
+      decksJson[deck.id] = {
+        id: deck.id,
+        name: deck.name,
+        mod: deck.mod || now,
+        usn: -1,
+        collapsed: deck.collapsed || 0,
+        dyn: deck.dyn || 0,
+        desc: deck.desc || '',
+        conf: deck.conf || 1,
+        extendNew: 20,
+        extendRev: 200,
+      };
+    }
+
+    return decksJson;
+  }
+
+  /**
+   * Get deck config for Standard Anki format
+   */
+  private getDeckConfigForStandardAnki(): Record<number, any> {
+    const now = Math.floor(Date.now() / 1000);
+
+    return {
+      1: {
+        id: 1,
+        name: 'Default',
+        mod: now,
+        usn: -1,
+        replayq: 1,
+        timer: 0,
+        maxTaken: 60,
+        autoplay: 1,
+        new: {
+          bury: true,
+          editsingle: false,
+          deledit: false,
+          separate: true,
+          add: true,
+          timer: 0,
+          delays: [1, 10],
+          order: 1,
+          perDay: 20,
+          buries: true,
+          learns: true,
+          minSpace: 1,
+        },
+        rev: {
+          editsingle: false,
+          deledit: false,
+          separate: true,
+          add: false,
+          timer: 0,
+          perDay: 200,
+          fuzz: 0.05,
+          ivlFct: 1,
+          maxIvl: 36500,
+          bury: true,
+          buries: true,
+          minSpace: 1,
+        },
+        lapse: {
+          deledit: false,
+          deltimer: 0,
+          minInt: 1,
+          mult: 0,
+          maxLapses: 8,
+          delays: [10],
+          relearn: 1,
+          minSpace: 1,
+        },
+        edit: false,
+        report: true,
+        timeout: 60,
+        undo: 1,
+      },
+    };
+  }
+
+  /**
+   * Generate col.json content for Standard Anki export
+   */
+  private generateColJson(
+    models: Record<number, any>,
+    decks: Record<number, any>,
+    dconf: Record<number, any>
+  ): any {
+    const now = Math.floor(Date.now() / 1000);
+
+    return {
+      id: 1,
+      crt: now - 86400, // Created yesterday
+      mod: now,
+      scm: now * 1000, // Schema mod (microseconds)
+      ver: 213,
+      dty: 0, // Deck type (0 = standard)
+      usn: -1,
+      ls: 0,
+      conf: JSON.stringify({
+        curDeck: 1,
+        newSpread: 0,
+        collapseTime: 1200,
+        timer: 0,
+        autoplay: true,
+        replayq: true,
+        dueCounts: true,
+        curModel: null,
+        sidebarWS: 250,
+        notetypeSidetoggle: true,
+        showTimer: 1,
+        showProgress: 1,
+        browserNotesPerPane: -1,
+        cardStateForUndo: 'both',
+        skipMediaSanityCheck: false,
+        forceFullSearch: false,
+        mainWindowState: 'maximized',
+        creationOffset: 0,
+        timezone: null,
+      }),
+      models: JSON.stringify(models),
+      decks: JSON.stringify(decks),
+      dconf: JSON.stringify(dconf),
+      tags: JSON.stringify({}),
+    };
+  }
+
+  /**
+   * Get media files referenced in notes
+   */
+  private async getMediaFilesForExport(notes: { flds: string }[]): Promise<Set<string>> {
+    const mediaFiles = new Set<string>();
+
+    const soundPattern = /\[sound:([^\]]+)\]/g;
+    const imgPattern = /<img[^>]+src=["']([^"']+)["']/g;
+
+    for (const note of notes) {
+      const flds = note.flds || '';
+      let match;
+
+      while ((match = soundPattern.exec(flds)) !== null) {
+        mediaFiles.add(match[1]);
+      }
+
+      while ((match = imgPattern.exec(flds)) !== null) {
+        const src = match[1];
+        const filename = src.split('/').pop() || src;
+        mediaFiles.add(filename);
+      }
+    }
+
+    return mediaFiles;
+  }
+
+  /**
+   * Add media to zip with manifest for Standard Anki format
+   */
+  private async addMediaToZipStandardAnki(
+    zip: JSZip,
+    notes: { flds: string }[],
+    mediaFiles: Set<string>
+  ): Promise<void> {
+    if (mediaFiles.size === 0) return;
+
+    // Get media manifest mapping (numeric ID -> filename)
+    const db = getDatabase();
+    const mediaManifest: Record<string, string> = {};
+    let mediaId = 0;
+
+    const mediaRecords = await db
+      .select()
+      .from(echoeMedia)
+      .where(inArray(echoeMedia.filename, [...mediaFiles]));
+
+    for (const media of mediaRecords) {
+      // Create numeric ID mapping
+      const numericId = String(mediaId++);
+      mediaManifest[numericId] = media.filename;
+    }
+
+    // Add media manifest
+    zip.file('media', JSON.stringify(mediaManifest));
+
+    // Add actual media files
+    for (const filename of mediaFiles) {
+      try {
+        const media = await this.mediaService.getMedia(filename);
+        if (media) {
+          // Find the numeric ID for this filename
+          let numericId = '';
+          for (const [id, name] of Object.entries(mediaManifest)) {
+            if (name === filename) {
+              numericId = id;
+              break;
+            }
+          }
+          if (numericId) {
+            zip.file(`media/${numericId}`, media.buffer);
+          }
+        }
+      } catch (error) {
+        logger.warn(`Failed to add media ${filename} to export:`, error);
+      }
+    }
   }
 
   /**

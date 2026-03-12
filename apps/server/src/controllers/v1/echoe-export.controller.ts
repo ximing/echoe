@@ -24,14 +24,17 @@ export class EchoeExportController {
   async exportApkg(
     @QueryParam('deckId') deckId?: number,
     @QueryParam('includeScheduling') includeScheduling?: string,
+    @QueryParam('format') format?: string,
     @Res() res?: Response
   ): Promise<void> {
     try {
       const includeSchedulingBool = includeScheduling === 'true';
+      const formatValue = format === 'legacy' ? 'legacy' : 'anki';
 
       const options: ExportOptions = {
         deckId,
         includeScheduling: includeSchedulingBool,
+        format: formatValue,
       };
 
       const result = await this.exportService.exportApkg(options);

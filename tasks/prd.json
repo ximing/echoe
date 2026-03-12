@@ -201,8 +201,8 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Standard Anki APKG export implemented with col.json generation, media manifest mapping, format parameter support, and backward compatibility with legacy format"
     },
     {
       "id": "US-014",
