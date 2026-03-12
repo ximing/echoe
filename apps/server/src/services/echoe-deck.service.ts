@@ -139,7 +139,7 @@ export class EchoeDeckService {
   }
 
   /**
-   * Build deck hierarchy from flat list
+   * Build deck hierarchy from flat list with aggregated stats from child decks
    */
   private buildDeckHierarchy(decks: EchoeDeckWithCountsDto[]): EchoeDeckWithCountsDto[] {
     const deckMap = new Map<number, EchoeDeckWithCountsDto>();
@@ -169,7 +169,60 @@ export class EchoeDeckService {
       }
     }
 
+    // Third pass: aggregate stats from children to parents (post-order traversal)
+    for (const root of rootDecks) {
+      this.aggregateChildStats(root);
+    }
+
     return rootDecks.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Recursively aggregate stats from child decks to parent
+   * - newCount, learnCount, reviewCount: sum of direct + children
+   * - totalCount, matureCount, difficultCount: sum of direct + children
+   * - averageRetrievability: weighted average by totalCount
+   * - lastStudiedAt: max of self and children
+   */
+  private aggregateChildStats(deck: EchoeDeckWithCountsDto): void {
+    // First aggregate all children
+    for (const child of deck.children) {
+      this.aggregateChildStats(child);
+    }
+
+    // Then aggregate this deck's stats with children
+    if (deck.children.length > 0) {
+      let totalNewCount = deck.newCount;
+      let totalLearnCount = deck.learnCount;
+      let totalReviewCount = deck.reviewCount;
+      let totalTotalCount = deck.totalCount;
+      let totalMatureCount = deck.matureCount;
+      let totalDifficultCount = deck.difficultCount;
+      let totalRetrievabilitySum = deck.averageRetrievability * deck.totalCount;
+      let maxLastStudiedAt = deck.lastStudiedAt;
+
+      for (const child of deck.children) {
+        totalNewCount += child.newCount;
+        totalLearnCount += child.learnCount;
+        totalReviewCount += child.reviewCount;
+        totalTotalCount += child.totalCount;
+        totalMatureCount += child.matureCount;
+        totalDifficultCount += child.difficultCount;
+        totalRetrievabilitySum += child.averageRetrievability * child.totalCount;
+        if (child.lastStudiedAt !== null && (maxLastStudiedAt === null || child.lastStudiedAt > maxLastStudiedAt)) {
+          maxLastStudiedAt = child.lastStudiedAt;
+        }
+      }
+
+      deck.newCount = totalNewCount;
+      deck.learnCount = totalLearnCount;
+      deck.reviewCount = totalReviewCount;
+      deck.totalCount = totalTotalCount;
+      deck.matureCount = totalMatureCount;
+      deck.difficultCount = totalDifficultCount;
+      deck.averageRetrievability = totalTotalCount > 0 ? totalRetrievabilitySum / totalTotalCount : 0;
+      deck.lastStudiedAt = maxLastStudiedAt;
+    }
   }
 
   /**

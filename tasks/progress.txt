@@ -1,5 +1,11 @@
 # Flashcards FSRS Full Chain - Progress
 
+## Codebase Patterns
+- Deck hierarchy uses '::' separator (e.g., "Parent::Child") to denote parent-child relationships
+- Use `buildDeckHierarchy()` in echoe-deck.service.ts to convert flat deck list to tree structure
+- FSRS stats are calculated per-deck in SQL queries, then aggregated in the service layer
+- For recursive aggregation: newCount/learnCount/reviewCount/totalCount/matureCount/difficultCount are summed; averageRetrievability is weighted by totalCount; lastStudiedAt is MAX
+
 ## User Stories Progress
 
 | ID | Title | Status |
@@ -9,7 +15,7 @@
 | US-003 | Persist FSRS state on review | [x] |
 | US-004 | Add rating preview API endpoint | [x] |
 | US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [x] |
-| US-006 | Implement deck recursive aggregation for stats | [ ] |
+| US-006 | Implement deck recursive aggregation for stats | [x] |
 | US-007 | Fix Undo to restore complete card state | [ ] |
 | US-008 | Add APKG import page and fix import entry point | [ ] |
 | US-009 | Redesign Flashcards list page with grid layout | [ ] |
@@ -76,4 +82,20 @@
   - Difficult cards are those with retrievability < 0.9 (i.e., time since review > stability * dayMs * 0.111...)
   - Mature cards are defined as stability >= 21 days
   - lastStudiedAt uses MAX(last_review) timestamp, returns null if never studied
+---
+
+## 2026-03-12 15:00 - US-006
+- Implemented recursive aggregation for deck stats in echoe-deck.service.ts
+- Added aggregateChildStats() method that post-order traverses the deck tree
+- Parent deck stats now include sums from all child decks:
+  - newCount, learnCount, reviewCount: sum of direct + children
+  - totalCount, matureCount, difficultCount: sum of direct + children
+  - averageRetrievability: weighted mean by totalCount
+  - lastStudiedAt: MAX of self and children
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use post-order traversal to aggregate child stats before parent (children first, then parent)
+  - averageRetrievability needs weighted average, not simple sum
+  - lastStudiedAt should use MAX to show most recent study time across all children
 ---
