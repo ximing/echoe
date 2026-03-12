@@ -78,3 +78,10 @@
 - Browser verified: clicking "仪表盘" navigates to `/dashboard`
 - Files changed: `apps/web/src/components/layout.tsx`
 ---
+
+## 2026-03-12 - US-007
+- Registered `/dashboard` route in `apps/web/src/App.tsx` → `DashboardPage`
+- Created placeholder `apps/web/src/pages/dashboard/index.tsx` exporting `DashboardPage` (view component)
+- Browser verified: `/dashboard` renders with Layout sidebar and "仪表盘" placeholder text, no 404
+- Files changed: `apps/web/src/App.tsx`, `apps/web/src/pages/dashboard/index.tsx`
+---
