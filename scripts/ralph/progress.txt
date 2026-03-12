@@ -1,3 +1,18 @@
+## 2026-03-12 - US-003
+- Modified apps/server/src/services/echoe-study.service.ts to persist FSRS state on review
+- Added stability, difficulty, and lastReview fields to the card update in answerCard
+- stability: schedulingResult.stability (from FSRS output)
+- difficulty: schedulingResult.difficulty (from FSRS output)
+- lastReview: now.getTime() (current timestamp)
+- All 58 tests pass, typecheck passes
+- Files changed:
+  - apps/server/src/services/echoe-study.service.ts (added FSRS fields to card update)
+- **Learnings for future iterations:**
+  - The schedulingResult from fsrsService.scheduleCard() contains stability and difficulty as decimal values
+  - The card's factor field stores stability as permille (stability * 1000), but the FSRS column stores the actual decimal
+  - lastReview should be stored as a Unix timestamp in milliseconds (not seconds)
+---
+
 ## 2026-03-12 - US-008
 - Modified apps/server/src/services/echoe-note.service.ts to use normalizeNoteFields in updateNote
 - updateNote now fetches the notetype (via note[0].mid) to get ordered field names
