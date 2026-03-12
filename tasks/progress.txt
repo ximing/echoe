@@ -68,3 +68,13 @@
   - All web services are global singletons registered in main.tsx; dashboard service follows same pattern
   - `this.resolve(EchoeDeckService)` in a getter provides lazy DI access to the global deck service
 ---
+
+## 2026-03-12 - US-006
+- Modified `apps/web/src/components/layout.tsx` to update sidebar first item to Dashboard
+- Replaced `Zap` import with `LayoutDashboard` from lucide-react
+- Added `isDashboardPage = location.pathname.startsWith('/dashboard')` variable
+- Replaced conditional-navigation Study button with always-`/dashboard` Dashboard button using `LayoutDashboard` icon
+- Preserved `isStudyPage`, `showFab`, and red `dueCount` badge unchanged
+- Browser verified: clicking "仪表盘" navigates to `/dashboard`
+- Files changed: `apps/web/src/components/layout.tsx`
+---
