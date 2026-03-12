@@ -1,129 +1,26 @@
-## Dashboard 仪表盘页面 Progress
+# Flashcards FSRS Full Chain - Progress
 
-## Codebase Patterns
-- All services in apps/web/src/services/ are registered globally in main.tsx via `register()`
-- Use `this.resolve(ServiceClass)` in a getter to access other global Services from within a Service
-- `HistoryData` and `ForecastData` in the PRD correspond to `StudyHistoryDayDto[]` and `ForecastDayDto[]` from `@echoe/dto`
-- echoeRevlog.id is bigint (Unix ms × 1000); convert to Date via `new Date(Number(id) / 1000)`
-- Stats service uses UTC dates: `today.setUTCHours(0, 0, 0, 0)` for day boundaries
-- No user filtering in stats service (single-user system)
-- Use `gte(echoeRevlog.id, timestamp * 1000)` for time-range queries on revlog
+## User Stories Progress
+
+| ID | Title | Status |
+|----|-------|--------|
+| US-001 | Add FSRS fields to echoe_cards table | [ ] |
+| US-002 | Fix elapsed_days calculation in FSRS scheduling | [ ] |
+| US-003 | Persist FSRS state on review | [ ] |
+| US-004 | Add rating preview API endpoint | [ ] |
+| US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [ ] |
+| US-006 | Implement deck recursive aggregation for stats | [ ] |
+| US-007 | Fix Undo to restore complete card state | [ ] |
+| US-008 | Add APKG import page and fix import entry point | [ ] |
+| US-009 | Redesign Flashcards list page with grid layout | [ ] |
+| US-010 | Add search, sort, and collapsible hierarchy | [ ] |
+| US-011 | Update frontend study page to use server rating preview | [ ] |
+| US-012 | Implement Standard Anki APKG import | [ ] |
+| US-013 | Implement Standard Anki APKG export | [ ] |
+| US-014 | Refactor stats service to use FSRS stability | [ ] |
 
 ---
 
-## 2026-03-12 - US-001
-- Implemented `getStreak()` method in `EchoeStatsService`
-- Queries echoeRevlog for past 365 days, converts bigint IDs to UTC dates
-- Logic: today has reviews → count back from today; yesterday has reviews → count back from yesterday; neither → 0
-- Files changed: `apps/server/src/services/echoe-stats.service.ts`
-- **Learnings for future iterations:**
-  - echoeRevlog.id is stored as bigint (Unix ms × 1000), so divide by 1000 to get Unix ms for Date conversion
-  - UTC date boundaries: `today.setUTCHours(0, 0, 0, 0)` then `today.getTime() * 1000` for revlog id threshold
-  - The service uses `getDatabase()` imported from `../db/connection.js`
----
+## Execution Log
 
-## 2026-03-12 - US-002
-- Implemented `getMaturityBatch()` method in `EchoeStatsService`
-- Single SQL query fetches all cards with `did` and `ivl` fields, groups in memory by deckId
-- Classification boundaries match existing `getMaturity()`: ivl=0→new, 0<ivl<21→learning, 21≤ivl<90→young, ivl≥90→mature
-- Returns `{ decks: Array<{ deckId, new, learning, young, mature }> }`
-- Files changed: `apps/server/src/services/echoe-stats.service.ts`
-- **Learnings for future iterations:**
-  - No user filtering needed (single-user system)
-  - `echoeCards.did` is `bigint({ mode: 'number' })` so it's a JS number directly
-  - Grouping in memory (Map) is simpler than SQL GROUP BY with CASE WHEN for this use case
----
-
-## 2026-03-12 - US-003
-- Added `GET /streak` and `GET /maturity/batch` endpoints to `EchoeStatsController`
-- `/streak` calls `echoeStatsService.getStreak()` and returns `{ streak: number }`
-- `/maturity/batch` calls `echoeStatsService.getMaturityBatch()` and returns `{ decks: [...] }`
-- Files changed: `apps/server/src/controllers/v1/echoe-stats.controller.ts`
-- **Learnings for future iterations:**
-  - Stats controller is at `apps/server/src/controllers/v1/echoe-stats.controller.ts` (not `stats.controller.ts` as mentioned in PRD)
-  - Uses `@JsonController('/api/v1/stats')` decorator from `routing-controllers`
-  - Pattern: wrap service call in try/catch, return `ResponseUtil.success(data)` or `ResponseUtil.error(ErrorCode.DB_ERROR)`
----
-
-## 2026-03-12 - US-004
-- Added `getStreak()` and `getMaturityBatch()` API client functions in `apps/web/src/api/echoe.ts`
-- Added `MaturityBatchDeck` interface exported from the same file
-- Functions follow existing pattern: `request.get<unknown, { code: number; data: T }>(url)`
-- Files changed: `apps/web/src/api/echoe.ts`
-- **Learnings for future iterations:**
-  - API client functions in `apps/web/src/api/echoe.ts` follow pattern: `request.get<unknown, { code: number; data: T }>(url)`
-  - Local types/interfaces are defined inline in echoe.ts when not available from `@echoe/dto`
-  - Explicit return type annotations on API functions help TypeScript inference downstream
----
-
-## 2026-03-12 - US-005
-- Created `apps/web/src/services/echoe-dashboard.service.ts` with `EchoeDashboardService`
-- Service manages: `streak`, `maturityBatch`, `history`, `historyDays`, `forecast`, `loading`
-- Methods: `loadStreak()`, `loadMaturityBatch()`, `loadHistory(days)`, `loadForecast()`, `loadAll()`
-- `deckService` getter uses `this.resolve(EchoeDeckService)` for DI access to global deck service
-- Registered as global singleton in `apps/web/src/main.tsx` via `register(EchoeDashboardService)`
-- Files changed: `apps/web/src/services/echoe-dashboard.service.ts`, `apps/web/src/main.tsx`
-- **Learnings for future iterations:**
-  - `HistoryData`/`ForecastData` in PRD = `StudyHistoryDayDto[]`/`ForecastDayDto[]` from `@echoe/dto`
-  - All web services are global singletons registered in main.tsx; dashboard service follows same pattern
-  - `this.resolve(EchoeDeckService)` in a getter provides lazy DI access to the global deck service
----
-
-## 2026-03-12 - US-006
-- Modified `apps/web/src/components/layout.tsx` to update sidebar first item to Dashboard
-- Replaced `Zap` import with `LayoutDashboard` from lucide-react
-- Added `isDashboardPage = location.pathname.startsWith('/dashboard')` variable
-- Replaced conditional-navigation Study button with always-`/dashboard` Dashboard button using `LayoutDashboard` icon
-- Preserved `isStudyPage`, `showFab`, and red `dueCount` badge unchanged
-- Browser verified: clicking "仪表盘" navigates to `/dashboard`
-- Files changed: `apps/web/src/components/layout.tsx`
----
-
-## 2026-03-12 - US-007
-- Registered `/dashboard` route in `apps/web/src/App.tsx` → `DashboardPage`
-- Created placeholder `apps/web/src/pages/dashboard/index.tsx` exporting `DashboardPage` (view component)
-- Browser verified: `/dashboard` renders with Layout sidebar and "仪表盘" placeholder text, no 404
-- Files changed: `apps/web/src/App.tsx`, `apps/web/src/pages/dashboard/index.tsx`
----
-
-## 2026-03-12 - US-008
-- Implemented 今日行动区 (Today's Action Zone) in `apps/web/src/pages/dashboard/index.tsx`
-- Three-column card layout: left (due counts + badges), center (streak + flame icon), right (study button)
-- Calls `deckService.loadDecks()` and `dashboardService.loadAll()` in useEffect
-- Loading state: spinner button; 0 due: "今日已完成 ✓" disabled; >0 due: "开始学习" → `/cards/study`
-- Browser verified: renders correctly with due counts, streak, and disabled completion button
-- Files changed: `apps/web/src/pages/dashboard/index.tsx`
----
-
-## 2026-03-12 - US-009
-- Implemented 卡片集列表区 (Deck List Zone) in `apps/web/src/pages/dashboard/index.tsx`
-- Added `parseDeckName()` to split `::` names into last segment + depth level for indentation display
-- Added `MaturityBar` component: 4-color segment bar (new/learning/young/mature) with proportional widths
-- Added `DeckCard` component: name + depth indent, three badges (blue/orange/green), maturity bar, study button
-- Grid layout (2 cols) for ≤4 decks, list layout (1 col) for >4 decks
-- "学习此卡片集" button → `/cards/study/:deckId` when due > 0; "已完成 ✓" disabled when due = 0
-- Reuses `EchoeDeckService.decks` and `EchoeDashboardService.maturityBatch` (no extra requests)
-- Typecheck passes
-- Files changed: `apps/web/src/pages/dashboard/index.tsx`
-- **Learnings for future iterations:**
-  - `EchoeDeckWithCountsDto` from `@echoe/dto` has `id`, `name`, `newCount`, `learnCount`, `reviewCount` fields
-  - `MaturityBatchDeck` from `../../api/echoe` has `deckId`, `new`, `learning`, `young`, `mature` fields
-  - `useGrid = decks.length <= 4` drives grid vs list layout selection
----
-
-## 2026-03-12 - US-010
-- Implemented 统计趋势图表区 (Statistics Charts Zone) in `apps/web/src/pages/dashboard/index.tsx`
-- Left: LineChart (recharts) showing study history with X=date (MM-DD), Y=review count, custom Tooltip showing count + time spent
-- Left: 7天/30天 toggle buttons call `dashboardService.loadHistory(days)` to refetch
-- Right: BarChart showing 14-day forecast with today's bar highlighted in primary color (#6366F1), others in gray
-- Both charts use `ThemeService.isDark()` for dark mode chart styling (grid, axis, tooltip colors)
-- Data comes from `dashboardService.history` and `dashboardService.forecast` (already loaded by `loadAll()` on mount)
-- No extra API requests needed — data is pre-loaded by `EchoeDashboardService.loadAll()`
-- Typecheck passes (`tsc --noEmit` clean)
-- Files changed: `apps/web/src/pages/dashboard/index.tsx`
-- **Learnings for future iterations:**
-  - recharts `formatter` prop type requires `(value: ValueType | undefined)` — don't annotate as `number` directly
-  - Use `content` prop (custom render function) instead of `formatter` when tooltip needs multiple data fields
-  - `ThemeService.isDark()` from `../../services/theme.service` provides dark mode state for chart styling
-  - `Cell` component from recharts allows per-bar color control in BarChart
----
+<!-- Ralph will append execution notes here -->

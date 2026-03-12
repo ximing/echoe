@@ -1,174 +1,222 @@
 {
-  "project": "echoe",
-  "branchName": "ralph/dashboard",
-  "description": "Dashboard 仪表盘页面 - 将侧边栏第一项改造为三区布局仪表盘，支持全局概览、跨卡片集学习入口、统计趋势图表",
+  "project": "Echoe Flashcards",
+  "branchName": "ralph/fsrs-full-chain",
+  "description": "Flashcards 列表与学习流程 FSRS 全链路改造 - 重构卡片集列表页面并统一到 FSRS 主口径",
   "userStories": [
     {
       "id": "US-001",
-      "title": "后端实现 getStreak() 方法",
-      "description": "As a developer, I need a getStreak() method in EchoeStatsService so that the dashboard can display the user's consecutive learning days.",
+      "title": "Add FSRS fields to echoe_cards table",
+      "description": "As a developer, I need to add stability, difficulty, and last_review fields to the database so FSRS state can persist.",
       "acceptanceCriteria": [
-        "在 apps/server/src/services/echoe-stats.service.ts 中新增 getStreak() 方法",
-        "查询 echoeRevlog 表，使用 id 字段（bigint，Unix 毫秒 × 1000）推算 UTC 日期，与现有 getTodayStats/getHistory 保持一致",
-        "若今天（UTC）有学习记录：streak = 从今天往前连续有记录的天数",
-        "若今天无记录但昨天有记录：streak = 从昨天往前连续有记录的天数（streak 不中断）",
-        "若今天和昨天均无记录：streak = 0",
-        "不做用户过滤（与现有 stats 接口保持一致，系统为单用户场景）",
+        "Add stability (DOUBLE) column to echoe_cards table",
+        "Add difficulty (DOUBLE) column to echoe_cards table",
+        "Add last_review (BIGINT) column to echoe_cards table",
+        "Add composite index on (did, queue, due)",
+        "Add index on (did, last_review)",
+        "Add index on (did, stability)",
+        "Generate and run migration successfully",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "后端实现 getMaturityBatch() 方法",
-      "description": "As a developer, I need a getMaturityBatch() method in EchoeStatsService so that the dashboard can display maturity distribution for all decks in one request.",
+      "title": "Fix elapsed_days calculation in FSRS scheduling",
+      "description": "As a developer, I need to fix the elapsed_days calculation in echoe-study.service.ts to use (now - last_review) instead of ivl.",
       "acceptanceCriteria": [
-        "在 apps/server/src/services/echoe-stats.service.ts 中新增 getMaturityBatch() 方法",
-        "单次 SQL 查询 echoeCards 表，按 did（deckId）分组",
-        "分类边界与现有 getCardMaturity() 完全一致：ivl=0 → new（优先判断）；0<ivl<21 → learning；21≤ivl<90 → young；ivl≥90 → mature",
-        "返回类型：{ decks: Array<{ deckId: number; new: number; learning: number; young: number; mature: number }> }",
-        "不做用户过滤（与现有 stats 接口保持一致）",
-        "Typecheck passes"
+        "In echoe-study.service.ts, change elapsed_days from card.ivl to (now - last_review) / dayMs",
+        "Handle case when last_review is null (treat as new card)",
+        "Typecheck passes",
+        "Tests pass"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "后端注册 streak 和 maturity/batch 路由",
-      "description": "As a developer, I need to register the two new API endpoints in StatsController so that frontend clients can call them.",
+      "title": "Persist FSRS state (stability/difficulty/last_review) on review",
+      "description": "As a developer, I need to ensure stability, difficulty, and last_review are properly stored when a card is reviewed.",
       "acceptanceCriteria": [
-        "在 apps/server/src/controllers/stats.controller.ts 中新增 GET /streak 端点，调用 statsService.getStreak()，返回 { streak: number }",
-        "在 apps/server/src/controllers/stats.controller.ts 中新增 GET /maturity/batch 端点，调用 statsService.getMaturityBatch()，返回 { decks: [...] }",
-        "curl GET /api/v1/stats/streak 返回 HTTP 200 和 { streak: number }",
-        "curl GET /api/v1/stats/maturity/batch 返回 HTTP 200 和 { decks: [...] }",
-        "Typecheck passes"
+        "Store stability from FSRS output to card.stability field",
+        "Store difficulty from FSRS output to card.difficulty field",
+        "Store last_review as current timestamp when review submitted",
+        "Typecheck passes",
+        "Tests pass"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "前端新增 API 客户端函数",
-      "description": "As a developer, I need client-side API functions for the two new endpoints so that the dashboard service can call them.",
+      "title": "Add rating preview API endpoint",
+      "description": "As a user, I want to see the estimated interval before answering so I know when the card will reappear.",
       "acceptanceCriteria": [
-        "在 apps/web/src/api/echoe.ts 中新增 getStreak(): Promise<{ streak: number }> 函数",
-        "在 apps/web/src/api/echoe.ts 中新增 getMaturityBatch(): Promise<{ decks: MaturityBatchDeck[] }> 函数",
-        "导出 MaturityBatchDeck 类型：{ deckId: number; new: number; learning: number; young: number; mature: number }",
+        "Create GET /api/v1/study/options?cardId=... endpoint",
+        "Return four options: Again/Hard/Good/Easy with next interval and due time",
+        "Use FSRS getSchedulingOptions to compute real values",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "新增 EchoeDashboardService 数据服务",
-      "description": "As a developer, I need an EchoeDashboardService (@rabjs/react Service) so that the dashboard page has a reactive data layer.",
+      "title": "Update EchoeDeckWithCountsDto with FSRS metrics",
+      "description": "As a developer, I need to add FSRS metrics to the deck list DTO so the frontend can display maturity and difficulty counts.",
       "acceptanceCriteria": [
-        "新建 apps/web/src/services/echoe-dashboard.service.ts，使用 @rabjs/react Service 模式（参考现有 EchoeStatsService）",
-        "服务管理可观察状态：streak（number）、maturityBatch（MaturityBatchDeck[]）、history（HistoryData）、historyDays（7 | 30）、forecast（ForecastData）、loading（boolean）",
-        "提供方法：loadStreak()、loadMaturityBatch()、loadHistory(days: 7 | 30)、loadForecast()",
-        "decks 数据不在此服务请求，通过 DI 获取 EchoeDeckService 单例",
+        "Add totalCount field to EchoeDeckWithCountsDto",
+        "Add matureCount (stability >= 21) field",
+        "Add difficultCount (retrievability < 0.9) field",
+        "Add averageRetrievability field",
+        "Add lastStudiedAt field",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "修改侧边栏导航至仪表盘",
-      "description": "As a user, I want the first sidebar item to navigate to the dashboard so that I have a central overview page.",
+      "title": "Implement deck recursive aggregation for stats",
+      "description": "As a user, I want parent decks to show aggregated stats from all child decks.",
       "acceptanceCriteria": [
-        "apps/web/src/components/layout.tsx 导入 LayoutDashboard（从 lucide-react），替换 Zap 图标",
-        "第一项路由改为 /dashboard，点击行为始终导航至 /dashboard（不再有条件跳转逻辑）",
-        "新增 isDashboardPage = location.pathname.startsWith('/dashboard')",
-        "第一项 active class 改为使用 isDashboardPage（在 /cards/study 页面时不高亮）",
-        "isStudyPage 变量保留不变，showFab 仍依赖它",
-        "侧边栏红色徽章（待学总数）保留，数字来源不变（EchoeDeckService.getTotalDue()）",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Deck stats query supports recursive aggregation of child decks",
+        "Parent deck matureCount = sum of all child deck matureCounts",
+        "Parent deck difficultCount = sum of all child deck difficultCounts",
+        "Parent deck averageRetrievability = weighted mean of children",
+        "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "注册 /dashboard 路由",
-      "description": "As a developer, I need to register the /dashboard route so that the dashboard page is accessible.",
+      "title": "Fix Undo to restore complete card state",
+      "description": "As a user, I want Undo to restore the exact state before review, including all FSRS fields.",
       "acceptanceCriteria": [
-        "在 apps/web/src/App.tsx（或路由文件）中注册 /dashboard → DashboardPage",
-        "新建 apps/web/src/pages/dashboard/index.tsx，导出 DashboardPage 组件（初始可为占位页面）",
-        "直接访问 /dashboard 可正确渲染页面，不报 404",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Undo restores: due, ivl, factor, reps, lapses, left, type, queue, stability, difficulty, last_review",
+        "Store pre-review snapshot in revlog extension column or separate table",
+        "Remove logic that tries to infer due from lastIvl",
+        "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "实现第一区——今日行动区",
-      "description": "As a user, I want to see today's due count and my streak at a glance, and start studying with one click.",
+      "title": "Add APKG import page and fix import entry point",
+      "description": "As a user, I want a dedicated APKG import page and the import button should go to the correct page.",
       "acceptanceCriteria": [
-        "DashboardPage 在 useEffect 中调用 deckService.loadDecks() 加载 decks 数据",
-        "页面顶部全宽卡片，三列布局：左侧待学数 | 中间 streak | 右侧开始学习按钮",
-        "左侧：大号数字显示今日待学总数（所有 decks 的 newCount + learnCount + reviewCount 之和）",
-        "左侧下方：三个小标签，新卡（蓝色）/ 学习中（橙色）/ 复习（绿色），各自数量",
-        "中间：火焰图标 + 大号 streak 数字 + 下方"已坚持 X 天"文字",
-        "右侧：按钮文案"开始学习"，点击导航至 /cards/study（不传 deckId）",
-        "数据加载中时按钮显示 loading 状态（禁用 + spinner）",
-        "数据加载完成且待学总数为 0 时按钮显示"今日已完成"禁用状态",
+        "Create APKG import page at /import/apkg",
+        "Fix Import .apkg button to navigate to /import/apkg (not CSV import)",
+        "Separate CSV import and APKG import into different entry points",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "实现第二区——卡片集列表",
-      "description": "As a user, I want to see each deck's status and start studying a specific deck from the dashboard.",
+      "title": "Redesign Flashcards list page with grid layout",
+      "description": "As a user, I want to see flashcards in a responsive grid layout with learning metrics.",
       "acceptanceCriteria": [
-        "卡片集 ≤ 4 个时，2 列网格布局；> 4 个时，单列列表布局",
-        "每张卡片展示卡片集名称（:: 分隔符处理层级缩进，显示最后一级名称并缩进）",
-        "每张卡片展示三个数字徽章：新卡（蓝色）/ 学习中（橙色）/ 复习（绿色）",
-        "每张卡片展示成熟度进度条：四段颜色条（新/学习中/年轻/成熟），宽度按比例，数据来自 maturityBatch",
-        "今日有待学时：按钮文案"学习此卡片集"，点击跳转 /cards/study/:deckId",
-        "今日无待学时：按钮显示"已完成 ✓"（禁用状态）",
-        "decks 数据复用 EchoeDeckService 已加载的数据，不发额外请求",
+        "Implement grid layout: 1 column mobile, 2 columns tablet, 4 columns desktop",
+        "Show deck name, total cards, mastery progress bar",
+        "Show new/learn/review badges (color-coded)",
+        "Show last studied time",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-010",
-      "title": "实现第三区——统计趋势图表",
-      "description": "As a user, I want to see my learning history and upcoming forecast so that I can understand my study patterns.",
+      "title": "Add search, sort, and collapsible hierarchy to deck list",
+      "description": "As a user, I want to search decks, sort by different criteria, and collapse/expand child decks.",
       "acceptanceCriteria": [
-        "页面底部两列并排布局（左：学习历史折线图，右：14天预测柱状图）",
-        "左侧折线图：X 轴日期，Y 轴复习数量，Tooltip 展示当天学习数 + 用时",
-        "左侧：页面挂载时默认请求 GET /api/v1/stats/history?days=7",
-        "左侧：提供 7 天 / 30 天切换按钮，切换时重新请求对应数据",
-        "右侧柱状图：X 轴日期，Y 轴预计到期数量，今天对应柱子高亮显示",
-        "右侧：数据来自 GET /api/v1/stats/forecast?days=14",
-        "两个图表均为全局数据，不按卡片集过滤（不传 deckId）",
+        "Add search input that filters deck names in real-time",
+        "Add sort dropdown: by due count, by name A-Z, by last studied",
+        "Show collapse/expand arrows for parent decks with children",
+        "Indent child decks with visual hierarchy (left border)",
+        "Persist collapse state in localStorage or backend",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Update frontend study page to use server rating preview",
+      "description": "As a user, I want the estimated intervals shown below rating buttons to come from the server (FSRS), not local calculation.",
+      "acceptanceCriteria": [
+        "Fetch rating preview from GET /api/v1/study/options when loading study card",
+        "Display server-calculated intervals under each rating button",
+        "Remove local heuristic interval calculation",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement Standard Anki APKG import",
+      "description": "As an Anki user, I want to import official Anki APKG packages with full compatibility.",
+      "acceptanceCriteria": [
+        "Auto-detect package type (Standard Anki vs Echoe Legacy)",
+        "Read col.json for models/decks/dconf (not custom tables)",
+        "Parse media manifest and map数字文件名 to real names",
+        "Import cards with proper FSRS field backfill",
+        "Show detailed import result report with errors",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Implement Standard Anki APKG export",
+      "description": "As a user, I want to export packages that can be opened in Anki Desktop.",
+      "acceptanceCriteria": [
+        "Generate Standard Anki package structure with col.json",
+        "Include media manifest mapping",
+        "Support includeScheduling=false (export as new cards)",
+        "Support includeScheduling=true (export with scheduling and revlog)",
+        "Default to format=anki (not legacy)",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Refactor stats service to use FSRS stability",
+      "description": "As a developer, I need to refactor the stats service to use stability instead of ivl for maturity calculations.",
+      "acceptanceCriteria": [
+        "Update getMaturity to use stability >= 21 for mature classification",
+        "Update getMaturityBatch for batch operations",
+        "Add retrievability calculation: R(t,S) = (1 + t/(9S))^(-1)",
+        "Ensure stats, deck list, and study queue use consistent due time semantics (ms timestamp)",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
       "notes": ""
     }
   ]
