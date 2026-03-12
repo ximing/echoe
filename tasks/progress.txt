@@ -1,5 +1,32 @@
 ## Dashboard 仪表盘页面 Progress
 
 ## Codebase Patterns
+- echoeRevlog.id is bigint (Unix ms × 1000); convert to Date via `new Date(Number(id) / 1000)`
+- Stats service uses UTC dates: `today.setUTCHours(0, 0, 0, 0)` for day boundaries
+- No user filtering in stats service (single-user system)
+- Use `gte(echoeRevlog.id, timestamp * 1000)` for time-range queries on revlog
 
+---
+
+## 2026-03-12 - US-001
+- Implemented `getStreak()` method in `EchoeStatsService`
+- Queries echoeRevlog for past 365 days, converts bigint IDs to UTC dates
+- Logic: today has reviews → count back from today; yesterday has reviews → count back from yesterday; neither → 0
+- Files changed: `apps/server/src/services/echoe-stats.service.ts`
+- **Learnings for future iterations:**
+  - echoeRevlog.id is stored as bigint (Unix ms × 1000), so divide by 1000 to get Unix ms for Date conversion
+  - UTC date boundaries: `today.setUTCHours(0, 0, 0, 0)` then `today.getTime() * 1000` for revlog id threshold
+  - The service uses `getDatabase()` imported from `../db/connection.js`
+---
+
+## 2026-03-12 - US-002
+- Implemented `getMaturityBatch()` method in `EchoeStatsService`
+- Single SQL query fetches all cards with `did` and `ivl` fields, groups in memory by deckId
+- Classification boundaries match existing `getMaturity()`: ivl=0→new, 0<ivl<21→learning, 21≤ivl<90→young, ivl≥90→mature
+- Returns `{ decks: Array<{ deckId, new, learning, young, mature }> }`
+- Files changed: `apps/server/src/services/echoe-stats.service.ts`
+- **Learnings for future iterations:**
+  - No user filtering needed (single-user system)
+  - `echoeCards.did` is `bigint({ mode: 'number' })` so it's a JS number directly
+  - Grouping in memory (Map) is simpler than SQL GROUP BY with CASE WHEN for this use case
 ---
