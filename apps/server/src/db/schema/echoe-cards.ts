@@ -5,11 +5,13 @@ import {
   varchar,
   text,
   index,
+  double,
 } from 'drizzle-orm/mysql-core';
 
 /**
  * Cards table - stores flashcard instances
  * Mirrors Anki 2.1's cards table
+ * Extended with FSRS fields: stability, difficulty, last_review
  */
 export const echoeCards = mysqlTable(
   'echoe_cards',
@@ -32,6 +34,10 @@ export const echoeCards = mysqlTable(
     odid: bigint('odid', { mode: 'number' }).notNull().default(0), // Original deck ID (for filtered decks)
     flags: int('flags').notNull().default(0), // Flags
     data: text('data').notNull().$type<string>(), // Extra data field (JSON)
+    // FSRS fields
+    stability: double('stability').notNull().default(0), // Stability (days) - represents how well the card is remembered
+    difficulty: double('difficulty').notNull().default(0), // Difficulty (0-1) - probability of forgetting
+    lastReview: bigint('last_review', { mode: 'number' }).notNull().default(0), // Last review timestamp (Unix ms)
   },
   (table) => ({
     nidIdx: index('nid_idx').on(table.nid),
@@ -39,6 +45,10 @@ export const echoeCards = mysqlTable(
     usnIdx: index('usn_idx').on(table.usn),
     queueIdx: index('queue_idx').on(table.queue),
     dueIdx: index('due_idx').on(table.due),
+    // FSRS-related indexes
+    didQueueDueIdx: index('did_queue_due_idx').on(table.did, table.queue, table.due),
+    didLastReviewIdx: index('did_last_review_idx').on(table.did, table.lastReview),
+    didStabilityIdx: index('did_stability_idx').on(table.did, table.stability),
   })
 );
 
