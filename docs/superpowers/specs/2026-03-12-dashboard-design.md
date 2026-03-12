@@ -21,7 +21,7 @@
 
 - **新增路由：** `/dashboard` → `DashboardPage` 组件，文件路径 `apps/web/src/pages/dashboard/index.tsx`（遵循现有 pages 目录约定）
 - **侧边栏第一项：** 图标改为 `LayoutDashboard`（从 lucide-react 导入，替换现有 `Zap`），标签"仪表盘"，指向 `/dashboard`
-- **active 状态：** 新增 `isDashboardPage = location.pathname.startsWith('/dashboard')`，第一项 active class 使用此变量；`isStudyPage` 变量重命名为 `isDashboardPage`（`/cards/study` 路由仍然存在，`showFab` 逻辑不变，仍保留 `location.pathname.startsWith('/cards/study')` 判断）
+- **active 状态：** 新增 `isDashboardPage = location.pathname.startsWith('/dashboard')`，第一项 active class 改为使用 `isDashboardPage`（原来用 `isStudyPage`）；`isStudyPage` 变量保留不变，仍用于 `showFab` 判断；在 `/cards/study` 页面时，侧边栏第一项不高亮（`isDashboardPage` 为 false）
 - **侧边栏第一项点击行为：** 始终导航至 `/dashboard`，不再根据 `dueCount` 条件跳转；侧边栏红色徽章（待学总数）保留，数字来源不变（`EchoeDeckService.getTotalDue()`）
 
 ---
@@ -56,7 +56,7 @@
 - **右侧：** "开始学习"按钮，点击导航至 `/cards/study`（不传 deckId，学习全部卡片集）；数据加载完成且待学数为 0 时显示"今日已完成"禁用状态；数据加载中时按钮显示 loading 状态
 
 **数据来源：**
-- 待学数：直接使用 `EchoeDeckService`（已在 `layout.tsx` 中实例化为单例）的 decks 数据聚合 `newCount + learnCount + reviewCount`，避免重复请求。`DashboardPage` 通过 `useService(EchoeDeckService)` 获取同一实例。
+- 待学数：`DashboardPage` 在 `useEffect` 中调用 `deckService.loadDecks()`（与其他页面保持一致的模式），从 `EchoeDeckService` 单例的 `decks` 数据聚合 `newCount + learnCount + reviewCount`。
 - Streak：`GET /api/v1/stats/streak`（新增接口）
 
 ---
@@ -77,7 +77,7 @@
 - 今日无待学时：按钮显示"已完成 ✓"
 
 **数据来源：**
-- 卡片集列表及待学数：复用 `EchoeDeckService` 单例的 decks 数据（与第一区共享，无额外请求）
+- 卡片集列表及待学数：复用 `EchoeDeckService` 单例的 decks 数据（与第一区共享，由第一区的 `loadDecks()` 调用加载，无额外请求）
 - 成熟度：`GET /api/v1/stats/maturity/batch`（新增批量接口，一次返回所有卡片集）
 
 ---
@@ -162,7 +162,7 @@
 
 | 文件 | 变更内容 |
 |------|----------|
-| `apps/web/src/components/layout.tsx` | 1) 导入 `LayoutDashboard`（替换 `Zap`）；2) 第一项路由改为 `/dashboard`，点击行为始终导航至 `/dashboard`；3) 新增 `isDashboardPage = location.pathname.startsWith('/dashboard')`；4) `isStudyPage` 变量保留（`showFab` 仍依赖它） |
+| `apps/web/src/components/layout.tsx` | 1) 导入 `LayoutDashboard`（替换 `Zap`）；2) 第一项路由改为 `/dashboard`，点击行为始终导航至 `/dashboard`；3) 新增 `isDashboardPage = location.pathname.startsWith('/dashboard')`；4) 第一项 active class 改为使用 `isDashboardPage`；5) `isStudyPage` 变量保留（`showFab` 仍依赖它） |
 | `apps/web/src/App.tsx` 或路由文件 | 注册 `/dashboard` 路由，指向 `DashboardPage` |
 | `apps/web/src/api/echoe.ts` | 新增 `getStreak()` 和 `getMaturityBatch()` 客户端 API 函数 |
 | `apps/server/src/controllers/stats.controller.ts` | 新增 `GET /streak` 和 `GET /maturity/batch` 端点 |
