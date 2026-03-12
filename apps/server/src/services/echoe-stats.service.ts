@@ -166,7 +166,24 @@ export class EchoeStatsService {
   }
 
   /**
-   * Get card maturity distribution
+   * Calculate retrievability: R(t,S) = (1 + t/(9S))^(-1)
+   * @param lastReview - Last review timestamp (Unix ms)
+   * @param stability - Stability in days
+   * @returns Retrievability between 0 and 1
+   */
+  private calculateRetrievability(lastReview: number, stability: number): number {
+    if (stability <= 0 || lastReview === 0) {
+      return 1; // New cards have full retrievability
+    }
+    const dayMs = 86400000;
+    const now = Date.now();
+    const t = (now - lastReview) / dayMs; // days since last review
+    const S = stability;
+    return 1 / (1 + t / (9 * S));
+  }
+
+  /**
+   * Get card maturity distribution using FSRS stability
    */
   async getMaturity(deckId?: number): Promise<CardMaturityDto> {
     const db = getDatabase();
@@ -176,14 +193,16 @@ export class EchoeStatsService {
       const deckIds = await this.getDeckAndSubdeckIds(deckId);
       query = db
         .select({
-          ivl: echoeCards.ivl,
+          stability: echoeCards.stability,
+          lastReview: echoeCards.lastReview,
         })
         .from(echoeCards)
         .where(inArray(echoeCards.did, deckIds));
     } else {
       query = db
         .select({
-          ivl: echoeCards.ivl,
+          stability: echoeCards.stability,
+          lastReview: echoeCards.lastReview,
         })
         .from(echoeCards);
     }
@@ -198,12 +217,15 @@ export class EchoeStatsService {
     };
 
     for (const card of cards) {
-      const ivl = card.ivl;
-      if (ivl === 0) {
+      const stability = card.stability;
+      const lastReview = card.lastReview;
+
+      // New card: never reviewed (lastReview = 0) or stability = 0
+      if (lastReview === 0 || stability === 0) {
         maturity.new++;
-      } else if (ivl < 21) {
+      } else if (stability < 21) {
         maturity.learning++;
-      } else if (ivl < 90) {
+      } else if (stability < 90) {
         maturity.young++;
       } else {
         maturity.mature++;
@@ -336,7 +358,7 @@ export class EchoeStatsService {
   }
 
   /**
-   * Get maturity distribution for all decks in a single query
+   * Get maturity distribution for all decks in a single query using FSRS stability
    */
   async getMaturityBatch(): Promise<{
     decks: Array<{
@@ -352,7 +374,8 @@ export class EchoeStatsService {
     const cards = await db
       .select({
         did: echoeCards.did,
-        ivl: echoeCards.ivl,
+        stability: echoeCards.stability,
+        lastReview: echoeCards.lastReview,
       })
       .from(echoeCards);
 
@@ -367,12 +390,15 @@ export class EchoeStatsService {
         deckMap.set(deckId, { new: 0, learning: 0, young: 0, mature: 0 });
       }
       const entry = deckMap.get(deckId)!;
-      const ivl = card.ivl;
-      if (ivl === 0) {
+      const stability = card.stability;
+      const lastReview = card.lastReview;
+
+      // New card: never reviewed (lastReview = 0) or stability = 0
+      if (lastReview === 0 || stability === 0) {
         entry.new++;
-      } else if (ivl < 21) {
+      } else if (stability < 21) {
         entry.learning++;
-      } else if (ivl < 90) {
+      } else if (stability < 90) {
         entry.young++;
       } else {
         entry.mature++;

@@ -212,12 +212,12 @@
         "Update getMaturity to use stability >= 21 for mature classification",
         "Update getMaturityBatch for batch operations",
         "Add retrievability calculation: R(t,S) = (1 + t/(9S))^(-1)",
-        "Ensure stats, deck list, and study queue use consistent due time semantics (ms timestamp)",
+        "Ensure stats, deck list, study queue use consistent due time semantics (ms timestamp)",
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated getMaturity and getMaturityBatch to use stability instead of ivl. Added calculateRetrievability helper method with formula R(t,S) = (1 + t/(9S))^(-1). Maturity: new (lastReview=0 or stability=0), learning (0<stability<21), young (21<=stability<90), mature (stability>=21)."
     }
   ]
 }
