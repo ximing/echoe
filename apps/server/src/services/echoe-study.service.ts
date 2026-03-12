@@ -261,6 +261,10 @@ export class EchoeStudyService {
         queue: newQueue,
         mod: Math.floor(now.getTime() / 1000),
         usn: -1,
+        // FSRS fields
+        stability: schedulingResult.stability,
+        difficulty: schedulingResult.difficulty,
+        lastReview: now.getTime(),
       })
       .where(eq(echoeCards.id, dto.cardId));
 
