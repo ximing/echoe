@@ -32,6 +32,16 @@ export interface EchoeDeckWithCountsDto extends EchoeDeckDto {
   learnCount: number;
   /** Number of review cards due */
   reviewCount: number;
+  /** Total number of cards in this deck */
+  totalCount: number;
+  /** Number of mature cards (stability >= 21 days) */
+  matureCount: number;
+  /** Number of difficult cards (retrievability < 0.9) */
+  difficultCount: number;
+  /** Average retrievability of cards in this deck (0-1) */
+  averageRetrievability: number;
+  /** Last studied timestamp (Unix ms), null if never studied */
+  lastStudiedAt: number | null;
   /** Child decks */
   children: EchoeDeckWithCountsDto[];
 }

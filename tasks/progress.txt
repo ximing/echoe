@@ -8,7 +8,7 @@
 | US-002 | Fix elapsed_days calculation in FSRS scheduling | [x] |
 | US-003 | Persist FSRS state on review | [x] |
 | US-004 | Add rating preview API endpoint | [x] |
-| US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [ ] |
+| US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [x] |
 | US-006 | Implement deck recursive aggregation for stats | [ ] |
 | US-007 | Fix Undo to restore complete card state | [ ] |
 | US-008 | Add APKG import page and fix import entry point | [ ] |
@@ -61,4 +61,19 @@
   - Use card.stability if available, fallback to card.factor/1000 for backward compatibility
   - The getSchedulingOptions method already exists in FSRSService - reuse it
   - Rating values: 1=Again, 2=Hard, 3=Good, 4=Easy
+---
+
+## 2026-03-12 14:30 - US-005
+- Added FSRS metrics to EchoeDeckWithCountsDto in DTO package
+- Added fields: totalCount, matureCount (stability >= 21), difficultCount (retrievability < 0.9), averageRetrievability, lastStudiedAt
+- Updated getAllDecks() to query FSRS stats with SQL aggregations
+- Updated getDeckById() to include FSRS metrics
+- Updated createDeck() to return zero values for new FSRS fields
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Retrievability formula: R(t,S) = (1 + t/(9S))^(-1), where t = time since last review in days, S = stability
+  - Difficult cards are those with retrievability < 0.9 (i.e., time since review > stability * dayMs * 0.111...)
+  - Mature cards are defined as stability >= 21 days
+  - lastStudiedAt uses MAX(last_review) timestamp, returns null if never studied
 ---

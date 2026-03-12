@@ -51,7 +51,27 @@ export class EchoeDeckService {
       .from(echoeCards)
       .groupBy(echoeCards.did);
 
-    // Create a map for quick lookup
+    // Get FSRS stats grouped by deck
+    const now = Date.now();
+    const dayMs = 86400000;
+    const cardsWithFsrsStats = await db
+      .select({
+        did: echoeCards.did,
+        totalCount: sql<number>`COUNT(*)`,
+        matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
+        // Retrievability R(t,S) = (1 + t/(9S))^(-1), difficult if R < 0.9
+        // t = (now - last_review) / dayMs, S = stability
+        // For performance, we use a simplified check: if stability > 0 and (1 + (now-last_review)/(9*stability*dayMs))^-1 < 0.9
+        // This simplifies to: last_review > 0 AND stability > 0 AND (now - last_review) > stability * dayMs * (1/0.9 - 1) = stability * dayMs * 0.111...
+        // Actually: R < 0.9 means (1 + t/(9S))^-1 < 0.9 => 1 + t/(9S) > 1/0.9 => t/(9S) > 0.111... => t > S * dayMs * 0.111...
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${dayMs} * 0.111111111) THEN 1 ELSE 0 END)`,
+        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN POWER(1 + (${now} - ${echoeCards.lastReview}) / (9 * ${echoeCards.stability} * ${dayMs}), -1) ELSE NULL END)`,
+        lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
+      })
+      .from(echoeCards)
+      .groupBy(echoeCards.did);
+
+    // Create maps for quick lookup
     const countsMap = new Map<number, { newCount: number; learnCount: number; reviewCount: number }>();
     for (const card of cardsWithCounts) {
       countsMap.set(Number(card.did), {
@@ -61,9 +81,36 @@ export class EchoeDeckService {
       });
     }
 
+    const fsrsMap = new Map<
+      number,
+      {
+        totalCount: number;
+        matureCount: number;
+        difficultCount: number;
+        averageRetrievability: number;
+        lastStudiedAt: number | null;
+      }
+    >();
+    for (const card of cardsWithFsrsStats) {
+      fsrsMap.set(Number(card.did), {
+        totalCount: Number(card.totalCount) || 0,
+        matureCount: Number(card.matureCount) || 0,
+        difficultCount: Number(card.difficultCount) || 0,
+        averageRetrievability: Number(card.averageRetrievability) || 0,
+        lastStudiedAt: card.lastStudiedAt ? Number(card.lastStudiedAt) : null,
+      });
+    }
+
     // Convert to DTOs with counts
     const decksWithCounts: EchoeDeckWithCountsDto[] = decks.map((deck) => {
       const counts = countsMap.get(Number(deck.id)) || { newCount: 0, learnCount: 0, reviewCount: 0 };
+      const fsrs = fsrsMap.get(Number(deck.id)) || {
+        totalCount: 0,
+        matureCount: 0,
+        difficultCount: 0,
+        averageRetrievability: 0,
+        lastStudiedAt: null,
+      };
       return {
         id: Number(deck.id),
         name: deck.name,
@@ -78,6 +125,11 @@ export class EchoeDeckService {
         newCount: counts.newCount,
         learnCount: counts.learnCount,
         reviewCount: counts.reviewCount,
+        totalCount: fsrs.totalCount,
+        matureCount: fsrs.matureCount,
+        difficultCount: fsrs.difficultCount,
+        averageRetrievability: fsrs.averageRetrievability,
+        lastStudiedAt: fsrs.lastStudiedAt,
         children: [],
       };
     });
@@ -145,7 +197,30 @@ export class EchoeDeckService {
       .where(eq(echoeCards.did, id))
       .groupBy(echoeCards.did);
 
+    // Get FSRS stats for this deck
+    const now = Date.now();
+    const dayMs = 86400000;
+    const fsrsStats = await db
+      .select({
+        did: echoeCards.did,
+        totalCount: sql<number>`COUNT(*)`,
+        matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${dayMs} * 0.111111111) THEN 1 ELSE 0 END)`,
+        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN POWER(1 + (${now} - ${echoeCards.lastReview}) / (9 * ${echoeCards.stability} * ${dayMs}), -1) ELSE NULL END)`,
+        lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
+      })
+      .from(echoeCards)
+      .where(eq(echoeCards.did, id))
+      .groupBy(echoeCards.did);
+
     const count = counts[0] || { newCount: 0, learnCount: 0, reviewCount: 0 };
+    const fsrs = fsrsStats[0] || {
+      totalCount: 0,
+      matureCount: 0,
+      difficultCount: 0,
+      averageRetrievability: 0,
+      lastStudiedAt: null,
+    };
 
     return {
       id: Number(deck[0].id),
@@ -161,6 +236,11 @@ export class EchoeDeckService {
       newCount: Number(count.newCount) || 0,
       learnCount: Number(count.learnCount) || 0,
       reviewCount: Number(count.reviewCount) || 0,
+      totalCount: Number(fsrs.totalCount) || 0,
+      matureCount: Number(fsrs.matureCount) || 0,
+      difficultCount: Number(fsrs.difficultCount) || 0,
+      averageRetrievability: Number(fsrs.averageRetrievability) || 0,
+      lastStudiedAt: fsrs.lastStudiedAt ? Number(fsrs.lastStudiedAt) : null,
       children: [],
     };
   }
@@ -225,6 +305,11 @@ export class EchoeDeckService {
       newCount: 0,
       learnCount: 0,
       reviewCount: 0,
+      totalCount: 0,
+      matureCount: 0,
+      difficultCount: 0,
+      averageRetrievability: 0,
+      lastStudiedAt: null,
       children: [],
     };
   }
