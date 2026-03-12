@@ -168,7 +168,7 @@ const CardsPageContent = view(() => {
 
   // Handle import
   const handleImport = () => {
-    navigate('/cards/import/csv');
+    navigate('/cards/import/apkg');
   };
 
   // Render deck row recursively

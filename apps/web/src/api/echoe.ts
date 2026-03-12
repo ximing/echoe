@@ -32,6 +32,7 @@ import type {
   FindDuplicatesDto,
   DuplicateGroupDto,
   MergeDuplicatesDto,
+  ImportResultDto,
 } from '@echoe/dto';
 import request from '../utils/request';
 
@@ -639,5 +640,25 @@ export const mergeDuplicates = (dto: MergeDuplicatesDto) => {
   return request.post<{ success: boolean }, { code: number; data: { success: boolean } }>(
     '/api/v1/notes/merge-duplicates',
     dto
+  );
+};
+
+// ===== APKG Import =====
+
+/**
+ * Import an APKG file
+ */
+export const importApkg = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return request.post<unknown, { code: number; data: ImportResultDto }>(
+    '/api/v1/import/apkg',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
   );
 };

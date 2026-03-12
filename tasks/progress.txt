@@ -112,4 +112,18 @@
   - Store pre-review snapshot in revlog for undo instead of inferring from lastIvl
   - The preDue is stored as a timestamp (ms), not interval days
   - All card state fields (due, ivl, factor, reps, lapses, left, type, queue) plus FSRS fields (stability, difficulty, lastReview) should be restored from pre-review snapshot
+
+---
+
+## 2026-03-12 16:30 - US-008
+- Created APKG import page at /cards/import/apkg with full UI
+- Added importApkg API function to echoe.ts using ImportResultDto
+- Fixed Import .apkg button in cards index page to navigate to /cards/import/apkg
+- Added route in App.tsx for /cards/import/apkg
+- Server typecheck passes, web has pre-existing errors unrelated to this story
+
+**Learnings for future iterations:**
+  - Use ImportResultDto from @echoe/dto for import results (has notesAdded, cardsAdded, etc.)
+  - API response returns ImportResultDto directly in response.data (axios interceptor unwraps)
+  - Routes under /cards use Layout wrapper with ProtectedRoute
 ---

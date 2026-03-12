@@ -10,6 +10,7 @@ import NoteTypesPage from './pages/cards/notetypes';
 import TagsPage from './pages/cards/tags';
 import MediaPage from './pages/cards/media';
 import CsvImportPage from './pages/cards/csv-import';
+import ApkgImportPage from './pages/cards/apkg-import';
 import DuplicatesPage from './pages/cards/duplicates';
 import LandingPage from './pages/landing';
 import SettingsPage from './pages/settings';
@@ -186,6 +187,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <CsvImportPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cards/import/apkg"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ApkgImportPage />
               </Layout>
             </ProtectedRoute>
           }
