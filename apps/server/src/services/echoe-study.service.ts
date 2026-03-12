@@ -175,12 +175,19 @@ export class EchoeStudyService {
     // Build FSRS config from deck config
     const fsrsConfig = this.getFSRSConfig(deckConfig);
 
+    // Calculate elapsed_days since last review
+    // dayMs = 24 * 60 * 60 * 1000 = 86400000
+    const dayMs = 24 * 60 * 60 * 1000;
+    const elapsedDays = card.lastReview && card.lastReview > 0
+      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
+      : 0;
+
     // Create FSRS card input from database card
     const fsCardInput = {
       due: new Date(card.due),
       stability: card.factor / 1000, // Convert from permille to decimal
       difficulty: 0, // Will be calculated by FSRS
-      elapsed_days: Math.max(card.ivl, 0),
+      elapsed_days: elapsedDays,
       scheduled_days: card.ivl,
       learning_steps: card.left,
       reps: card.reps,

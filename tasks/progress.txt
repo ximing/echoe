@@ -5,7 +5,7 @@
 | ID | Title | Status |
 |----|-------|--------|
 | US-001 | Add FSRS fields to echoe_cards table | [x] |
-| US-002 | Fix elapsed_days calculation in FSRS scheduling | [ ] |
+| US-002 | Fix elapsed_days calculation in FSRS scheduling | [x] |
 | US-003 | Persist FSRS state on review | [ ] |
 | US-004 | Add rating preview API endpoint | [ ] |
 | US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [ ] |
@@ -36,3 +36,15 @@
   - Server build passes even if web app has type errors (separate packages)
 ---
 
+## 2026-03-12 12:20 - US-002
+- Fixed elapsed_days calculation in echoe-study.service.ts
+- Changed from `Math.max(card.ivl, 0)` to calculate based on `(now - last_review) / dayMs`
+- Added null check: if lastReview is 0 or null, treat as new card (elapsed_days = 0)
+- Server typecheck passes
+- All 58 tests pass
+
+**Learnings for future iterations:**
+  - elapsed_days should represent actual time since last review, not the interval
+  - For new cards (lastReview = 0), use elapsed_days = 0 to let FSRS calculate initial values
+  - The schema field is `lastReview` (camelCase) which maps to `last_review` in database
+---
