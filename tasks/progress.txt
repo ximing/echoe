@@ -41,3 +41,14 @@
   - Uses `@JsonController('/api/v1/stats')` decorator from `routing-controllers`
   - Pattern: wrap service call in try/catch, return `ResponseUtil.success(data)` or `ResponseUtil.error(ErrorCode.DB_ERROR)`
 ---
+
+## 2026-03-12 - US-004
+- Added `getStreak()` and `getMaturityBatch()` API client functions in `apps/web/src/api/echoe.ts`
+- Added `MaturityBatchDeck` interface exported from the same file
+- Functions follow existing pattern: `request.get<unknown, { code: number; data: T }>(url)`
+- Files changed: `apps/web/src/api/echoe.ts`
+- **Learnings for future iterations:**
+  - API client functions in `apps/web/src/api/echoe.ts` follow pattern: `request.get<unknown, { code: number; data: T }>(url)`
+  - Local types/interfaces are defined inline in echoe.ts when not available from `@echoe/dto`
+  - Explicit return type annotations on API functions help TypeScript inference downstream
+---
