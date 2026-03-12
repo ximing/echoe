@@ -272,7 +272,7 @@ function processLatex(template: string): string {
  * In Anki, {{FrontSide}} includes the front template content
  */
 function processFrontSide(template: string, frontContent: string): string {
-  return template.replace(/\{\{FrontSide\}\}/g, frontContent);
+  return template.replace(/\{\{\s*FrontSide\s*\}\}/g, () => frontContent);
 }
 
 /**
@@ -346,6 +346,7 @@ function renderTemplate(
   richTextFields: Record<string, Record<string, any>> | undefined,
   side: 'front' | 'back',
   clozeOrdinal?: number,
+  frontTemplate?: string,
   _recursionDepth = 0
 ): string {
   // Prevent infinite recursion from FrontSide processing (max 2 levels)
@@ -356,11 +357,11 @@ function renderTemplate(
   let result = template;
 
   // Process FrontSide only when rendering back side
-  if (side === 'back' && template.includes('{{FrontSide}}')) {
-    // Render front template separately to get front content
-    const frontTemplate = template.replace(/[\s\S]*\{\{FrontSide\}\}[\s\S]*/g, '');
-    const frontContent = renderTemplate(frontTemplate, fields, richTextFields, 'front', clozeOrdinal, _recursionDepth + 1);
-    result = processFrontSide(template, frontContent);
+  if (side === 'back' && /\{\{\s*FrontSide\s*\}\}/.test(template)) {
+    const renderedFront = frontTemplate
+      ? renderTemplate(frontTemplate, fields, richTextFields, 'front', clozeOrdinal, undefined, _recursionDepth + 1)
+      : '';
+    result = processFrontSide(result, renderedFront);
   }
 
   // Process conditionals (now supports rich text fields)
@@ -423,12 +424,12 @@ export function CardRenderer({
   // Process type-answer after sanitization
   const processedContent = useMemo(() => {
     const template = side === 'front' ? qfmt : afmt;
-    const rendered = renderTemplate(template, fields, richTextFields, side, clozeOrdinal);
+    const rendered = renderTemplate(template, fields, richTextFields, side, clozeOrdinal, qfmt);
     const sanitized = sanitizeHtml(rendered);
 
     // Process type-answer inputs
     return processTypeAnswer(sanitized, fields, localTypedAnswers, side);
-  }, [qfmt, afmt, fields, side, clozeOrdinal, localTypedAnswers]);
+  }, [qfmt, afmt, fields, richTextFields, side, clozeOrdinal, localTypedAnswers]);
 
   // Auto-play audio based on autoplay setting and side
   useEffect(() => {

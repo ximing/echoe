@@ -63,6 +63,27 @@ describe('prosemirror-serializer', () => {
       expect(html).toContain('italic text');
     });
 
+    it('converts strike text to <s> tag', () => {
+      const doc: ProseMirrorJsonDoc = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'strike text',
+                marks: [{ type: 'strike' }],
+              },
+            ],
+          },
+        ],
+      };
+      const html = serializeToHtml(doc);
+      expect(html).toContain('<s>');
+      expect(html).toContain('strike text');
+    });
+
     it('converts a bullet list to <ul>', () => {
       const doc: ProseMirrorJsonDoc = {
         type: 'doc',

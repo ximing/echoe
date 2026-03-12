@@ -94,6 +94,32 @@ describe('normalizeNoteFields', () => {
       expect(result.fieldsJson['Front']).toContain('Rich version');
       expect(result.fieldsJson['Front']).not.toBe('Plain version');
     });
+
+    it('supports strike mark emitted by the rich text editor', () => {
+      const frontDoc: ProseMirrorJsonDoc = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'striked',
+                marks: [{ type: 'strike' }],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = normalizeNoteFields({
+        notetypeFields: ['Front'],
+        richTextFields: { Front: frontDoc },
+      });
+
+      expect(result.fieldsJson['Front']).toContain('<s>');
+      expect(result.sfld).toBe('striked');
+    });
   });
 
   describe('mixed input', () => {

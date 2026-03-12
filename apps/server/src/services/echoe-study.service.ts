@@ -104,9 +104,10 @@ export class EchoeStudyService {
       // Determine cloze ordinal - for cloze cards, templateOrd IS the cloze ordinal
       const clozeOrdinal = noteType.type === 1 ? card.ord + 1 : 0;
 
-      // Render front and back with cloze awareness
+      // Render front first so {{FrontSide}} in back template can be resolved.
       const front = this.renderTemplate(template.qfmt, fieldMap, 'front', clozeOrdinal);
-      const back = this.renderTemplate(template.afmt || template.qfmt, fieldMap, 'back', clozeOrdinal);
+      const backTemplate = this.injectFrontSide(template.afmt || template.qfmt, front);
+      const back = this.renderTemplate(backTemplate, fieldMap, 'back', clozeOrdinal);
 
       result.push({
         cardId: card.id,
@@ -652,6 +653,13 @@ export class EchoeStudyService {
       }
     }
     return [];
+  }
+
+  /**
+   * Replace {{FrontSide}} in back template with rendered front content.
+   */
+  private injectFrontSide(template: string, frontContent: string): string {
+    return template.replace(/\{\{\s*FrontSide\s*\}\}/g, () => frontContent);
   }
 
   /**

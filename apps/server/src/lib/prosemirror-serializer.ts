@@ -12,14 +12,18 @@ import { generateHTML, generateText } from '@tiptap/core';
 import Bold from '@tiptap/extension-bold';
 import Blockquote from '@tiptap/extension-blockquote';
 import BulletList from '@tiptap/extension-bullet-list';
+import Code from '@tiptap/extension-code';
 import CodeBlock from '@tiptap/extension-code-block';
 import Document from '@tiptap/extension-document';
 import HardBreak from '@tiptap/extension-hard-break';
 import Heading from '@tiptap/extension-heading';
+import Image from '@tiptap/extension-image';
 import Italic from '@tiptap/extension-italic';
+import Link from '@tiptap/extension-link';
 import ListItem from '@tiptap/extension-list-item';
 import OrderedList from '@tiptap/extension-ordered-list';
 import Paragraph from '@tiptap/extension-paragraph';
+import Strike from '@tiptap/extension-strike';
 import Text from '@tiptap/extension-text';
 import Underline from '@tiptap/extension-underline';
 import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
@@ -39,9 +43,10 @@ if (typeof g['window'] === 'undefined') {
 
 /**
  * The set of Tiptap extensions used for serialization.
- * Covers all node/mark types required by the acceptance criteria:
- * paragraph, text, bold, italic, underline, heading, bulletList,
- * orderedList, listItem, codeBlock, blockquote, hardBreak
+ * Covers node/mark types emitted by the web rich-text editor:
+ * paragraph, text, bold, italic, underline, strike, code, link,
+ * image, heading, bulletList, orderedList, listItem, codeBlock,
+ * blockquote, hardBreak
  */
 const SERIALIZER_EXTENSIONS = [
   Document,
@@ -50,6 +55,9 @@ const SERIALIZER_EXTENSIONS = [
   Bold,
   Italic,
   Underline,
+  Strike,
+  Code,
+  Link,
   Heading,
   BulletList,
   OrderedList,
@@ -57,6 +65,7 @@ const SERIALIZER_EXTENSIONS = [
   CodeBlock,
   Blockquote,
   HardBreak,
+  Image,
 ];
 
 /**

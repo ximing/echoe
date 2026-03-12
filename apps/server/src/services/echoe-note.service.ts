@@ -477,7 +477,12 @@ export class EchoeNoteService {
     // Get paginated cards
     const offset = (page - 1) * limit;
     const cards = await db
-      .select()
+      .select({
+        card: echoeCards,
+        note: echoeNotes,
+        deck: echoeDecks,
+        notetype: echoeNotetypes,
+      })
       .from(echoeCards)
       .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.id))
       .leftJoin(echoeDecks, eq(echoeCards.did, echoeDecks.id))
@@ -488,44 +493,53 @@ export class EchoeNoteService {
       .offset(offset);
 
     // Map to DTO
-    const result: EchoeCardListItemDto[] = cards.map((row) => {
-      const card = row.echoeCards;
-      const note = row.echoeNotes;
-      const deck = row.echoeDecks;
-      const notetype = row.echoeNotetypes;
+    const result: EchoeCardListItemDto[] = cards
+      .map((row: any) => {
+        const card = row.card;
+        const note = row.note;
+        const deck = row.deck;
+        const notetype = row.notetype;
 
-      // Get front field from fieldsJson (primary source)
-      const noteFields = note ? this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld) : {};
-      let front = '';
-      const firstFieldValue = Object.values(noteFields)[0] || '';
-      front = firstFieldValue.replace(/<[^>]*>/g, '').trim();
-      if (front.length > 100) {
-        front = front.substring(0, 100) + '...';
-      }
+        if (!card) {
+          logger.warn('Skip card row without base card data in getCards()', {
+            rowKeys: Object.keys(row || {}),
+          });
+          return null;
+        }
 
-      return {
-        id: Number(card.id),
-        nid: Number(card.nid),
-        did: Number(card.did),
-        deckName: deck?.name || 'Unknown',
-        ord: card.ord,
-        type: card.type,
-        queue: card.queue,
-        due: card.due,
-        ivl: card.ivl,
-        factor: card.factor,
-        reps: card.reps,
-        lapses: card.lapses,
-        front,
-        fields: noteFields,
-        tags: note ? this.parseNoteTags(note.tags) : [],
-        mid: Number(note?.mid || 0),
-        notetypeName: notetype?.name || 'Unknown',
-        notetypeType: notetype?.type || 0,
-        addedAt: Number(card.id) < 100000000000 ? Number(card.id) : Math.floor(Number(card.id) / 1000),
-        mod: note?.mod || card.mod,
-      };
-    });
+        // Get front field from fieldsJson (primary source)
+        const noteFields = note ? this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld) : {};
+        let front = '';
+        const firstFieldValue = Object.values(noteFields)[0] || '';
+        front = firstFieldValue.replace(/<[^>]*>/g, '').trim();
+        if (front.length > 100) {
+          front = front.substring(0, 100) + '...';
+        }
+
+        return {
+          id: Number(card.id),
+          nid: Number(card.nid),
+          did: Number(card.did),
+          deckName: deck?.name || 'Unknown',
+          ord: card.ord,
+          type: card.type,
+          queue: card.queue,
+          due: card.due,
+          ivl: card.ivl,
+          factor: card.factor,
+          reps: card.reps,
+          lapses: card.lapses,
+          front,
+          fields: noteFields,
+          tags: note ? this.parseNoteTags(note.tags) : [],
+          mid: Number(note?.mid || 0),
+          notetypeName: notetype?.name || 'Unknown',
+          notetypeType: notetype?.type || 0,
+          addedAt: Number(card.id) < 100000000000 ? Number(card.id) : Math.floor(Number(card.id) / 1000),
+          mod: note?.mod || card.mod,
+        };
+      })
+      .filter((item): item is EchoeCardListItemDto => item !== null);
 
     return { cards: result, total };
   }
