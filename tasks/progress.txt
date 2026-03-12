@@ -85,3 +85,12 @@
 - Browser verified: `/dashboard` renders with Layout sidebar and "仪表盘" placeholder text, no 404
 - Files changed: `apps/web/src/App.tsx`, `apps/web/src/pages/dashboard/index.tsx`
 ---
+
+## 2026-03-12 - US-008
+- Implemented 今日行动区 (Today's Action Zone) in `apps/web/src/pages/dashboard/index.tsx`
+- Three-column card layout: left (due counts + badges), center (streak + flame icon), right (study button)
+- Calls `deckService.loadDecks()` and `dashboardService.loadAll()` in useEffect
+- Loading state: spinner button; 0 due: "今日已完成 ✓" disabled; >0 due: "开始学习" → `/cards/study`
+- Browser verified: renders correctly with due counts, streak, and disabled completion button
+- Files changed: `apps/web/src/pages/dashboard/index.tsx`
+---
