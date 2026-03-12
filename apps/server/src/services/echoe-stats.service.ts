@@ -336,6 +336,58 @@ export class EchoeStatsService {
   }
 
   /**
+   * Get maturity distribution for all decks in a single query
+   */
+  async getMaturityBatch(): Promise<{
+    decks: Array<{
+      deckId: number;
+      new: number;
+      learning: number;
+      young: number;
+      mature: number;
+    }>;
+  }> {
+    const db = getDatabase();
+
+    const cards = await db
+      .select({
+        did: echoeCards.did,
+        ivl: echoeCards.ivl,
+      })
+      .from(echoeCards);
+
+    const deckMap = new Map<
+      number,
+      { new: number; learning: number; young: number; mature: number }
+    >();
+
+    for (const card of cards) {
+      const deckId = card.did;
+      if (!deckMap.has(deckId)) {
+        deckMap.set(deckId, { new: 0, learning: 0, young: 0, mature: 0 });
+      }
+      const entry = deckMap.get(deckId)!;
+      const ivl = card.ivl;
+      if (ivl === 0) {
+        entry.new++;
+      } else if (ivl < 21) {
+        entry.learning++;
+      } else if (ivl < 90) {
+        entry.young++;
+      } else {
+        entry.mature++;
+      }
+    }
+
+    return {
+      decks: Array.from(deckMap.entries()).map(([deckId, counts]) => ({
+        deckId,
+        ...counts,
+      })),
+    };
+  }
+
+  /**
    * Get deck and all sub-deck IDs
    */
   private async getDeckAndSubdeckIds(id: number): Promise<number[]> {
