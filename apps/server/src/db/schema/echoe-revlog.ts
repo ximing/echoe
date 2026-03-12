@@ -3,11 +3,14 @@ import {
   bigint,
   int,
   index,
+  double,
+  text,
 } from 'drizzle-orm/mysql-core';
 
 /**
  * Review log table - stores review history
  * Mirrors Anki 2.1's revlog table
+ * Extended with FSRS fields and pre-review snapshot for undo functionality
  */
 export const echoeRevlog = mysqlTable(
   'echoe_revlog',
@@ -21,6 +24,22 @@ export const echoeRevlog = mysqlTable(
     factor: int('factor').notNull(), // Ease factor after this review (permille)
     time: int('time').notNull(), // Time taken for this review (ms)
     type: int('type').notNull(), // Review type: 0=learning, 1=review, 2=relearning, 3=filtered, 4=custom study
+    // FSRS fields (current state after review)
+    stability: double('stability').notNull().default(0), // Stability after this review
+    difficulty: double('difficulty').notNull().default(0), // Difficulty after this review
+    lastReview: bigint('last_review', { mode: 'number' }).notNull().default(0), // Last review timestamp (Unix ms)
+    // Pre-review snapshot (for undo functionality)
+    preDue: bigint('pre_due', { mode: 'number' }).notNull().default(0), // Due timestamp before review
+    preIvl: int('pre_ivl').notNull().default(0), // Interval before review
+    preFactor: int('pre_factor').notNull().default(0), // Ease factor before review
+    preReps: int('pre_reps').notNull().default(0), // Reps count before review
+    preLapses: int('pre_lapses').notNull().default(0), // Lapses count before review
+    preLeft: int('pre_left').notNull().default(0), // Steps left before review
+    preType: int('pre_type').notNull().default(0), // Card type before review
+    preQueue: int('pre_queue').notNull().default(0), // Queue before review
+    preStability: double('pre_stability').notNull().default(0), // Stability before review
+    preDifficulty: double('pre_difficulty').notNull().default(0), // Difficulty before review
+    preLastReview: bigint('pre_last_review', { mode: 'number' }).notNull().default(0), // Last review before review
   },
   (table) => ({
     cidIdx: index('cid_idx').on(table.cid),

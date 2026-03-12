@@ -36,6 +36,13 @@
       "when": 1773286703537,
       "tag": "0004_huge_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1773288478292,
+      "tag": "0005_powerful_moon_knight",
+      "breakpoints": true
     }
   ]
 }

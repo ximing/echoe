@@ -283,11 +283,22 @@ export class EchoeStudyService {
       factor: Math.round(schedulingResult.stability * 1000),
       time: dto.timeTaken,
       type: 4, // Custom study type
-      step: card.left,
-      id_: reviewTime * 1000,
-      cid_: card.nid,
-      nid_: card.nid,
-      lid_: 0,
+      // FSRS fields (post-review state)
+      stability: schedulingResult.stability,
+      difficulty: schedulingResult.difficulty,
+      lastReview: now.getTime(),
+      // Pre-review snapshot (for undo functionality)
+      preDue: card.due,
+      preIvl: card.ivl,
+      preFactor: card.factor,
+      preReps: card.reps,
+      preLapses: card.lapses,
+      preLeft: card.left,
+      preType: card.type,
+      preQueue: card.queue,
+      preStability: card.stability,
+      preDifficulty: card.difficulty,
+      preLastReview: card.lastReview,
     });
 
     // Leech detection - check if card lapsed and exceeds threshold
@@ -421,20 +432,24 @@ export class EchoeStudyService {
       };
     }
 
-    // Restore card to previous state
+    // Restore card to previous state using pre-review snapshot
     const now = Math.floor(Date.now() / 1000);
-    const lastIvl = lastReview.lastIvl;
     await db
       .update(echoeCards)
       .set({
-        due: lastIvl > 0 ? lastIvl * 24 * 60 * 60 * 1000 : 0,
-        ivl: lastIvl,
-        factor: lastReview.factor,
-        reps: Math.max(0, card.reps - 1),
-        lapses: card.lapses,
-        left: lastReview.step,
-        type: lastReview.type,
-        queue: lastReview.type,
+        // Restore from pre-review snapshot (stored in revlog)
+        due: lastReview.preDue,
+        ivl: lastReview.preIvl,
+        factor: lastReview.preFactor,
+        reps: lastReview.preReps,
+        lapses: lastReview.preLapses,
+        left: lastReview.preLeft,
+        type: lastReview.preType,
+        queue: lastReview.preQueue,
+        // Restore FSRS fields from pre-review snapshot
+        stability: lastReview.preStability,
+        difficulty: lastReview.preDifficulty,
+        lastReview: lastReview.preLastReview,
         mod: now,
         usn: -1,
       })
