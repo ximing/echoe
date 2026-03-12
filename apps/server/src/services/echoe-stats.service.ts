@@ -282,6 +282,60 @@ export class EchoeStatsService {
   }
 
   /**
+   * Get the user's consecutive learning streak in days
+   */
+  async getStreak(): Promise<number> {
+    const db = getDatabase();
+
+    // Get today's start (UTC midnight)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    // We look back up to 365 days to find the streak
+    const maxDays = 365;
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - maxDays);
+    const startTimestamp = startDate.getTime();
+
+    // Query all review log IDs (bigint, Unix ms × 1000) from the past year
+    const reviews = await db
+      .select({ id: echoeRevlog.id })
+      .from(echoeRevlog)
+      .where(gte(echoeRevlog.id, startTimestamp * 1000));
+
+    // Build a set of UTC date strings that have reviews
+    const daysWithReviews = new Set<string>();
+    for (const review of reviews) {
+      const date = new Date(Number(review.id) / 1000);
+      daysWithReviews.add(date.toISOString().split('T')[0]);
+    }
+
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // If neither today nor yesterday has reviews, streak = 0
+    if (!daysWithReviews.has(todayStr) && !daysWithReviews.has(yesterdayStr)) {
+      return 0;
+    }
+
+    // Start counting from today if today has reviews, otherwise from yesterday
+    const startDay = daysWithReviews.has(todayStr) ? today : yesterday;
+    let streak = 0;
+    const current = new Date(startDay);
+
+    while (true) {
+      const dateStr = current.toISOString().split('T')[0];
+      if (!daysWithReviews.has(dateStr)) break;
+      streak++;
+      current.setDate(current.getDate() - 1);
+    }
+
+    return streak;
+  }
+
+  /**
    * Get deck and all sub-deck IDs
    */
   private async getDeckAndSubdeckIds(id: number): Promise<number[]> {
