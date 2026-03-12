@@ -10,6 +10,7 @@ import { EchoeNoteService } from './services/echoe-note.service';
 import { EchoeSettingsService } from './services/echoe-settings.service';
 import { EchoeStatsService } from './services/echoe-stats.service';
 import { EchoeStudyService } from './services/echoe-study.service';
+import { EchoeDashboardService } from './services/echoe-dashboard.service';
 import { AuthService } from './services/auth.service';
 import { ThemeService } from './services/theme.service';
 import { ToastService } from './services/toast.service';
@@ -30,6 +31,7 @@ register(EchoeStudyService);
 register(EchoeStatsService);
 register(EchoeSettingsService);
 register(EchoeCsvImportService);
+register(EchoeDashboardService);
 
 // Initialize theme before rendering
 resolve(ThemeService).loadTheme();
