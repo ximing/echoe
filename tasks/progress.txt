@@ -1,6 +1,9 @@
 ## Dashboard 仪表盘页面 Progress
 
 ## Codebase Patterns
+- All services in apps/web/src/services/ are registered globally in main.tsx via `register()`
+- Use `this.resolve(ServiceClass)` in a getter to access other global Services from within a Service
+- `HistoryData` and `ForecastData` in the PRD correspond to `StudyHistoryDayDto[]` and `ForecastDayDto[]` from `@echoe/dto`
 - echoeRevlog.id is bigint (Unix ms × 1000); convert to Date via `new Date(Number(id) / 1000)`
 - Stats service uses UTC dates: `today.setUTCHours(0, 0, 0, 0)` for day boundaries
 - No user filtering in stats service (single-user system)
@@ -51,4 +54,17 @@
   - API client functions in `apps/web/src/api/echoe.ts` follow pattern: `request.get<unknown, { code: number; data: T }>(url)`
   - Local types/interfaces are defined inline in echoe.ts when not available from `@echoe/dto`
   - Explicit return type annotations on API functions help TypeScript inference downstream
+---
+
+## 2026-03-12 - US-005
+- Created `apps/web/src/services/echoe-dashboard.service.ts` with `EchoeDashboardService`
+- Service manages: `streak`, `maturityBatch`, `history`, `historyDays`, `forecast`, `loading`
+- Methods: `loadStreak()`, `loadMaturityBatch()`, `loadHistory(days)`, `loadForecast()`, `loadAll()`
+- `deckService` getter uses `this.resolve(EchoeDeckService)` for DI access to global deck service
+- Registered as global singleton in `apps/web/src/main.tsx` via `register(EchoeDashboardService)`
+- Files changed: `apps/web/src/services/echoe-dashboard.service.ts`, `apps/web/src/main.tsx`
+- **Learnings for future iterations:**
+  - `HistoryData`/`ForecastData` in PRD = `StudyHistoryDayDto[]`/`ForecastDayDto[]` from `@echoe/dto`
+  - All web services are global singletons registered in main.tsx; dashboard service follows same pattern
+  - `this.resolve(EchoeDeckService)` in a getter provides lazy DI access to the global deck service
 ---
