@@ -16,8 +16,9 @@ export class EchoeDeckService extends Service {
   isLoading = false;
   error: string | null = null;
 
-  // Expanded state for sub-decks
-  expandedDecks: Set<number> = new Set();
+  // Expanded state for sub-decks (persisted in localStorage)
+  private readonly expandedDecksStorageKey = 'echoe_cards_expanded_decks_v1';
+  expandedDecks: Set<number> = this.loadExpandedDecksFromStorage();
 
   /**
    * Load all decks with counts
@@ -29,6 +30,7 @@ export class EchoeDeckService extends Service {
     try {
       const response = await getDecks();
       this.decks = response.data;
+      this.syncExpandedDecksWithLoadedTree();
     } catch (err) {
       this.error = 'Failed to load decks';
       console.error('Load decks error:', err);
@@ -86,11 +88,16 @@ export class EchoeDeckService extends Service {
    * Toggle deck expansion
    */
   toggleExpanded(deckId: number): void {
-    if (this.expandedDecks.has(deckId)) {
-      this.expandedDecks.delete(deckId);
+    const nextExpandedDecks = new Set(this.expandedDecks);
+
+    if (nextExpandedDecks.has(deckId)) {
+      nextExpandedDecks.delete(deckId);
     } else {
-      this.expandedDecks.add(deckId);
+      nextExpandedDecks.add(deckId);
     }
+
+    this.expandedDecks = nextExpandedDecks;
+    this.persistExpandedDecks();
   }
 
   /**
@@ -110,17 +117,95 @@ export class EchoeDeckService extends Service {
   }
 
   /**
-   * Get root decks (decks without parent)
+   * Get root decks from server-provided hierarchy
    */
   getRootDecks(): EchoeDeckWithCountsDto[] {
-    return this.decks.filter((deck) => !deck.name.includes('::'));
+    return this.decks;
   }
 
   /**
-   * Get children of a deck
+   * Read expanded deck IDs from localStorage.
    */
-  getChildren(parentName: string): EchoeDeckWithCountsDto[] {
-    const prefix = parentName + '::';
-    return this.decks.filter((deck) => deck.name.startsWith(prefix) && !deck.name.slice(prefix.length).includes('::'));
+  private loadExpandedDecksFromStorage(): Set<number> {
+    if (typeof window === 'undefined') {
+      return new Set();
+    }
+
+    try {
+      const rawValue = window.localStorage.getItem(this.expandedDecksStorageKey);
+      if (!rawValue) {
+        return new Set();
+      }
+
+      const parsed = JSON.parse(rawValue) as unknown;
+      if (!Array.isArray(parsed)) {
+        return new Set();
+      }
+
+      return new Set(
+        parsed
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      );
+    } catch {
+      return new Set();
+    }
+  }
+
+  /**
+   * Persist expanded deck IDs to localStorage.
+   */
+  private persistExpandedDecks(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(this.expandedDecksStorageKey, JSON.stringify(Array.from(this.expandedDecks)));
+    } catch {
+      // Ignore storage write failures (e.g. private mode / quota exceeded)
+    }
+  }
+
+  /**
+   * Keep only expanded IDs that still exist in the latest deck tree.
+   */
+  private syncExpandedDecksWithLoadedTree(): void {
+    if (this.expandedDecks.size === 0) {
+      return;
+    }
+
+    const validDeckIds = this.collectDeckIds(this.decks);
+    const nextExpandedDecks = new Set<number>();
+
+    for (const deckId of this.expandedDecks) {
+      if (validDeckIds.has(deckId)) {
+        nextExpandedDecks.add(deckId);
+      }
+    }
+
+    if (nextExpandedDecks.size !== this.expandedDecks.size) {
+      this.expandedDecks = nextExpandedDecks;
+      this.persistExpandedDecks();
+    }
+  }
+
+  /**
+   * Collect all deck IDs from hierarchy.
+   */
+  private collectDeckIds(decks: EchoeDeckWithCountsDto[]): Set<number> {
+    const deckIds = new Set<number>();
+
+    const visit = (items: EchoeDeckWithCountsDto[]) => {
+      for (const item of items) {
+        deckIds.add(item.id);
+        if (item.children.length > 0) {
+          visit(item.children);
+        }
+      }
+    };
+
+    visit(decks);
+    return deckIds;
   }
 }

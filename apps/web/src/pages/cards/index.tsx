@@ -7,8 +7,6 @@ import * as echoeApi from '../../api/echoe';
 import {
   Plus,
   Upload,
-  ChevronRight,
-  ChevronDown,
   MoreVertical,
   Pencil,
   Settings,
@@ -18,6 +16,11 @@ import {
   Filter,
   RotateCcw,
   Trash,
+  Clock,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
 
@@ -41,32 +44,32 @@ const CardsPageContent = view(() => {
   const [selectedDeck, setSelectedDeck] = useState<EchoeDeckWithCountsDto | null>(null);
   const [contextMenu, setContextMenu] = useState<{ deck: EchoeDeckWithCountsDto; x: number; y: number } | null>(null);
   const [deleteCards, setDeleteCards] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'due' | 'name' | 'lastStudied'>('due');
 
   // Load decks on mount
   useEffect(() => {
     deckService.loadDecks();
   }, [deckService]);
 
-  // Close context menu on click outside
+  // Handle context menu events from grid cards
   useEffect(() => {
+    const handleDeckContextMenu = (e: Event) => {
+      const customEvent = e as CustomEvent<{ deck: EchoeDeckWithCountsDto; x: number; y: number }>;
+      setContextMenu(customEvent.detail);
+    };
+
     const handleClick = () => setContextMenu(null);
+    document.addEventListener('deckContextMenu', handleDeckContextMenu);
     document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    return () => {
+      document.removeEventListener('deckContextMenu', handleDeckContextMenu);
+      document.removeEventListener('click', handleClick);
+    };
   }, []);
 
   // Calculate total due
   const totalDue = deckService.getTotalDue();
-
-  // Handle deck click - navigate to study
-  const handleDeckClick = (deck: EchoeDeckWithCountsDto) => {
-    navigate(`/cards/study/${deck.id}`);
-  };
-
-  // Handle context menu
-  const handleContextMenu = (e: React.MouseEvent, deck: EchoeDeckWithCountsDto) => {
-    e.preventDefault();
-    setContextMenu({ deck, x: e.clientX, y: e.clientY });
-  };
 
   // Handle rename
   const handleRename = () => {
@@ -171,25 +174,119 @@ const CardsPageContent = view(() => {
     navigate('/cards/import/apkg');
   };
 
-  // Render deck row recursively
-  const renderDeckRow = (deck: EchoeDeckWithCountsDto, depth: number = 0) => {
-    const children = deckService.getChildren(deck.name);
-    const hasChildren = children.length > 0;
-    const isExpanded = deckService.isExpanded(deck.id);
+  // Handle quick create entry
+  const handleOpenCreateDeckDialog = () => {
+    setSelectedDeck(null);
+    setIsCreateDialogOpen(true);
+  };
 
-    // Get display name (after last ::)
-    const displayName = deck.name.split('::').pop() || deck.name;
+  // Format last studied time
+const formatLastStudied = (timestamp: number | null): string => {
+  if (!timestamp) return 'Never studied';
 
-    return (
-      <div key={deck.id}>
-        <div
-          className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-800 cursor-pointer transition-colors group`}
-          style={{ paddingLeft: `${depth * 24 + 16}px` }}
-          onClick={() => handleDeckClick(deck)}
-          onContextMenu={(e) => handleContextMenu(e, deck)}
-        >
-          {/* Expand/Collapse Button */}
-          {hasChildren ? (
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+
+  return new Date(timestamp).toLocaleDateString();
+};
+
+// Calculate mastery percentage from average retrievability
+const getMasteryPercentage = (deck: EchoeDeckWithCountsDto): number => {
+  const retrievability = Number(deck.averageRetrievability);
+
+  if (!Number.isFinite(retrievability)) return 0;
+
+  return Math.round(Math.max(0, Math.min(1, retrievability)) * 100);
+};
+
+// Filter and sort decks
+const getFilteredAndSortedDecks = (
+  decks: EchoeDeckWithCountsDto[],
+  searchQuery: string,
+  sortBy: 'due' | 'name' | 'lastStudied'
+): EchoeDeckWithCountsDto[] => {
+  let filtered = decks;
+
+  // Filter by search query
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase();
+    filtered = decks.filter((deck) => deck.name.toLowerCase().includes(query));
+  }
+
+  // Sort decks
+  return [...filtered].sort((a, b) => {
+    if (sortBy === 'name') {
+      return a.name.localeCompare(b.name);
+    } else if (sortBy === 'lastStudied') {
+      // Sort by last studied (most recent first), nulls last
+      if (!a.lastStudiedAt && !b.lastStudiedAt) return 0;
+      if (!a.lastStudiedAt) return 1;
+      if (!b.lastStudiedAt) return -1;
+      return b.lastStudiedAt - a.lastStudiedAt;
+    } else {
+      // Sort by due count (most due first)
+      const dueA = a.newCount + a.learnCount + a.reviewCount;
+      const dueB = b.newCount + b.learnCount + b.reviewCount;
+      return dueB - dueA;
+    }
+  });
+};
+
+// Render deck card for grid layout
+const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckService) => {
+  const children = deck.children;
+  const hasChildren = children.length > 0;
+  const isExpanded = deckService.isExpanded(deck.id);
+
+  // Get display name (after last ::)
+  const displayName = deck.name.split('::').pop() || deck.name;
+
+  // Counts are already aggregated by backend hierarchy
+  const dueCount = deck.newCount + deck.learnCount + deck.reviewCount;
+  const masteryPercent = getMasteryPercentage(deck);
+
+  return (
+    <div key={deck.id} className="flex flex-col">
+      {/* Deck Card */}
+      <div
+        className="bg-white dark:bg-dark-800 rounded-xl border border-gray-200 dark:border-dark-700 p-4 hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer group"
+        onClick={() => navigate(`/cards/study/${deck.id}`)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Trigger context menu via service
+          const event = new CustomEvent('deckContextMenu', { detail: { deck: deck, x: e.clientX, y: e.clientY } });
+          document.dispatchEvent(event);
+        }}
+      >
+        {/* Deck Icon & Name */}
+        <div className="flex items-start gap-3 mb-3">
+          {deck.dyn === 1 ? (
+            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+              <Filter className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-700 flex items-center justify-center flex-shrink-0">
+              <Layers className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+              {displayName}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {deck.totalCount} cards
+            </p>
+          </div>
+          {/* Expand/Collapse Arrow (for parent decks with children) */}
+          {hasChildren && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -198,51 +295,18 @@ const CardsPageContent = view(() => {
               className="p-1 hover:bg-gray-200 dark:hover:bg-dark-700 rounded transition-colors"
             >
               {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="w-5 h-5 text-gray-500" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-500" />
+                <ChevronRight className="w-5 h-5 text-gray-500" />
               )}
             </button>
-          ) : (
-            <div className="w-6" />
           )}
-
-          {/* Deck Icon - Filter icon for filtered decks */}
-          {deck.dyn === 1 ? (
-            <Filter className="w-5 h-5 text-purple-500" />
-          ) : (
-            <Layers className="w-5 h-5 text-gray-400" />
-          )}
-
-          {/* Deck Name */}
-          <span className="flex-1 font-medium text-gray-900 dark:text-white truncate">
-            {displayName}
-          </span>
-
-          {/* Badges */}
-          <div className="flex items-center gap-2">
-            {deck.newCount > 0 && (
-              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
-                {deck.newCount}
-              </span>
-            )}
-            {deck.learnCount > 0 && (
-              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded-full">
-                {deck.learnCount}
-              </span>
-            )}
-            {deck.reviewCount > 0 && (
-              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">
-                {deck.reviewCount}
-              </span>
-            )}
-          </div>
-
-          {/* More Button */}
+          {/* Context Menu Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleContextMenu(e, deck);
+              const event = new CustomEvent('deckContextMenu', { detail: { deck: deck, x: e.clientX, y: e.clientY } });
+              document.dispatchEvent(event);
             }}
             className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-dark-700 rounded transition-all"
           >
@@ -250,21 +314,145 @@ const CardsPageContent = view(() => {
           </button>
         </div>
 
-        {/* Children */}
-        {hasChildren && isExpanded && children.map((child) => renderDeckRow(child, depth + 1))}
+        {/* Mastery Progress Bar */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-gray-500 dark:text-gray-400">Mastery (Retrievability)</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{masteryPercent}%</span>
+          </div>
+          <div className="h-2 bg-gray-100 dark:bg-dark-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
+              style={{ width: `${masteryPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Badges Row */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {deck.newCount > 0 && (
+            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md">
+              {deck.newCount} new
+            </span>
+          )}
+          {deck.learnCount > 0 && (
+            <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded-md">
+              {deck.learnCount} learn
+            </span>
+          )}
+          {deck.reviewCount > 0 && (
+            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-md">
+              {deck.reviewCount} review
+            </span>
+          )}
+          {deck.difficultCount > 0 && (
+            <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-md">
+              {deck.difficultCount} difficult
+            </span>
+          )}
+          {dueCount === 0 && deck.totalCount > 0 && (
+            <span className="px-2 py-1 bg-gray-100 dark:bg-dark-700 text-gray-500 dark:text-gray-400 text-xs font-medium rounded-md">
+              Done for now
+            </span>
+          )}
+        </div>
+
+        {/* Footer: Due count & Last studied */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-dark-700">
+          {dueCount > 0 ? (
+            <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
+              {dueCount} due
+            </span>
+          ) : (
+            <span></span>
+          )}
+          <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+            <Clock className="w-3 h-3" />
+            <span>{formatLastStudied(deck.lastStudiedAt)}</span>
+          </div>
+        </div>
       </div>
-    );
-  };
+
+      {/* Children (if expanded and has children) */}
+      {hasChildren && isExpanded && (
+        <div className="mt-2 pl-4 border-l-2 border-gray-200 dark:border-dark-700 space-y-2">
+          {children.map((child) => renderDeckCard(child, deckService))}
+        </div>
+      )}
+    </div>
+  );
+};
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-700">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleImport}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors text-sm font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              导入
+            </button>
+            <button
+              onClick={handleOpenCreateDeckDialog}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              新建
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Search and Sort Bar */}
+      {deckService.decks.length > 0 && (
+        <div className="px-6 py-3 border-b border-gray-200 dark:border-dark-700 bg-gray-50 dark:bg-dark-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          {/* Search Input */}
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search decks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-gray-500" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'due' | 'name' | 'lastStudied')}
+              className="text-sm border border-gray-300 dark:border-dark-600 rounded-lg px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="due">Due count</option>
+              <option value="name">Name A-Z</option>
+              <option value="lastStudied">Last studied</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Deck List */}
       <div className="flex-1 overflow-y-auto">
@@ -284,32 +472,16 @@ const CardsPageContent = view(() => {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               No decks yet
             </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Import a deck or create your first deck to get started
+            <p className="text-gray-500 dark:text-gray-400 mb-1">
+              使用顶部的「导入」或「新建」开始吧
             </p>
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={handleImport}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Import .apkg
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedDeck(null);
-                  setIsCreateDialogOpen(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Create Deck
-              </button>
-            </div>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-dark-700">
-            {deckService.getRootDecks().map((deck) => renderDeckRow(deck))}
+          <div className="p-6">
+            {/* Responsive Grid: 1 col mobile, 2 cols tablet, 3 cols small desktop, 4 cols large desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {getFilteredAndSortedDecks(deckService.getRootDecks(), searchQuery, sortBy).map((deck) => renderDeckCard(deck, deckService))}
+            </div>
           </div>
         )}
       </div>

@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import JSZip from 'jszip';
 import { Service, Inject } from 'typedi';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeNotes, type NewEchoeNotes } from '../db/schema/echoe-notes.js';
@@ -17,8 +17,6 @@ import { echoeNotetypes, type NewEchoeNotetypes } from '../db/schema/echoe-notet
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
-
-import type { NewEchoeMedia } from '../db/schema/echoe-media.js';
 
 export interface ImportResultDto {
   notesAdded: number;
@@ -31,9 +29,23 @@ export interface ImportResultDto {
   revlogImported: number;
   mediaImported: number;
   errors: string[];
+  errorDetails?: ImportErrorDetail[];
+  fsrsBackfilledFromRevlog?: number;
+  fsrsNewCards?: number;
+  fsrsHeuristic?: number;
 }
 
 type PackageType = 'standard-anki' | 'echoe-legacy' | 'unknown';
+
+interface ImportErrorDetail {
+  category: 'notetype' | 'deck' | 'note' | 'card' | 'revlog' | 'media' | 'general';
+  message: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SECOND_MS = 1000;
+const LEGACY_DAY_DUE_MAX = 10_000_000;
+const LEGACY_SECOND_DUE_MAX = 100_000_000_000;
 
 interface EchoeDeckRow {
   id: number;
@@ -122,15 +134,10 @@ export class EchoeImportService {
 
   /**
    * Detect the package type (Standard Anki vs Echoe Legacy)
+   * Priority: Official Anki uses collection.anki2/anki21 as primary source.
    */
   private async detectPackageType(zip: JSZip): Promise<PackageType> {
-    // Check for col.json (Standard Anki format)
-    const colJson = zip.file('col.json');
-    if (colJson) {
-      return 'standard-anki';
-    }
-
-    // Check for collection.anki21/anki2 (Echoe Legacy format)
+    // Check for collection.anki21/anki2 first (official Anki format)
     const collectionFile = zip.file('collection.anki21') || zip.file('collection.anki2');
     if (collectionFile) {
       // Try to read the collection and check for custom tables
@@ -149,9 +156,21 @@ export class EchoeImportService {
         if (hasEchoeTables) {
           return 'echoe-legacy';
         }
+        // If no Echoe tables, this is standard Anki
+        return 'standard-anki';
       } catch {
-        // If we can't read the DB, assume standard
+        // If we can't read the DB, check for col.json as fallback
+        const colJson = zip.file('col.json');
+        if (colJson) {
+          return 'standard-anki';
+        }
       }
+    }
+
+    // Check for col.json (legacy Standard Anki format, less common now)
+    const colJson = zip.file('col.json');
+    if (colJson) {
+      return 'standard-anki';
     }
 
     // Default to standard Anki if we can't determine
@@ -198,23 +217,11 @@ export class EchoeImportService {
 
   /**
    * Import Standard Anki APKG format
+   * Supports both official format (collection.anki2/anki21) and legacy col.json.
    */
   private async importStandardAnki(zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
     try {
-      // Read col.json
-      const colJsonFile = zip.file('col.json');
-      if (!colJsonFile) {
-        result.errors.push('col.json not found in Standard Anki package');
-        return result;
-      }
-
-      const colJsonContent = await colJsonFile.async('string');
-      const col = JSON.parse(colJsonContent);
-
-      // Read media manifest if exists
-      const mediaManifest = await this.parseMediaManifest(zip);
-
-      // Find the collection file
+      // Find the collection file (required for Standard Anki)
       const collectionFile = zip.file('collection.anki21') || zip.file('collection.anki2');
       if (!collectionFile) {
         result.errors.push('No collection file found in .apkg');
@@ -223,6 +230,40 @@ export class EchoeImportService {
 
       const collectionBuffer = await collectionFile.async('nodebuffer');
       const db = new Database(collectionBuffer, { readonly: true });
+
+      // Read col.json if exists (optional, for backwards compatibility)
+      const colJsonFile = zip.file('col.json');
+      let col: Record<string, unknown> = {};
+      if (colJsonFile) {
+        try {
+          const colJsonContent = await colJsonFile.async('string');
+          col = JSON.parse(colJsonContent);
+        } catch {
+          logger.warn('Failed to parse col.json, using collection database instead');
+        }
+      }
+
+      // If col.json doesn't have models/decks, try to read from collection database
+      // Note: Official Anki stores models/decks in the 'col' table as JSON
+      if (!col.models || !col.decks) {
+        try {
+          const colRow = db.prepare('SELECT models, decks FROM col LIMIT 1').get() as { models?: string; decks?: string } | undefined;
+          if (colRow) {
+            if (colRow.models && !col.models) {
+              col.models = JSON.parse(colRow.models);
+            }
+            if (colRow.decks && !col.decks) {
+              col.decks = JSON.parse(colRow.decks);
+            }
+          }
+        } catch {
+          // col table may not exist in some packages
+          logger.warn('Could not read models/decks from collection database');
+        }
+      }
+
+      // Read media manifest
+      const mediaManifest = await this.parseMediaManifest(zip);
 
       try {
         // Import notetypes from col.models
@@ -247,6 +288,10 @@ export class EchoeImportService {
         result.cardsAdded = cardResult.added;
         result.cardsUpdated = cardResult.updated;
         result.errors.push(...cardResult.errors);
+        // FSRS backfill stats
+        result.fsrsBackfilledFromRevlog = cardResult.fsrsBackfilledFromRevlog;
+        result.fsrsNewCards = cardResult.fsrsNewCards;
+        result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
         // Import revlog
         const revlogResult = await this.importRevlogFromStandardAnki(db);
@@ -309,13 +354,17 @@ export class EchoeImportService {
       result.cardsAdded = cardResult.added;
       result.cardsUpdated = cardResult.updated;
       result.errors.push(...cardResult.errors);
+      // FSRS backfill stats
+      result.fsrsBackfilledFromRevlog = cardResult.fsrsBackfilledFromRevlog;
+      result.fsrsNewCards = cardResult.fsrsNewCards;
+      result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
       // Import revlog
       const revlogResult = await this.importRevlog(db);
       result.revlogImported = revlogResult;
 
       // Import media files
-      const mediaResult = await this.importMedia(zip, db);
+      const mediaResult = await this.importMedia(zip);
       result.mediaImported = mediaResult;
     } finally {
       db.close();
@@ -496,120 +545,38 @@ export class EchoeImportService {
     col: Record<string, unknown>,
     mediaManifest: Map<string, string>
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
-    const errors: string[] = [];
-    let added = 0;
-    let updated = 0;
-    let skipped = 0;
-
     try {
       const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
-
-      if (rows.length === 0) {
-        return { added: 0, updated: 0, skipped: 0, errors: [] };
-      }
-
-      // Build notetype field names map from col.json
       const notetypeFieldsMap = this.buildNotetypeFieldsMapFromColJson(col);
-
-      const db = getDatabase();
-
-      for (const row of rows) {
-        try {
-          // Resolve notetype field names for this note
-          const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
-
-          // Parse flds (\x1f-separated) into a field name → value map
-          const rawValues = row.flds.split('\x1f');
-          const fields: Record<string, string> = {};
-          for (let i = 0; i < notetypeFields.length; i++) {
-            // Replace media references with actual filenames
-            let value = rawValues[i] ?? '';
-            value = this.replaceMediaReferences(value, mediaManifest);
-            fields[notetypeFields[i]] = value;
-          }
-
-          // Normalize using the standard module
-          const normalized = normalizeNoteFields({ notetypeFields, fields });
-
-          // Check if note with same guid already exists
-          const existing = await db
-            .select({ id: echoeNotes.id })
-            .from(echoeNotes)
-            .where(eq(echoeNotes.guid, row.guid))
-            .limit(1);
-
-          if (existing.length > 0) {
-            // Update existing note
-            await db
-              .update(echoeNotes)
-              .set({
-                mod: row.mod,
-                tags: row.tags || '[]',
-                flds: normalized.flds,
-                sfld: normalized.sfld,
-                csum: normalized.csum,
-                fldNames: normalized.fldNames,
-                fieldsJson: normalized.fieldsJson,
-              })
-              .where(eq(echoeNotes.guid, row.guid));
-            updated++;
-          } else {
-            // Insert new note
-            const newNote: NewEchoeNotes = {
-              id: row.id,
-              guid: row.guid,
-              mid: row.mid,
-              mod: row.mod,
-              usn: row.usn,
-              tags: row.tags || '[]',
-              flds: normalized.flds,
-              sfld: normalized.sfld,
-              csum: normalized.csum,
-              flags: row.flags || 0,
-              data: row.data || '{}',
-              fldNames: normalized.fldNames,
-              fieldsJson: normalized.fieldsJson,
-            };
-            await db.insert(echoeNotes).values(newNote);
-            added++;
-          }
-        } catch (error) {
-          errors.push(`Failed to import note ${row.guid}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
+      return await this.importNotesRows(rows, notetypeFieldsMap, mediaManifest);
     } catch (error) {
-      errors.push(`Failed to read notes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {
+        added: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [`Failed to read notes: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      };
     }
-
-    return { added, updated, skipped, errors };
   }
 
   /**
    * Build notetype fields map from col.json models
    */
   private buildNotetypeFieldsMapFromColJson(col: Record<string, unknown>): Map<number, string[]> {
-    const map = new Map<number, string[]>();
-
     try {
-      const models = col.models as Record<string, { id: number; flds: string }>;
+      const models = col.models as Record<string, { flds: unknown }> | undefined;
       if (!models || typeof models !== 'object') {
-        return map;
+        return new Map();
       }
 
-      for (const [mid, model] of Object.entries(models)) {
-        try {
-          const modelId = parseInt(mid, 10);
-          const fieldDefs = JSON.parse(model.flds) as { name: string }[];
-          map.set(modelId, fieldDefs.map(f => f.name));
-        } catch {
-          // Skip invalid JSON
-        }
-      }
+      const rows = Object.entries(models)
+        .map(([mid, model]) => ({ id: Number.parseInt(mid, 10), flds: model?.flds }))
+        .filter((row) => Number.isFinite(row.id));
+
+      return this.buildNotetypeFieldsMapFromRows(rows);
     } catch {
-      // Return empty map
+      return new Map();
     }
-
-    return map;
   }
 
   /**
@@ -628,226 +595,38 @@ export class EchoeImportService {
 
   /**
    * Import cards from Standard Anki SQLite database with FSRS backfill
+   * FSRS backfill strategy (per PRD FR-7):
+   * 1. If card has revlog, use latest revlog entry for FSRS fields
+   * 2. If no revlog and card is new (type=0), keep empty state (let study service initialize)
+   * 3. If no revlog but card has scheduling data (type=2), use heuristic mapping
    */
   private async importCardsFromStandardAnki(
     sourceDb: Database.Database,
-    col: Record<string, unknown>
-  ): Promise<{ added: number; updated: number; errors: string[] }> {
-    const errors: string[] = [];
-    let added = 0;
-    let updated = 0;
-
-    try {
-      const rows = sourceDb.prepare('SELECT * FROM cards').all() as EchoeCardRow[];
-
-      if (rows.length === 0) {
-        return { added: 0, updated: 0, errors: [] };
-      }
-
-      const db = getDatabase();
-
-      // Get current time for FSRS backfill
-      const now = Date.now();
-      const dayMs = 24 * 60 * 60 * 1000;
-
-      for (const row of rows) {
-        try {
-          // Check if card already exists
-          const existing = await db
-            .select({ id: echoeCards.id })
-            .from(echoeCards)
-            .where(eq(echoeCards.id, row.id))
-            .limit(1);
-
-          // Calculate FSRS fields from card data
-          // For Standard Anki, we backfill: stability = ivl (if > 0), difficulty = factor/1000
-          const stability = row.ivl > 0 ? row.ivl : 1;
-          const difficulty = row.factor > 0 ? row.factor / 1000 : 2.5;
-          // Use card mod time as last_review if available, otherwise use current time
-          const lastReview = row.mod > 0 ? row.mod * 1000 : now;
-
-          if (existing.length > 0) {
-            // Update existing card with FSRS fields
-            await db
-              .update(echoeCards)
-              .set({
-                nid: row.nid,
-                did: row.did,
-                ord: row.ord,
-                mod: row.mod,
-                usn: row.usn,
-                type: row.type,
-                queue: row.queue,
-                due: row.due,
-                ivl: row.ivl,
-                factor: row.factor,
-                reps: row.reps,
-                lapses: row.lapses,
-                left: row.left,
-                odue: row.odue,
-                odid: row.odid,
-                flags: row.flags,
-                data: row.data || '{}',
-                // FSRS fields
-                stability: stability,
-                difficulty: difficulty,
-                lastReview: lastReview,
-              })
-              .where(eq(echoeCards.id, row.id));
-            updated++;
-          } else {
-            // Insert new card with FSRS fields
-            const newCard: NewEchoeCards = {
-              id: row.id,
-              nid: row.nid,
-              did: row.did,
-              ord: row.ord,
-              mod: row.mod,
-              usn: row.usn,
-              type: row.type,
-              queue: row.queue,
-              due: row.due,
-              ivl: row.ivl,
-              factor: row.factor,
-              reps: row.reps,
-              lapses: row.lapses,
-              left: row.left,
-              odue: row.odue,
-              odid: row.odid,
-              flags: row.flags,
-              data: row.data || '{}',
-              // FSRS fields
-              stability: stability,
-              difficulty: difficulty,
-              lastReview: lastReview,
-            };
-            await db.insert(echoeCards).values(newCard);
-            added++;
-          }
-        } catch (error) {
-          errors.push(`Failed to import card ${row.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-    } catch (error) {
-      errors.push(`Failed to read cards: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    return { added, updated, errors };
+    _col: Record<string, unknown>
+  ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
+    return this.importCardsRows(sourceDb, 'Could not read revlog for FSRS backfill');
   }
 
   /**
    * Import revlog from Standard Anki SQLite database
    */
   private async importRevlogFromStandardAnki(sourceDb: Database.Database): Promise<number> {
-    let imported = 0;
-
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-
-      if (rows.length === 0) {
-        return 0;
-      }
-
-      const db = getDatabase();
-
-      for (const row of rows) {
-        try {
-          // Check if revlog entry already exists
-          const existing = await db
-            .select({ id: echoeRevlog.id })
-            .from(echoeRevlog)
-            .where(eq(echoeRevlog.id, row.id))
-            .limit(1);
-
-          if (existing.length === 0) {
-            // Calculate FSRS fields from current card state
-            const stability = row.ivl > 0 ? row.ivl : 1;
-            const difficulty = row.factor > 0 ? row.factor / 1000 : 2.5;
-            const lastReview = row.time;
-
-            // Calculate pre-review values based on lastIvl
-            const preStability = row.lastIvl > 0 ? row.lastIvl : 1;
-            const preLastReview = row.time - (row.lastIvl * 24 * 60 * 60 * 1000); // Approximate
-
-            // Insert new revlog entry with FSRS fields (backfilled from card state)
-            const newRevlog: NewEchoeRevlog = {
-              id: row.id,
-              cid: row.cid,
-              usn: row.usn,
-              ease: row.ease,
-              ivl: row.ivl,
-              lastIvl: row.lastIvl,
-              factor: row.factor,
-              time: row.time,
-              type: row.type,
-              // FSRS fields - current state after review
-              stability: stability,
-              difficulty: difficulty,
-              lastReview: lastReview,
-              // Pre-review snapshot (estimated from lastIvl)
-              preStability: preStability,
-              preDifficulty: difficulty, // Assume same difficulty before review
-              preLastReview: preLastReview > 0 ? preLastReview : 0,
-              preDue: 0,
-              preIvl: row.lastIvl,
-              preFactor: row.factor,
-              preReps: 0,
-              preLapses: 0,
-              preLeft: 0,
-              preType: row.type,
-              preQueue: row.type,
-            };
-            await db.insert(echoeRevlog).values(newRevlog);
-            imported++;
-          }
-        } catch {
-          // Skip duplicates silently
-        }
-      }
+      return this.importRevlogRows(rows, { difficultyFallback: 2.5, clampDifficulty: false });
     } catch (error) {
       logger.error('Failed to import revlog:', error);
+      return 0;
     }
-
-    return imported;
   }
 
   /**
    * Import media files from Standard Anki package
+   * Supports both official format (numeric filenames + media manifest) and legacy format (media/ subdirectory).
    */
   private async importMediaFromStandardAnki(zip: JSZip, mediaManifest: Map<string, string>): Promise<number> {
-    let imported = 0;
-
-    try {
-      // Find all media files in the zip
-      const mediaFiles = Object.keys(zip.files).filter((name) => name.startsWith('media/'));
-
-      for (const mediaPath of mediaFiles) {
-        try {
-          const file = zip.file(mediaPath);
-          if (!file) continue;
-
-          const buffer = await file.async('nodebuffer');
-          // Get filename from path
-          let filename = mediaPath.replace('media/', '');
-
-          // Check if it's a numeric reference that needs mapping
-          const actualName = mediaManifest.get(filename);
-          if (actualName) {
-            filename = actualName;
-          }
-
-          // Upload to storage via EchoeMediaService
-          await this.mediaService.uploadMedia(buffer, filename);
-          imported++;
-        } catch (error) {
-          logger.warn(`Failed to import media ${mediaPath}:`, error);
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to import media:', error);
-    }
-
-    return imported;
+    const mediaFiles = this.collectMediaPaths(zip, true);
+    return this.importMediaEntries(zip, mediaFiles, mediaManifest);
   }
 
   /**
@@ -979,21 +758,12 @@ export class EchoeImportService {
    * Anki's notetypes.flds is a JSON array of field definition objects, each with a "name" property.
    */
   private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<number, string[]> {
-    const map = new Map<number, string[]>();
     try {
-      const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: string }[];
-      for (const row of rows) {
-        try {
-          const fieldDefs = JSON.parse(row.flds) as { name: string }[];
-          map.set(row.id, fieldDefs.map((f) => f.name));
-        } catch {
-          // If parsing fails, leave this notetype out of the map
-        }
-      }
+      const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: unknown }[];
+      return this.buildNotetypeFieldsMapFromRows(rows);
     } catch {
-      // If notetypes table is missing, return empty map
+      return new Map();
     }
-    return map;
   }
 
   /**
@@ -1002,121 +772,284 @@ export class EchoeImportService {
   private async importNotes(
     sourceDb: Database.Database
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
+    try {
+      const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
+      const notetypeFieldsMap = this.buildNotetypeFieldsMap(sourceDb);
+      return await this.importNotesRows(rows, notetypeFieldsMap);
+    } catch (error) {
+      return {
+        added: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [`Failed to read notes: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      };
+    }
+  }
+
+  /**
+   * Import cards from source database with FSRS backfill
+   * FSRS backfill strategy (per PRD FR-1):
+   * 1. If card has revlog, use latest revlog entry for FSRS fields
+   * 2. If no revlog and card is new (type=0), keep empty state (let study service initialize)
+   * 3. If no revlog but card has scheduling data (type=2), use heuristic mapping
+   */
+  private async importCards(
+    sourceDb: Database.Database
+  ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
+    return this.importCardsRows(sourceDb, 'Could not read revlog for FSRS backfill in legacy import');
+  }
+
+  /**
+   * Normalize imported due values into millisecond timestamps.
+   * - review cards: Anki day number -> ms
+   * - learning/relearning cards: second timestamp -> ms
+   */
+  private normalizeDueToMilliseconds(due: number, queue: number, type: number): number {
+    if (!Number.isFinite(due) || due <= 0) {
+      return due;
+    }
+
+    if (due >= LEGACY_SECOND_DUE_MAX) {
+      return due;
+    }
+
+    const effectiveQueue = queue < 0 ? type : queue;
+
+    if (effectiveQueue === 2 && due < LEGACY_DAY_DUE_MAX) {
+      return due * DAY_MS;
+    }
+
+    if (effectiveQueue === 1 || effectiveQueue === 3) {
+      return due * SECOND_MS;
+    }
+
+    return due;
+  }
+
+  /**
+   * Import revlog from source database with FSRS fields (insert ignore duplicates)
+   */
+  private async importRevlog(sourceDb: Database.Database): Promise<number> {
+    try {
+      const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
+      return this.importRevlogRows(rows, { difficultyFallback: 0.3, clampDifficulty: true });
+    } catch (error) {
+      logger.error('Failed to import revlog:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Import media files from the zip archive
+   */
+  private async importMedia(zip: JSZip): Promise<number> {
+    const mediaFiles = this.collectMediaPaths(zip, false);
+    return this.importMediaEntries(zip, mediaFiles);
+  }
+
+  private buildNotetypeFieldsMapFromRows(rows: Array<{ id: number; flds: unknown }>): Map<number, string[]> {
+    const map = new Map<number, string[]>();
+
+    for (const row of rows) {
+      try {
+        const fieldDefs = this.parseNotetypeFieldDefs(row.flds);
+        map.set(row.id, fieldDefs.map((field) => field.name));
+      } catch {
+        // Skip invalid notetype field definitions
+      }
+    }
+
+    return map;
+  }
+
+  private parseNotetypeFieldDefs(rawFields: unknown): Array<{ name: string }> {
+    const parsed = typeof rawFields === 'string' ? JSON.parse(rawFields) : rawFields;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (field): field is { name: string } =>
+        typeof field === 'object' && field !== null && typeof (field as { name?: unknown }).name === 'string'
+    );
+  }
+
+  private async importNotesRows(
+    rows: EchoeNoteRow[],
+    notetypeFieldsMap: Map<number, string[]>,
+    mediaManifest?: Map<string, string>
+  ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
+    if (rows.length === 0) {
+      return { added: 0, updated: 0, skipped: 0, errors: [] };
+    }
+
     const errors: string[] = [];
     let added = 0;
     let updated = 0;
     let skipped = 0;
+    const db = getDatabase();
 
-    try {
-      const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
+    for (const row of rows) {
+      try {
+        const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
 
-      if (rows.length === 0) {
-        return { added: 0, updated: 0, skipped: 0, errors: [] };
-      }
-
-      // Build notetype field names map once for all notes
-      const notetypeFieldsMap = this.buildNotetypeFieldsMap(sourceDb);
-
-      const db = getDatabase();
-
-      for (const row of rows) {
-        try {
-          // Resolve notetype field names for this note
-          const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
-
-          // Parse flds (\x1f-separated) into a field name → value map
-          const rawValues = row.flds.split('\x1f');
-          const fields: Record<string, string> = {};
-          for (let i = 0; i < notetypeFields.length; i++) {
-            fields[notetypeFields[i]] = rawValues[i] ?? '';
+        const rawValues = row.flds.split('\x1f');
+        const fields: Record<string, string> = {};
+        for (let i = 0; i < notetypeFields.length; i++) {
+          let value = rawValues[i] ?? '';
+          if (mediaManifest) {
+            value = this.replaceMediaReferences(value, mediaManifest);
           }
+          fields[notetypeFields[i]] = value;
+        }
 
-          // Normalize using the standard module
-          const normalized = normalizeNoteFields({ notetypeFields, fields });
+        const normalized = normalizeNoteFields({ notetypeFields, fields });
 
-          // Check if note with same guid already exists
-          const existing = await db
-            .select({ id: echoeNotes.id })
-            .from(echoeNotes)
-            .where(eq(echoeNotes.guid, row.guid))
-            .limit(1);
+        const existing = await db
+          .select({ id: echoeNotes.id })
+          .from(echoeNotes)
+          .where(eq(echoeNotes.guid, row.guid))
+          .limit(1);
 
-          if (existing.length > 0) {
-            // Update existing note with normalized field data
-            await db
-              .update(echoeNotes)
-              .set({
-                mod: row.mod,
-                tags: row.tags || '[]',
-                flds: normalized.flds,
-                sfld: normalized.sfld,
-                csum: normalized.csum,
-                fldNames: normalized.fldNames,
-                fieldsJson: normalized.fieldsJson,
-              })
-              .where(eq(echoeNotes.guid, row.guid));
-            updated++;
-          } else {
-            // Insert new note with normalized field data
-            const newNote: NewEchoeNotes = {
-              id: row.id,
-              guid: row.guid,
-              mid: row.mid,
+        if (existing.length > 0) {
+          await db
+            .update(echoeNotes)
+            .set({
               mod: row.mod,
-              usn: row.usn,
               tags: row.tags || '[]',
               flds: normalized.flds,
               sfld: normalized.sfld,
               csum: normalized.csum,
-              flags: row.flags || 0,
-              data: row.data || '{}',
               fldNames: normalized.fldNames,
               fieldsJson: normalized.fieldsJson,
-            };
-            await db.insert(echoeNotes).values(newNote);
-            added++;
-          }
-        } catch (error) {
-          errors.push(`Failed to import note ${row.guid}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            })
+            .where(eq(echoeNotes.guid, row.guid));
+          updated++;
+        } else {
+          const newNote: NewEchoeNotes = {
+            id: row.id,
+            guid: row.guid,
+            mid: row.mid,
+            mod: row.mod,
+            usn: row.usn,
+            tags: row.tags || '[]',
+            flds: normalized.flds,
+            sfld: normalized.sfld,
+            csum: normalized.csum,
+            flags: row.flags || 0,
+            data: row.data || '{}',
+            fldNames: normalized.fldNames,
+            fieldsJson: normalized.fieldsJson,
+          };
+          await db.insert(echoeNotes).values(newNote);
+          added++;
         }
+      } catch (error) {
+        errors.push(`Failed to import note ${row.guid}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    } catch (error) {
-      errors.push(`Failed to read notes: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     return { added, updated, skipped, errors };
   }
 
-  /**
-   * Import cards from source database
-   */
-  private async importCards(
-    sourceDb: Database.Database
-  ): Promise<{ added: number; updated: number; errors: string[] }> {
-    const errors: string[] = [];
-    let added = 0;
-    let updated = 0;
+  private buildLatestRevlogMap(sourceDb: Database.Database, warnMessage: string): Map<number, EchoeRevlogRow> {
+    const latestRevlogMap = new Map<number, EchoeRevlogRow>();
+
+    try {
+      const revlogRows = sourceDb.prepare('SELECT * FROM revlog ORDER BY id DESC').all() as EchoeRevlogRow[];
+      for (const row of revlogRows) {
+        if (!latestRevlogMap.has(row.cid)) {
+          latestRevlogMap.set(row.cid, row);
+        }
+      }
+    } catch {
+      logger.warn(warnMessage);
+    }
+
+    return latestRevlogMap;
+  }
+
+  private resolveCardFsrsBackfill(
+    row: EchoeCardRow,
+    latestRevlog: EchoeRevlogRow | undefined,
+    now: number
+  ): { stability: number; difficulty: number; lastReview: number; source: 'revlog' | 'new' | 'heuristic' } {
+    if (latestRevlog) {
+      return {
+        stability: latestRevlog.ivl > 0 ? latestRevlog.ivl : 1,
+        difficulty: latestRevlog.factor > 0 ? Math.max(0.1, Math.min(1, latestRevlog.factor / 1000)) : 0.3,
+        lastReview: latestRevlog.time,
+        source: 'revlog',
+      };
+    }
+
+    if (row.type === 0 || row.ivl === 0) {
+      return {
+        stability: 0,
+        difficulty: 0,
+        lastReview: 0,
+        source: 'new',
+      };
+    }
+
+    return {
+      stability: row.ivl > 0 ? row.ivl : 1,
+      difficulty: row.factor > 0 ? Math.max(0.1, Math.min(1, row.factor / 1000)) : 0.3,
+      lastReview: row.mod > 0 ? row.mod * 1000 : now,
+      source: 'heuristic',
+    };
+  }
+
+  private async importCardsRows(
+    sourceDb: Database.Database,
+    revlogWarnMessage: string
+  ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
+    const emptyResult = {
+      added: 0,
+      updated: 0,
+      errors: [] as string[],
+      fsrsBackfilledFromRevlog: 0,
+      fsrsNewCards: 0,
+      fsrsHeuristic: 0,
+    };
 
     try {
       const rows = sourceDb.prepare('SELECT * FROM cards').all() as EchoeCardRow[];
-
       if (rows.length === 0) {
-        return { added: 0, updated: 0, errors: [] };
+        return emptyResult;
       }
 
       const db = getDatabase();
+      const latestRevlogMap = this.buildLatestRevlogMap(sourceDb, revlogWarnMessage);
+      const now = Date.now();
+      const errors: string[] = [];
+      let added = 0;
+      let updated = 0;
+      let fsrsBackfilledFromRevlog = 0;
+      let fsrsNewCards = 0;
+      let fsrsHeuristic = 0;
 
       for (const row of rows) {
         try {
-          // Check if card already exists
           const existing = await db
             .select({ id: echoeCards.id })
             .from(echoeCards)
             .where(eq(echoeCards.id, row.id))
             .limit(1);
 
+          const fsrs = this.resolveCardFsrsBackfill(row, latestRevlogMap.get(row.id), now);
+          if (fsrs.source === 'revlog') {
+            fsrsBackfilledFromRevlog++;
+          } else if (fsrs.source === 'new') {
+            fsrsNewCards++;
+          } else {
+            fsrsHeuristic++;
+          }
+
+          const normalizedDue = this.normalizeDueToMilliseconds(row.due, row.queue, row.type);
+          const normalizedOdue = this.normalizeDueToMilliseconds(row.odue, row.type, row.type);
+
           if (existing.length > 0) {
-            // Update existing card
             await db
               .update(echoeCards)
               .set({
@@ -1127,21 +1060,23 @@ export class EchoeImportService {
                 usn: row.usn,
                 type: row.type,
                 queue: row.queue,
-                due: row.due,
+                due: normalizedDue,
                 ivl: row.ivl,
                 factor: row.factor,
                 reps: row.reps,
                 lapses: row.lapses,
                 left: row.left,
-                odue: row.odue,
+                odue: normalizedOdue,
                 odid: row.odid,
                 flags: row.flags,
                 data: row.data || '{}',
+                stability: fsrs.stability,
+                difficulty: fsrs.difficulty,
+                lastReview: fsrs.lastReview,
               })
               .where(eq(echoeCards.id, row.id));
             updated++;
           } else {
-            // Insert new card
             const newCard: NewEchoeCards = {
               id: row.id,
               nid: row.nid,
@@ -1151,16 +1086,19 @@ export class EchoeImportService {
               usn: row.usn,
               type: row.type,
               queue: row.queue,
-              due: row.due,
+              due: normalizedDue,
               ivl: row.ivl,
               factor: row.factor,
               reps: row.reps,
               lapses: row.lapses,
               left: row.left,
-              odue: row.odue,
+              odue: normalizedOdue,
               odid: row.odid,
               flags: row.flags,
               data: row.data || '{}',
+              stability: fsrs.stability,
+              difficulty: fsrs.difficulty,
+              lastReview: fsrs.lastReview,
             };
             await db.insert(echoeCards).values(newCard);
             added++;
@@ -1169,83 +1107,151 @@ export class EchoeImportService {
           errors.push(`Failed to import card ${row.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
-    } catch (error) {
-      errors.push(`Failed to read cards: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
 
-    return { added, updated, errors };
+      return {
+        added,
+        updated,
+        errors,
+        fsrsBackfilledFromRevlog,
+        fsrsNewCards,
+        fsrsHeuristic,
+      };
+    } catch (error) {
+      return {
+        ...emptyResult,
+        errors: [`Failed to read cards: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      };
+    }
   }
 
-  /**
-   * Import revlog from source database (insert ignore duplicates)
-   */
-  private async importRevlog(sourceDb: Database.Database): Promise<number> {
+  private resolveRevlogDifficulty(
+    factor: number,
+    options: { difficultyFallback: number; clampDifficulty: boolean }
+  ): number {
+    const rawDifficulty = factor > 0 ? factor / 1000 : options.difficultyFallback;
+    if (!options.clampDifficulty) {
+      return rawDifficulty;
+    }
+    return Math.max(0.1, Math.min(1, rawDifficulty));
+  }
+
+  private async importRevlogRows(
+    rows: EchoeRevlogRow[],
+    options: { difficultyFallback: number; clampDifficulty: boolean }
+  ): Promise<number> {
+    if (rows.length === 0) {
+      return 0;
+    }
+
     let imported = 0;
+    const db = getDatabase();
 
-    try {
-      const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
+    for (const row of rows) {
+      try {
+        const existing = await db
+          .select({ id: echoeRevlog.id })
+          .from(echoeRevlog)
+          .where(eq(echoeRevlog.id, row.id))
+          .limit(1);
 
-      if (rows.length === 0) {
-        return 0;
-      }
-
-      const db = getDatabase();
-
-      for (const row of rows) {
-        try {
-          // Check if revlog entry already exists
-          const existing = await db
-            .select({ id: echoeRevlog.id })
-            .from(echoeRevlog)
-            .where(eq(echoeRevlog.id, row.id))
-            .limit(1);
-
-          if (existing.length === 0) {
-            // Insert new revlog entry
-            const newRevlog: NewEchoeRevlog = {
-              id: row.id,
-              cid: row.cid,
-              usn: row.usn,
-              ease: row.ease,
-              ivl: row.ivl,
-              lastIvl: row.lastIvl,
-              factor: row.factor,
-              time: row.time,
-              type: row.type,
-            };
-            await db.insert(echoeRevlog).values(newRevlog);
-            imported++;
-          }
-        } catch {
-          // Skip duplicates silently
+        if (existing.length > 0) {
+          continue;
         }
+
+        const difficulty = this.resolveRevlogDifficulty(row.factor, options);
+        const stability = row.ivl > 0 ? row.ivl : 1;
+        const lastReview = row.time;
+        const preStability = row.lastIvl > 0 ? row.lastIvl : 1;
+        const preLastReview = row.time - (row.lastIvl * DAY_MS);
+
+        const newRevlog: NewEchoeRevlog = {
+          id: row.id,
+          cid: row.cid,
+          usn: row.usn,
+          ease: row.ease,
+          ivl: row.ivl,
+          lastIvl: row.lastIvl,
+          factor: row.factor,
+          time: row.time,
+          type: row.type,
+          stability,
+          difficulty,
+          lastReview,
+          preStability,
+          preDifficulty: difficulty,
+          preLastReview: preLastReview > 0 ? preLastReview : 0,
+          preDue: 0,
+          preIvl: row.lastIvl,
+          preFactor: row.factor,
+          preReps: 0,
+          preLapses: 0,
+          preLeft: 0,
+          preType: row.type,
+          preQueue: row.type,
+        };
+
+        await db.insert(echoeRevlog).values(newRevlog);
+        imported++;
+      } catch {
+        // Skip duplicates silently
       }
-    } catch (error) {
-      logger.error('Failed to import revlog:', error);
     }
 
     return imported;
   }
 
-  /**
-   * Import media files from the zip archive
-   */
-  private async importMedia(zip: JSZip, sourceDb: Database.Database): Promise<number> {
+  private collectMediaPaths(zip: JSZip, includeRootFiles: boolean): string[] {
+    const excludeFiles = new Set(['collection.anki2', 'collection.anki21', 'col.json', 'media']);
+
+    return Object.keys(zip.files).filter((name) => {
+      if (name.endsWith('/')) {
+        return false;
+      }
+
+      if (name.startsWith('media/')) {
+        return true;
+      }
+
+      if (!includeRootFiles || excludeFiles.has(name)) {
+        return false;
+      }
+
+      if (/^\d+$/.test(name)) {
+        return true;
+      }
+
+      return !name.includes('/');
+    });
+  }
+
+  private resolveImportMediaFilename(mediaPath: string, mediaManifest?: Map<string, string>): string {
+    const normalizedPath = mediaPath.startsWith('media/') ? mediaPath.replace('media/', '') : mediaPath;
+    const numericKey = normalizedPath.match(/^\d+$/)?.[0];
+
+    if (numericKey && mediaManifest?.has(numericKey)) {
+      return mediaManifest.get(numericKey) || normalizedPath;
+    }
+
+    return normalizedPath;
+  }
+
+  private async importMediaEntries(
+    zip: JSZip,
+    mediaPaths: string[],
+    mediaManifest?: Map<string, string>
+  ): Promise<number> {
     let imported = 0;
 
     try {
-      // Find all media files in the zip
-      const mediaFiles = Object.keys(zip.files).filter((name) => name.startsWith('media/'));
-
-      for (const mediaPath of mediaFiles) {
+      for (const mediaPath of mediaPaths) {
         try {
           const file = zip.file(mediaPath);
-          if (!file) continue;
+          if (!file) {
+            continue;
+          }
 
           const buffer = await file.async('nodebuffer');
-          const filename = mediaPath.replace('media/', '');
-
-          // Upload to storage via EchoeMediaService
+          const filename = this.resolveImportMediaFilename(mediaPath, mediaManifest);
           await this.mediaService.uploadMedia(buffer, filename);
           imported++;
         } catch (error) {

@@ -4,7 +4,12 @@ import { getDatabase } from '../db/connection.js';
 import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes } from '../db/schema/index.js';
 import { FSRSService, Rating, State } from './fsrs.service.js';
 import { EchoeDeckService } from './echoe-deck.service.js';
-import type { FSRSConfig } from './fsrs.service.js';
+import type { FSRSConfig, FSRSInput } from './fsrs.service.js';
+
+/**
+ * Internal type for FSRS card input built from database card
+ */
+type FSRSCardInput = FSRSInput;
 
 import type {
   StudyQueueParams,
@@ -177,26 +182,8 @@ export class EchoeStudyService {
     // Build FSRS config from deck config
     const fsrsConfig = this.getFSRSConfig(deckConfig);
 
-    // Calculate elapsed_days since last review
-    // dayMs = 24 * 60 * 60 * 1000 = 86400000
-    const dayMs = 24 * 60 * 60 * 1000;
-    const elapsedDays = card.lastReview && card.lastReview > 0
-      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
-      : 0;
-
-    // Create FSRS card input from database card
-    const fsCardInput = {
-      due: new Date(card.due),
-      stability: card.factor / 1000, // Convert from permille to decimal
-      difficulty: 0, // Will be calculated by FSRS
-      elapsed_days: elapsedDays,
-      scheduled_days: card.ivl,
-      learning_steps: card.left,
-      reps: card.reps,
-      lapses: card.lapses,
-      state: card.type as State,
-      last_review: undefined,
-    };
+    // Build FSRS card input from database card (uses real FSRS fields)
+    const fsCardInput = this.buildFSRSCardInput(card, now);
 
     // Calculate new scheduling using FSRS
     const schedulingResult = this.fsrsService.scheduleCard(
@@ -675,25 +662,8 @@ export class EchoeStudyService {
     // Build FSRS config from deck config
     const fsrsConfig = this.getFSRSConfig(deckConfig);
 
-    // Calculate elapsed_days since last review
-    const dayMs = 24 * 60 * 60 * 1000;
-    const elapsedDays = card.lastReview && card.lastReview > 0
-      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
-      : 0;
-
-    // Create FSRS card input from database card
-    const fsCardInput = {
-      due: new Date(card.due),
-      stability: card.stability || card.factor / 1000, // Use stability if available, fallback to factor
-      difficulty: card.difficulty || 0, // Will be calculated by FSRS
-      elapsed_days: elapsedDays,
-      scheduled_days: card.ivl,
-      learning_steps: card.left,
-      reps: card.reps,
-      lapses: card.lapses,
-      state: card.type as State,
-      last_review: undefined,
-    };
+    // Build FSRS card input from database card (uses real FSRS fields)
+    const fsCardInput = this.buildFSRSCardInput(card, now);
 
     // Get all scheduling options using FSRS
     const schedulingOutput = this.fsrsService.getSchedulingOptions(
@@ -730,6 +700,69 @@ export class EchoeStudyService {
     return {
       cardId,
       options,
+    };
+  }
+
+  /**
+   * Build FSRS card input from database card
+   * Priority: use real FSRS fields (stability/difficulty/last_review) if available,
+   * otherwise initialize for new cards or use minimal fallback for legacy cards.
+   */
+  private buildFSRSCardInput(card: typeof echoeCards.$inferSelect, now: Date): FSRSCardInput {
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    // Calculate elapsed_days from last_review (in milliseconds)
+    // lastReview is stored as Unix timestamp in milliseconds
+    const elapsedDays = card.lastReview && card.lastReview > 0
+      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
+      : 0;
+
+    // Priority 1: Use real FSRS fields if available
+    if (card.stability != null && card.stability > 0) {
+      return {
+        due: new Date(card.due),
+        stability: card.stability,
+        difficulty: card.difficulty ?? 0.3, // Default difficulty if not set
+        elapsed_days: elapsedDays,
+        scheduled_days: card.ivl,
+        learning_steps: card.left,
+        reps: card.reps,
+        lapses: card.lapses,
+        state: card.type as State,
+        last_review: card.lastReview && card.lastReview > 0 ? new Date(card.lastReview) : undefined,
+      };
+    }
+
+    // Priority 2: New card - use FSRS defaults for initialization
+    if (card.type === 0 || card.ivl === 0) {
+      // FSRS will initialize stability and difficulty based on first review
+      return {
+        due: new Date(card.due),
+        stability: 1, // Initial stability (will be overwritten by FSRS)
+        difficulty: 0.3, // Initial difficulty (will be overwritten by FSRS)
+        elapsed_days: 0,
+        scheduled_days: 0,
+        learning_steps: card.left,
+        reps: card.reps,
+        lapses: card.lapses,
+        state: State.New,
+        last_review: undefined,
+      };
+    }
+
+    // Priority 3: Legacy card without FSRS fields - use conservative defaults
+    // This path should be rare after the migration script runs
+    return {
+      due: new Date(card.due),
+      stability: Math.max(1, card.ivl), // Use interval as rough stability estimate
+      difficulty: 0.3, // Neutral difficulty
+      elapsed_days: elapsedDays,
+      scheduled_days: card.ivl,
+      learning_steps: card.left,
+      reps: card.reps,
+      lapses: card.lapses,
+      state: card.type as State,
+      last_review: card.lastReview && card.lastReview > 0 ? new Date(card.lastReview) : undefined,
     };
   }
 

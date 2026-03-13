@@ -76,7 +76,7 @@ export class EchoeNoteService {
 
     // Filter by status
     if (status) {
-      const today = Math.floor(Date.now() / 86400000);
+      const nowMs = Date.now();
       let cardConditions: any;
 
       switch (status) {
@@ -87,7 +87,7 @@ export class EchoeNoteService {
           cardConditions = sql`${echoeCards.queue} IN (1, 3)`;
           break;
         case 'review':
-          cardConditions = and(eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${today}`);
+          cardConditions = and(eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${nowMs}`);
           break;
         case 'suspended':
           cardConditions = eq(echoeCards.queue, -1);

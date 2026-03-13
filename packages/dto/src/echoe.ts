@@ -355,7 +355,7 @@ export interface EchoeCardDto {
   type: number;
   /** Queue (0=new, 1=learning, 2=review, -1=suspended, -2=buried, -3=sibling buried) */
   queue: number;
-  /** Due date */
+  /** Due time (Unix timestamp in milliseconds) */
   due: number;
   /** Interval in days */
   ivl: number;
@@ -369,6 +369,12 @@ export interface EchoeCardDto {
   left: number;
   /** USN */
   usn: number;
+  /** Stability (days) - represents how well the card is remembered */
+  stability: number;
+  /** Difficulty (0-1) - probability of forgetting */
+  difficulty: number;
+  /** Last review timestamp (Unix ms) */
+  lastReview: number;
 }
 
 export interface EchoeCardWithNoteDto extends EchoeCardDto {
@@ -392,7 +398,7 @@ export interface EchoeCardListItemDto {
   type: number;
   /** Queue (0=new, 1=learning, 2=review, -1=suspended, -2=buried, -3=sibling buried) */
   queue: number;
-  /** Due date (Unix timestamp in seconds or days based on queue type) */
+  /** Due time (Unix timestamp in milliseconds) */
   due: number;
   /** Interval in days */
   ivl: number;
@@ -658,6 +664,15 @@ export interface CheckUnusedMediaResultDto {
 
 // ===== Import =====
 
+export interface ImportErrorDetailDto {
+  /** Category of the error */
+  category: 'notetype' | 'deck' | 'note' | 'card' | 'revlog' | 'media' | 'general';
+  /** Error message */
+  message: string;
+  /** Optional identifier (e.g., note id, deck name) */
+  id?: string | number;
+}
+
 export interface ImportResultDto {
   /** Number of notes added */
   notesAdded: number;
@@ -677,8 +692,16 @@ export interface ImportResultDto {
   revlogImported: number;
   /** Number of media files imported */
   mediaImported: number;
-  /** List of errors */
+  /** List of errors (simple string format for backwards compatibility) */
   errors: string[];
+  /** Detailed error breakdown by category */
+  errorDetails?: ImportErrorDetailDto[];
+  /** Number of cards with FSRS backfill from revlog */
+  fsrsBackfilledFromRevlog?: number;
+  /** Number of cards kept as new (no revlog, type=0) */
+  fsrsNewCards?: number;
+  /** Number of cards with heuristic FSRS backfill */
+  fsrsHeuristic?: number;
 }
 
 // ===== Statistics =====

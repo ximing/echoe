@@ -234,17 +234,23 @@ const CardBrowserPageContent = view(() => {
       return '-';
     }
 
-    // Due is in days (for review) or milliseconds (for learning)
+    // Due is always stored as Unix timestamp in milliseconds
+    const dueMs = Number(card.due);
+    if (!Number.isFinite(dueMs) || dueMs <= 0) {
+      return '-';
+    }
+
     if (card.queue === 1 || card.queue === 3) {
-      // Learning - due is timestamp
-      const dueTime = new Date(card.due);
+      // Learning/relearning cards show precise due time
+      const dueTime = new Date(dueMs);
       return dueTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    // Review - due is days since epoch
-    const today = Math.floor(Date.now() / 86400000);
-    const dueDays = Math.floor(card.due);
-    const diff = dueDays - today;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(dueMs);
+    dueDate.setHours(0, 0, 0, 0);
+    const diff = Math.floor((dueDate.getTime() - today.getTime()) / 86400000);
 
     if (diff < 0) {
       return `${Math.abs(diff)}d overdue`;

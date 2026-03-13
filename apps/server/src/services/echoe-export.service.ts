@@ -18,6 +18,10 @@ import { echoeMedia } from '../db/schema/echoe-media.js';
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SECOND_MS = 1000;
+const LIKELY_MS_TIMESTAMP_MIN = 100_000_000_000;
+
 export interface ExportOptions {
   /** Deck ID to export (if not specified, export all decks) */
   deckId?: number;
@@ -99,21 +103,23 @@ export class EchoeExportService {
 
       logger.info(`Exported: ${notes.length} notes, ${cardCount} cards, ${mediaFiles.size} media files`);
 
+      const colJson = this.generateColJson(models, decks, dconf);
+      this.updateStandardCollection(tempDb, colJson);
+
       // Get the SQLite buffer
       const sqliteBuffer = (tempDb as any).export();
 
       // Create the zip file
       const zip = new JSZip();
 
-      // Add collection.db (Standard Anki uses .db extension)
-      zip.file('collection.db', sqliteBuffer);
+      // Official Standard Anki collection filename
+      zip.file('collection.anki21', sqliteBuffer);
 
-      // Add col.json
-      const colJson = this.generateColJson(models, decks, dconf);
+      // Keep col.json as compatibility metadata for importers
       zip.file('col.json', JSON.stringify(colJson));
 
-      // Add media manifest and files
-      await this.addMediaToZipStandardAnki(zip, notes, mediaFiles);
+      // Add media manifest and files (root numeric filenames)
+      await this.addMediaToZipStandardAnki(zip, mediaFiles);
 
       // Generate the final .apkg buffer
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -638,7 +644,7 @@ export class EchoeExportService {
         collapsed: deck.collapsed || 0,
         dyn: deck.dyn || 0,
         desc: deck.desc || '',
-        conf: deck.conf || 1,
+        conf: 1,
         extendNew: 20,
         extendRev: 200,
       };
@@ -716,20 +722,22 @@ export class EchoeExportService {
     models: Record<number, any>,
     decks: Record<number, any>,
     dconf: Record<number, any>
-  ): any {
+  ): Record<string, any> {
     const now = Math.floor(Date.now() / 1000);
+    const firstDeckId = Object.keys(decks)[0];
+    const currentDeckId = firstDeckId ? Number(firstDeckId) : 1;
 
     return {
       id: 1,
       crt: now - 86400, // Created yesterday
       mod: now,
-      scm: now * 1000, // Schema mod (microseconds)
+      scm: now * 1000,
       ver: 213,
-      dty: 0, // Deck type (0 = standard)
+      dty: 0,
       usn: -1,
       ls: 0,
-      conf: JSON.stringify({
-        curDeck: 1,
+      conf: {
+        curDeck: currentDeckId,
         newSpread: 0,
         collapseTime: 1200,
         timer: 0,
@@ -748,91 +756,67 @@ export class EchoeExportService {
         mainWindowState: 'maximized',
         creationOffset: 0,
         timezone: null,
-      }),
-      models: JSON.stringify(models),
-      decks: JSON.stringify(decks),
-      dconf: JSON.stringify(dconf),
-      tags: JSON.stringify({}),
+      },
+      models,
+      decks,
+      dconf,
+      tags: {},
     };
+  }
+
+  private updateStandardCollection(db: Database.Database, colJson: Record<string, any>) {
+    db
+      .prepare(
+        `UPDATE col
+         SET crt = ?, mod = ?, scm = ?, ver = ?, dty = ?, usn = ?, ls = ?, conf = ?, models = ?, decks = ?, dconf = ?, tags = ?
+         WHERE id = ?`
+      )
+      .run(
+        colJson.crt,
+        colJson.mod,
+        colJson.scm,
+        colJson.ver,
+        colJson.dty,
+        colJson.usn,
+        colJson.ls,
+        JSON.stringify(colJson.conf),
+        JSON.stringify(colJson.models),
+        JSON.stringify(colJson.decks),
+        JSON.stringify(colJson.dconf),
+        JSON.stringify(colJson.tags),
+        colJson.id
+      );
   }
 
   /**
    * Get media files referenced in notes
    */
   private async getMediaFilesForExport(notes: { flds: string }[]): Promise<Set<string>> {
-    const mediaFiles = new Set<string>();
-
-    const soundPattern = /\[sound:([^\]]+)\]/g;
-    const imgPattern = /<img[^>]+src=["']([^"']+)["']/g;
-
-    for (const note of notes) {
-      const flds = note.flds || '';
-      let match;
-
-      while ((match = soundPattern.exec(flds)) !== null) {
-        mediaFiles.add(match[1]);
-      }
-
-      while ((match = imgPattern.exec(flds)) !== null) {
-        const src = match[1];
-        const filename = src.split('/').pop() || src;
-        mediaFiles.add(filename);
-      }
-    }
-
-    return mediaFiles;
+    return this.collectMediaFilesFromNotes(notes);
   }
 
   /**
    * Add media to zip with manifest for Standard Anki format
    */
-  private async addMediaToZipStandardAnki(
-    zip: JSZip,
-    notes: { flds: string }[],
-    mediaFiles: Set<string>
-  ): Promise<void> {
-    if (mediaFiles.size === 0) return;
-
-    // Get media manifest mapping (numeric ID -> filename)
-    const db = getDatabase();
+  private async addMediaToZipStandardAnki(zip: JSZip, mediaFiles: Set<string>): Promise<void> {
     const mediaManifest: Record<string, string> = {};
-    let mediaId = 0;
 
-    const mediaRecords = await db
-      .select()
-      .from(echoeMedia)
-      .where(inArray(echoeMedia.filename, [...mediaFiles]));
-
-    for (const media of mediaRecords) {
-      // Create numeric ID mapping
-      const numericId = String(mediaId++);
-      mediaManifest[numericId] = media.filename;
+    if (mediaFiles.size === 0) {
+      zip.file('media', JSON.stringify(mediaManifest));
+      return;
     }
 
-    // Add media manifest
-    zip.file('media', JSON.stringify(mediaManifest));
-
-    // Add actual media files
-    for (const filename of mediaFiles) {
-      try {
-        const media = await this.mediaService.getMedia(filename);
-        if (media) {
-          // Find the numeric ID for this filename
-          let numericId = '';
-          for (const [id, name] of Object.entries(mediaManifest)) {
-            if (name === filename) {
-              numericId = id;
-              break;
-            }
-          }
-          if (numericId) {
-            zip.file(`media/${numericId}`, media.buffer);
-          }
-        }
-      } catch (error) {
-        logger.warn(`Failed to add media ${filename} to export:`, error);
+    const sortedMediaFiles = [...mediaFiles].sort();
+    await this.addMediaFilesToZip(
+      zip,
+      sortedMediaFiles,
+      (_filename, index) => String(index),
+      (filename, entryName) => {
+        mediaManifest[entryName] = filename;
       }
-    }
+    );
+
+    zip.file('media', JSON.stringify(mediaManifest));
   }
 
   /**
@@ -965,6 +949,10 @@ export class EchoeExportService {
       let ivl = card.ivl;
       let factor = card.factor;
       let reps = card.reps;
+      let lapses = card.lapses || 0;
+      let left = card.left || 0;
+      let odue = card.odue || 0;
+      let odid = card.odid || 0;
 
       if (!includeScheduling) {
         // Export as clean new cards
@@ -974,6 +962,13 @@ export class EchoeExportService {
         ivl = 0;
         factor = 2500;
         reps = 0;
+        lapses = 0;
+        left = 0;
+        odue = 0;
+        odid = 0;
+      } else {
+        due = this.convertDueToAnkiUnit(due, queue, type, position);
+        odue = this.convertDueToAnkiUnit(odue, type, type, 0);
       }
 
       stmt.run(
@@ -989,16 +984,50 @@ export class EchoeExportService {
         ivl,
         factor,
         reps,
-        card.lapses || 0,
-        card.left || 0,
-        card.odue || 0,
-        card.odid || 0,
+        lapses,
+        left,
+        odue,
+        odid,
         card.flags || 0,
         card.data || '{}'
       );
     }
 
     return cards.length;
+  }
+
+  /**
+   * Convert Echoe due value (ms) into Anki-compatible unit by queue/type.
+   */
+  private convertDueToAnkiUnit(due: number, queue: number, type: number, newCardFallback: number): number {
+    if (!Number.isFinite(due) || due <= 0) {
+      return queue === 0 ? newCardFallback : 0;
+    }
+
+    const effectiveQueue = queue < 0 ? type : queue;
+
+    if (effectiveQueue === 2) {
+      if (due >= LIKELY_MS_TIMESTAMP_MIN) {
+        return Math.max(1, Math.floor(due / DAY_MS));
+      }
+      return Math.max(1, Math.floor(due));
+    }
+
+    if (effectiveQueue === 1 || effectiveQueue === 3) {
+      if (due >= LIKELY_MS_TIMESTAMP_MIN) {
+        return Math.max(1, Math.floor(due / SECOND_MS));
+      }
+      return Math.max(1, Math.floor(due));
+    }
+
+    if (effectiveQueue === 0) {
+      if (due >= LIKELY_MS_TIMESTAMP_MIN) {
+        return Math.max(1, newCardFallback);
+      }
+      return Math.max(1, Math.floor(due));
+    }
+
+    return Math.floor(due);
   }
 
   /**
@@ -1034,37 +1063,16 @@ export class EchoeExportService {
    * Export media files
    */
   private async exportMedia(tempDb: Database.Database, notes: { flds: string }[]): Promise<number> {
-    // Extract media references from note fields
-    const mediaFiles = new Set<string>();
-
-    const soundPattern = /\[sound:([^\]]+)\]/g;
-    const imgPattern = /<img[^>]+src=["']([^"']+)["']/g;
-
-    for (const note of notes) {
-      const flds = note.flds || '';
-      let match;
-
-      while ((match = soundPattern.exec(flds)) !== null) {
-        mediaFiles.add(match[1]);
-      }
-
-      while ((match = imgPattern.exec(flds)) !== null) {
-        const src = match[1];
-        const filename = src.split('/').pop() || src;
-        mediaFiles.add(filename);
-      }
-    }
+    const mediaFiles = this.collectMediaFilesFromNotes(notes);
 
     if (mediaFiles.size === 0) return 0;
 
-    // Get media info from database
     const db = getDatabase();
     const mediaRecords = await db
       .select()
       .from(echoeMedia)
       .where(inArray(echoeMedia.filename, [...mediaFiles]));
 
-    // Create media table in temp DB
     tempDb.exec(`
       CREATE TABLE media (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1093,7 +1101,13 @@ export class EchoeExportService {
    * Add media files to the zip archive
    */
   private async addMediaToZip(zip: JSZip, notes: { flds: string }[]) {
-    // Extract media references from note fields
+    const mediaFiles = [...this.collectMediaFilesFromNotes(notes)];
+    if (mediaFiles.length === 0) return;
+
+    await this.addMediaFilesToZip(zip, mediaFiles, (filename) => `media/${filename}`);
+  }
+
+  private collectMediaFilesFromNotes(notes: { flds: string }[]): Set<string> {
     const mediaFiles = new Set<string>();
 
     const soundPattern = /\[sound:([^\]]+)\]/g;
@@ -1101,7 +1115,7 @@ export class EchoeExportService {
 
     for (const note of notes) {
       const flds = note.flds || '';
-      let match;
+      let match: RegExpExecArray | null;
 
       while ((match = soundPattern.exec(flds)) !== null) {
         mediaFiles.add(match[1]);
@@ -1109,20 +1123,32 @@ export class EchoeExportService {
 
       while ((match = imgPattern.exec(flds)) !== null) {
         const src = match[1];
-        const filename = src.split('/').pop() || src;
-        mediaFiles.add(filename);
+        mediaFiles.add(src.split('/').pop() || src);
       }
     }
 
-    if (mediaFiles.size === 0) return;
+    return mediaFiles;
+  }
 
-    // Get media from storage
+  private async addMediaFilesToZip(
+    zip: JSZip,
+    mediaFiles: string[],
+    entryResolver: (filename: string, index: number) => string,
+    onAdded?: (filename: string, entryName: string) => void
+  ): Promise<void> {
+    let addedCount = 0;
+
     for (const filename of mediaFiles) {
       try {
         const media = await this.mediaService.getMedia(filename);
-        if (media) {
-          zip.file(`media/${filename}`, media.buffer);
+        if (!media) {
+          continue;
         }
+
+        const entryName = entryResolver(filename, addedCount);
+        zip.file(entryName, media.buffer);
+        onAdded?.(filename, entryName);
+        addedCount++;
       } catch (error) {
         logger.warn(`Failed to add media ${filename} to export:`, error);
       }

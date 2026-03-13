@@ -243,7 +243,9 @@ export class EchoeStatsService {
 
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const todayTimestamp = Math.floor(today.getTime() / 86400000); // Day number
+    const todayStartMs = today.getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const forecastEndMs = todayStartMs + days * dayMs;
 
     let query;
     if (deckId !== undefined) {
@@ -257,8 +259,10 @@ export class EchoeStatsService {
         .where(
           and(
             inArray(echoeCards.did, deckIds),
-            // Cards that are review (queue=2) or learning (queue=1,3)
-            sql`${echoeCards.queue} IN (1, 2, 3)`
+            // Cards that are review (queue=2) or learning (queue=1,3), within forecast window
+            sql`${echoeCards.queue} IN (1, 2, 3)`,
+            gte(echoeCards.due, todayStartMs),
+            lte(echoeCards.due, forecastEndMs - 1)
           )
         );
     } else {
@@ -268,7 +272,13 @@ export class EchoeStatsService {
           queue: echoeCards.queue,
         })
         .from(echoeCards)
-        .where(sql`${echoeCards.queue} IN (1, 2, 3)`);
+        .where(
+          and(
+            sql`${echoeCards.queue} IN (1, 2, 3)`,
+            gte(echoeCards.due, todayStartMs),
+            lte(echoeCards.due, forecastEndMs - 1)
+          )
+        );
     }
 
     const cards = await query;
@@ -284,17 +294,18 @@ export class EchoeStatsService {
       forecastMap.set(dateStr, 0);
     }
 
-    // Count cards by due date
+    // Count cards by due date bucket using due(ms)
     for (const card of cards) {
-      const dueDay = Number(card.due);
-      const daysUntilDue = dueDay - todayTimestamp;
-
-      if (daysUntilDue >= 0 && daysUntilDue < days) {
-        const date = new Date(today);
-        date.setDate(date.getDate() + daysUntilDue);
-        const dateStr = date.toISOString().split('T')[0];
-        forecastMap.set(dateStr, (forecastMap.get(dateStr) || 0) + 1);
+      const dueMs = Number(card.due);
+      if (!Number.isFinite(dueMs) || dueMs < todayStartMs || dueMs >= forecastEndMs) {
+        continue;
       }
+
+      const daysUntilDue = Math.floor((dueMs - todayStartMs) / dayMs);
+      const date = new Date(today);
+      date.setDate(date.getDate() + daysUntilDue);
+      const dateStr = date.toISOString().split('T')[0];
+      forecastMap.set(dateStr, (forecastMap.get(dateStr) || 0) + 1);
     }
 
     return Array.from(forecastMap.entries()).map(([date, dueCount]) => ({

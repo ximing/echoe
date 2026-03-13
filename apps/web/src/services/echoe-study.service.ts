@@ -7,10 +7,12 @@ import {
   buryCards as apiBuryCards,
   forgetCards as apiForgetCards,
   getEchoeConfig,
+  getStudyOptions,
 } from '../api/echoe';
 import type {
   StudyQueueItemDto,
   EchoeGlobalSettingsDto,
+  RatingOptionDto,
 } from '@echoe/dto';
 
 export interface SessionStats {
@@ -60,6 +62,11 @@ export class EchoeStudyService extends Service {
   // Undo stack (max 10 entries)
   undoStack: UndoEntry[] = [];
 
+  // Study options (rating previews from FSRS)
+  currentCardOptions: RatingOptionDto[] = [];
+  isLoadingStudyOptions = false;
+  studyOptionsError: string | null = null;
+
   // Leech detection
   lastReviewWasLeech = false;
 
@@ -77,6 +84,7 @@ export class EchoeStudyService extends Service {
     this.isLoading = true;
     this.error = null;
     this.deckId = deckId;
+    this.resetStudyOptionsState();
 
     try {
       // Load global settings for audio
@@ -179,6 +187,63 @@ export class EchoeStudyService extends Service {
     this.stats.timeSpent += Date.now() - this.cardStartTime;
     // Clear typed answers when showing answer
     this.typedAnswers = {};
+    this.currentCardOptions = [];
+    this.studyOptionsError = null;
+    // Fetch study options (rating previews) from server
+    this.fetchStudyOptions();
+  }
+
+  /**
+   * Fetch study options for current card
+   */
+  async fetchStudyOptions(): Promise<void> {
+    const card = this.getCurrentCard();
+    if (!card) {
+      this.resetStudyOptionsState();
+      return;
+    }
+
+    const requestCardId = card.cardId;
+    this.currentCardOptions = [];
+    this.studyOptionsError = null;
+    this.isLoadingStudyOptions = true;
+
+    try {
+      const response = await getStudyOptions(requestCardId);
+      const latestCardId = this.getCurrentCard()?.cardId;
+      if (latestCardId !== requestCardId) {
+        return;
+      }
+
+      this.currentCardOptions = response.data?.options ?? [];
+    } catch (error: unknown) {
+      const latestCardId = this.getCurrentCard()?.cardId;
+      if (latestCardId !== requestCardId) {
+        return;
+      }
+
+      this.currentCardOptions = [];
+      const optionsError = error as { msg?: string; message?: string };
+      this.studyOptionsError = optionsError.msg || optionsError.message || 'Failed to load study options';
+    } finally {
+      const latestCardId = this.getCurrentCard()?.cardId;
+      if (latestCardId === requestCardId) {
+        this.isLoadingStudyOptions = false;
+      }
+    }
+  }
+
+  /**
+   * Get study options for current card
+   */
+  getStudyOptions(): RatingOptionDto[] {
+    return this.currentCardOptions;
+  }
+
+  private resetStudyOptionsState(): void {
+    this.currentCardOptions = [];
+    this.isLoadingStudyOptions = false;
+    this.studyOptionsError = null;
   }
 
   /**
@@ -236,6 +301,7 @@ export class EchoeStudyService extends Service {
       this.currentIndex++;
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
+      this.resetStudyOptionsState();
       this.cardStartTime = Date.now();
 
       // Check if session complete
@@ -267,6 +333,7 @@ export class EchoeStudyService extends Service {
       // Move back to previous card
       this.currentIndex = Math.max(0, this.currentIndex - 1);
       this.isShowingAnswer = false;
+      this.resetStudyOptionsState();
       this.cardStartTime = Date.now();
 
       // Decrease stats for the undone card
@@ -301,6 +368,7 @@ export class EchoeStudyService extends Service {
       this.currentIndex++;
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
+      this.resetStudyOptionsState();
       this.cardStartTime = Date.now();
 
       return true;
@@ -325,6 +393,7 @@ export class EchoeStudyService extends Service {
       this.currentIndex++;
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
+      this.resetStudyOptionsState();
       this.cardStartTime = Date.now();
 
       return true;
@@ -376,44 +445,32 @@ export class EchoeStudyService extends Service {
    * Calculate next interval text for a rating
    */
   getNextIntervalText(rating: 1 | 2 | 3 | 4): string {
-    const card = this.getCurrentCard();
-    if (!card) return '';
-
-    // Simple estimation based on current interval and rating
-    // In a real implementation, this would come from the FSRS algorithm
-    const baseInterval = card.interval || 1;
-    const factor = card.factor / 1000; // Convert from permille to decimal
-
-    let multiplier: number;
-    switch (rating) {
-      case 1: // Again
-        return '<1m';
-      case 2: // Hard
-        multiplier = 1.2;
-        break;
-      case 3: // Good
-        multiplier = factor * 1.0;
-        break;
-      case 4: // Easy
-        multiplier = factor * 1.3;
-        break;
-      default:
-        multiplier = 1;
+    if (this.isLoadingStudyOptions) {
+      return '...';
     }
 
-    const nextInterval = Math.max(1, Math.round(baseInterval * multiplier));
+    const option = this.currentCardOptions.find((opt) => opt.rating === rating);
+    if (!option) {
+      return '--';
+    }
 
-    if (nextInterval < 1) {
+    return this.formatIntervalText(option.interval);
+  }
+
+  private formatIntervalText(interval: number): string {
+    if (interval < 1) {
       return '<1d';
-    } else if (nextInterval < 30) {
-      return `${nextInterval}d`;
-    } else if (nextInterval < 365) {
-      const months = Math.round(nextInterval / 30);
-      return `${months}mo`;
-    } else {
-      const years = Math.round(nextInterval / 365);
-      return `${years}y`;
     }
+
+    if (interval < 30) {
+      return `${Math.round(interval)}d`;
+    }
+
+    if (interval < 365) {
+      return `${Math.round(interval / 30)}mo`;
+    }
+
+    return `${Math.round(interval / 365)}y`;
   }
 
   /**

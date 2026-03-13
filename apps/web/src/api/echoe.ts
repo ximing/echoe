@@ -33,6 +33,7 @@ import type {
   DuplicateGroupDto,
   MergeDuplicatesDto,
   ImportResultDto,
+  StudyOptionsDto,
 } from '@echoe/dto';
 import request from '../utils/request';
 
@@ -211,6 +212,18 @@ export const getStudyCounts = (deckId?: number) => {
       params: {
         ...(deckId !== undefined && { deckId: deckId.toString() }),
       },
+    }
+  );
+};
+
+/**
+ * Get rating preview options for a card (FSRS scheduling)
+ */
+export const getStudyOptions = (cardId: number) => {
+  return request.get<unknown, { code: number; data: StudyOptionsDto }>(
+    '/api/v1/study/options',
+    {
+      params: { cardId: cardId.toString() },
     }
   );
 };
@@ -531,9 +544,10 @@ export const deleteDeckConfigPreset = (id: string) => {
 /**
  * Export all decks to .apkg
  */
-export const exportAllDecks = (includeScheduling = false) => {
+export const exportAllDecks = (includeScheduling = false, format: 'anki' | 'legacy' = 'anki') => {
   const params = new URLSearchParams();
   params.set('includeScheduling', includeScheduling.toString());
+  params.set('format', format);
   return request.get<Blob, { code: number }>(
     `/api/v1/export/apkg?${params.toString()}`,
     { responseType: 'blob' }

@@ -4,9 +4,9 @@
  */
 
 import multer from 'multer';
-import { JsonController, Post, Req, UseBefore } from 'routing-controllers';
+import { JsonController, Post, Req } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import { ErrorCode } from '../../constants/error-codes.js';
 import { EchoeCsvImportService } from '../../services/echoe-csv-import.service.js';
@@ -34,6 +34,26 @@ const upload = multer({
   },
 });
 
+// Extend Express Request type to include file from multer
+declare module 'express' {
+  interface Request {
+    file?: Express.Multer.File;
+  }
+}
+
+const runSingleFileUpload = async (request: Request): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    const response = request.res ?? ({} as Response);
+    upload.single('file')(request, response, (error: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
 @Service()
 @JsonController('/api/v1/csv-import')
 export class EchoeCsvImportController {
@@ -47,35 +67,32 @@ export class EchoeCsvImportController {
    * Preview CSV file - detect encoding, delimiter, return first 5 rows
    */
   @Post('/preview')
-  @UseBefore(upload.single('file'))
   async previewCsv(@Req() request: Request) {
-    return new Promise((resolve) => {
-      upload.single('file')(request, {} as any, async (error: any) => {
-        if (error) {
-          if (error.message.includes('File too large')) {
-            return resolve(ResponseUtil.error(ErrorCode.FILE_TOO_LARGE));
-          }
-          if (error.message.includes('Only .csv')) {
-            return resolve(ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE));
-          }
-          logger.error('CSV preview upload error:', error);
-          return resolve(ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR));
-        }
+    try {
+      await runSingleFileUpload(request);
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('File too large')) {
+        return ResponseUtil.error(ErrorCode.FILE_TOO_LARGE);
+      }
+      if (error instanceof Error && error.message.includes('Only .csv')) {
+        return ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE);
+      }
+      logger.error('CSV preview upload error:', error);
+      return ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR);
+    }
 
-        const file = (request as any).file;
-        if (!file) {
-          return resolve(ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded'));
-        }
+    const file = request.file;
+    if (!file) {
+      return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded');
+    }
 
-        try {
-          const preview = await this.csvImportService.preview(file.buffer);
-          return resolve(ResponseUtil.success(preview));
-        } catch (err) {
-          logger.error('Failed to preview CSV:', err);
-          return resolve(ResponseUtil.error(ErrorCode.DB_ERROR));
-        }
-      });
-    });
+    try {
+      const preview = await this.csvImportService.preview(file.buffer);
+      return ResponseUtil.success(preview);
+    } catch (err) {
+      logger.error('Failed to preview CSV:', err);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
   }
 
   /**
@@ -83,49 +100,46 @@ export class EchoeCsvImportController {
    * Execute CSV import with column mapping and target deck
    */
   @Post('/execute')
-  @UseBefore(upload.single('file'))
   async executeCsv(@Req() request: Request) {
-    return new Promise((resolve) => {
-      upload.single('file')(request, {} as any, async (error: any) => {
-        if (error) {
-          if (error.message.includes('File too large')) {
-            return resolve(ResponseUtil.error(ErrorCode.FILE_TOO_LARGE));
-          }
-          if (error.message.includes('Only .csv')) {
-            return resolve(ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE));
-          }
-          logger.error('CSV execute upload error:', error);
-          return resolve(ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR));
-        }
+    try {
+      await runSingleFileUpload(request);
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message.includes('File too large')) {
+        return ResponseUtil.error(ErrorCode.FILE_TOO_LARGE);
+      }
+      if (error instanceof Error && error.message.includes('Only .csv')) {
+        return ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE);
+      }
+      logger.error('CSV execute upload error:', error);
+      return ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR);
+    }
 
-        const file = (request as any).file;
-        if (!file) {
-          return resolve(ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded'));
-        }
+    const file = request.file;
+    if (!file) {
+      return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded');
+    }
 
-        const dto: CsvExecuteDto = request.body;
-        if (!dto || dto.deckId === undefined || dto.notetypeId === undefined) {
-          return resolve(ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'Missing required parameters'));
-        }
+    const dto: CsvExecuteDto = request.body;
+    if (!dto || dto.deckId === undefined || dto.notetypeId === undefined) {
+      return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'Missing required parameters');
+    }
 
-        // Normalize types coerced from multipart form data
-        const normalizedDto: CsvExecuteDto = {
-          columnMapping: typeof dto.columnMapping === 'string'
-            ? JSON.parse(dto.columnMapping)
-            : dto.columnMapping,
-          notetypeId: Number(dto.notetypeId),
-          deckId: Number(dto.deckId),
-          hasHeader: dto.hasHeader === true || (dto.hasHeader as any) === 'true',
-        };
+    // Normalize types coerced from multipart form data
+    const normalizedDto: CsvExecuteDto = {
+      columnMapping: typeof dto.columnMapping === 'string'
+        ? JSON.parse(dto.columnMapping)
+        : dto.columnMapping,
+      notetypeId: Number(dto.notetypeId),
+      deckId: Number(dto.deckId),
+      hasHeader: dto.hasHeader === true || (dto.hasHeader as any) === 'true',
+    };
 
-        try {
-          const result = await this.csvImportService.execute(file.buffer, normalizedDto);
-          return resolve(ResponseUtil.success(result));
-        } catch (err) {
-          logger.error('Failed to execute CSV import:', err);
-          return resolve(ResponseUtil.error(ErrorCode.DB_ERROR));
-        }
-      });
-    });
+    try {
+      const result = await this.csvImportService.execute(file.buffer, normalizedDto);
+      return ResponseUtil.success(result);
+    } catch (err) {
+      logger.error('Failed to execute CSV import:', err);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
   }
 }

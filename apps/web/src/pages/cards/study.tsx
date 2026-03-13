@@ -540,36 +540,45 @@ const StudyPageContent = view(() => {
               Show Answer
             </button>
           ) : (
-            <div className="grid grid-cols-4 gap-3">
-              <button
-                onClick={() => handleRating(1)}
-                className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex flex-col items-center"
-              >
-                <span className="font-medium">Again</span>
-                <span className="text-xs opacity-80">{studyService.getNextIntervalText(1)}</span>
-              </button>
-              <button
-                onClick={() => handleRating(2)}
-                className="py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex flex-col items-center"
-              >
-                <span className="font-medium">Hard</span>
-                <span className="text-xs opacity-80">{studyService.getNextIntervalText(2)}</span>
-              </button>
-              <button
-                onClick={() => handleRating(3)}
-                className="py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex flex-col items-center"
-              >
-                <span className="font-medium">Good</span>
-                <span className="text-xs opacity-80">{studyService.getNextIntervalText(3)}</span>
-              </button>
-              <button
-                onClick={() => handleRating(4)}
-                className="py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex flex-col items-center"
-              >
-                <span className="font-medium">Easy</span>
-                <span className="text-xs opacity-80">{studyService.getNextIntervalText(4)}</span>
-              </button>
-            </div>
+            <>
+              <div className="h-4 mb-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                {studyService.isLoadingStudyOptions
+                  ? 'Loading next intervals...'
+                  : studyService.studyOptionsError
+                    ? 'Failed to load next intervals'
+                    : ''}
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <button
+                  onClick={() => handleRating(1)}
+                  className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                >
+                  <span className="font-medium">Again</span>
+                  <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(1)}</span>
+                </button>
+                <button
+                  onClick={() => handleRating(2)}
+                  className="py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                >
+                  <span className="font-medium">Hard</span>
+                  <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(2)}</span>
+                </button>
+                <button
+                  onClick={() => handleRating(3)}
+                  className="py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                >
+                  <span className="font-medium">Good</span>
+                  <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(3)}</span>
+                </button>
+                <button
+                  onClick={() => handleRating(4)}
+                  className="py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                >
+                  <span className="font-medium">Easy</span>
+                  <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(4)}</span>
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

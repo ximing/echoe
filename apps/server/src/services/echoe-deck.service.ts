@@ -37,8 +37,8 @@ export class EchoeDeckService {
     // Get all decks
     const decks = await db.select().from(echoeDecks).orderBy(echoeDecks.name);
 
-    // Get today's day number (Unix timestamp in seconds / 86400)
-    const today = Math.floor(Date.now() / 86400000);
+    // Use millisecond timestamp semantics for all card due checks
+    const nowMs = Date.now();
 
     // Get all cards grouped by deck
     const cardsWithCounts = await db
@@ -46,7 +46,7 @@ export class EchoeDeckService {
         did: echoeCards.did,
         newCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 0 THEN 1 ELSE 0 END)`,
         learnCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} IN (1, 3) THEN 1 ELSE 0 END)`,
-        reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${today} THEN 1 ELSE 0 END)`,
+        reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
       .groupBy(echoeCards.did);
@@ -237,14 +237,14 @@ export class EchoeDeckService {
       return null;
     }
 
-    const today = Math.floor(Date.now() / 86400000);
+    const nowMs = Date.now();
 
     const counts = await db
       .select({
         did: echoeCards.did,
         newCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 0 THEN 1 ELSE 0 END)`,
         learnCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} IN (1, 3) THEN 1 ELSE 0 END)`,
-        reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${today} THEN 1 ELSE 0 END)`,
+        reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
       .where(eq(echoeCards.did, id))
@@ -792,7 +792,7 @@ export class EchoeDeckService {
    */
   private async findCardsBySearch(searchQuery: string, limit: number = 1000): Promise<any[]> {
     const db = getDatabase();
-    const today = Math.floor(Date.now() / 86400000);
+    const nowMs = Date.now();
 
     // Simple search parser - handles common search terms
     // Supports: deck:*, tag:*, is:new, is:learn, is:review, is:suspended, is:buried, note:*, "text"
@@ -826,7 +826,7 @@ export class EchoeDeckService {
         conditions.push(sql`${echoeCards.queue} IN (1, 3)`);
       } else if (term === 'is:review') {
         // Review cards due
-        conditions.push(and(eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${today}`));
+        conditions.push(and(eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${nowMs}`));
       } else if (term === 'is:suspended') {
         // Suspended cards
         conditions.push(eq(echoeCards.queue, -1));

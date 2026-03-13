@@ -135,12 +135,12 @@ export class EchoeSettingsService extends Service {
   /**
    * Export all decks
    */
-  async exportAll(includeScheduling: boolean): Promise<Blob | null> {
+  async exportAll(includeScheduling: boolean, format: 'anki' | 'legacy' = 'anki'): Promise<Blob | null> {
     this.isExporting = true;
     this.error = null;
 
     try {
-      const res = await exportAllDecks(includeScheduling);
+      const res = await exportAllDecks(includeScheduling, format);
       // For blob responses, the data is the blob itself (not wrapped in .data)
       if (res.code === 0 && res && res instanceof Blob) {
         return res;

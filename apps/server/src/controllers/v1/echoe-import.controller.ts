@@ -4,11 +4,10 @@
  */
 
 import multer from 'multer';
-import { JsonController, Post, Req, UseBefore } from 'routing-controllers';
+import { JsonController, Post, Req } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
-import { config } from '../../config/config.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 import { EchoeImportService } from '../../services/echoe-import.service.js';
 import { logger } from '../../utils/logger.js';
@@ -35,6 +34,26 @@ const upload = multer({
   },
 });
 
+// Extend Express Request type to include file from multer
+declare module 'express' {
+  interface Request {
+    file?: Express.Multer.File;
+  }
+}
+
+const runSingleFileUpload = async (request: Request): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    const response = request.res ?? ({} as Response);
+    upload.single('file')(request, response, (error: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
 @Service()
 @JsonController('/api/v1/import')
 export class EchoeImportController {
@@ -45,34 +64,31 @@ export class EchoeImportController {
    * Import an .apkg file
    */
   @Post('/apkg')
-  @UseBefore(upload.single('file'))
   async importApkg(@Req() request: Request) {
-    return new Promise((resolve) => {
-      upload.single('file')(request, {} as any, async (error: any) => {
-        if (error) {
-          if (error.message === 'Only .apkg files are allowed') {
-            return resolve(ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE));
-          }
-          if (error.message.includes('File too large')) {
-            return resolve(ResponseUtil.error(ErrorCode.FILE_TOO_LARGE));
-          }
-          logger.error('APKG upload error:', error);
-          return resolve(ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR));
-        }
+    try {
+      await runSingleFileUpload(request);
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === 'Only .apkg files are allowed') {
+        return ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE);
+      }
+      if (error instanceof Error && error.message.includes('File too large')) {
+        return ResponseUtil.error(ErrorCode.FILE_TOO_LARGE);
+      }
+      logger.error('APKG upload error:', error);
+      return ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR);
+    }
 
-        const file = (request as any).file;
-        if (!file) {
-          return resolve(ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded'));
-        }
+    const file = request.file;
+    if (!file) {
+      return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded');
+    }
 
-        try {
-          const result: ImportResultDto = await this.importService.importApkg(file.buffer);
-          return resolve(ResponseUtil.success(result));
-        } catch (error) {
-          logger.error('Failed to import .apkg:', error);
-          return resolve(ResponseUtil.error(ErrorCode.DB_ERROR));
-        }
-      });
-    });
+    try {
+      const result: ImportResultDto = await this.importService.importApkg(file.buffer);
+      return ResponseUtil.success(result);
+    } catch (error) {
+      logger.error('Failed to import .apkg:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
   }
 }

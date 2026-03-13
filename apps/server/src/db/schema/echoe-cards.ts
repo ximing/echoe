@@ -24,7 +24,7 @@ export const echoeCards = mysqlTable(
     usn: int('usn').notNull(), // Update sequence number (sync)
     type: int('type').notNull().default(0), // Card type: 0=new, 1=learning, 2=review, 3=relearning
     queue: int('queue').notNull().default(0), // Queue type: 0=new, 1=learning, 2=review, -1=suspended, -2=buried (manual), -3=buried (sibling)
-    due: bigint('due', { mode: 'number' }).notNull().default(0), // Due date (Unix timestamp in ms for learning, day number for review)
+    due: bigint('due', { mode: 'number' }).notNull().default(0), // Due time (Unix timestamp in milliseconds)
     ivl: int('ivl').notNull().default(0), // Interval (days)
     factor: int('factor').notNull().default(0), // Ease factor (permille, e.g., 2500 = 2.5)
     reps: int('reps').notNull().default(0), // Number of times reviewed

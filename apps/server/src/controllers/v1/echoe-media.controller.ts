@@ -13,7 +13,6 @@ import {
   Param,
   Req,
   Res,
-  UseBefore,
 } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 import type { Request, Response } from 'express';
@@ -52,6 +51,26 @@ const upload = multer({
     }
   },
 });
+
+// Extend Express Request type to include file from multer
+declare module 'express' {
+  interface Request {
+    file?: Express.Multer.File;
+  }
+}
+
+const runSingleFileUpload = async (request: Request): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    const response = request.res ?? ({} as Response);
+    upload.single('file')(request, response, (error: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+};
 
 @Service()
 @JsonController('/api/v1/media')
@@ -107,38 +126,38 @@ export class EchoeMediaController {
    * Upload a media file
    */
   @Post('/upload')
-  @UseBefore(upload.single('file'))
   async uploadMedia(@Req() request: Request) {
-    return new Promise((resolve) => {
-      upload.single('file')(request, {} as any, async (error: any) => {
-        if (error) {
-          if (error.message === 'Only media files (images, audio, video) and PDF are allowed') {
-            return resolve(ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE));
-          }
-          if (error.message.includes('File too large')) {
-            return resolve(ResponseUtil.error(ErrorCode.FILE_TOO_LARGE));
-          }
-          logger.error('Media upload error:', error);
-          return resolve(ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR));
-        }
+    try {
+      await runSingleFileUpload(request);
+    } catch (error: unknown) {
+      if (
+        error instanceof Error
+        && error.message === 'Only media files (images, audio, video) and PDF are allowed'
+      ) {
+        return ResponseUtil.error(ErrorCode.UNSUPPORTED_FILE_TYPE);
+      }
+      if (error instanceof Error && error.message.includes('File too large')) {
+        return ResponseUtil.error(ErrorCode.FILE_TOO_LARGE);
+      }
+      logger.error('Media upload error:', error);
+      return ResponseUtil.error(ErrorCode.FILE_UPLOAD_ERROR);
+    }
 
-        const file = (request as any).file;
-        if (!file) {
-          return resolve(ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded'));
-        }
+    const file = request.file;
+    if (!file) {
+      return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No file uploaded');
+    }
 
-        try {
-          const result: UploadMediaResultDto = await this.mediaService.uploadMedia(
-            file.buffer,
-            file.originalname
-          );
-          return resolve(ResponseUtil.success(result));
-        } catch (error) {
-          logger.error('Failed to upload media:', error);
-          return resolve(ResponseUtil.error(ErrorCode.STORAGE_ERROR));
-        }
-      });
-    });
+    try {
+      const result: UploadMediaResultDto = await this.mediaService.uploadMedia(
+        file.buffer,
+        file.originalname
+      );
+      return ResponseUtil.success(result);
+    } catch (error) {
+      logger.error('Failed to upload media:', error);
+      return ResponseUtil.error(ErrorCode.STORAGE_ERROR);
+    }
   }
 
   /**
