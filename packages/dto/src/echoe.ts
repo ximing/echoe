@@ -105,6 +105,23 @@ export interface EchoeDeckConfigDto {
   revConfig: EchoeReviewConfigDto;
   /** Lapse settings (JSON) */
   lapseConfig: EchoeLapseConfigDto;
+  /** Normalized FSRS scheduling settings */
+  fsrsConfig: EchoeFsrsConfigDto;
+}
+
+export interface EchoeFsrsConfigDto {
+  /** Target retention rate (0.7 - 0.99) */
+  requestRetention: number;
+  /** Maximum interval in days */
+  maxInterval: number;
+  /** Whether to enable scheduling fuzz */
+  enableFuzz: boolean;
+  /** Whether to enable short-term scheduler */
+  enableShortTerm: boolean;
+  /** Learning steps in minutes */
+  learningSteps: number[];
+  /** Relearning steps in minutes */
+  relearningSteps: number[];
 }
 
 export interface EchoeNewCardConfigDto {
@@ -163,6 +180,8 @@ export interface UpdateEchoeDeckConfigDto {
   revConfig?: Partial<EchoeReviewConfigDto>;
   /** Lapse settings (JSON) */
   lapseConfig?: Partial<EchoeLapseConfigDto>;
+  /** FSRS scheduling settings */
+  fsrsConfig?: Partial<EchoeFsrsConfigDto>;
 }
 
 // ===== Note Types =====
@@ -533,6 +552,13 @@ export interface StudyQueueItemDto {
   notetypeType: number;
   /** Cloze ordinal (1-based, for cloze cards) */
   clozeOrdinal: number;
+  /**
+   * Current retrievability (memory recall probability, 0-1).
+   * - New cards: 1 (full retrievability)
+   * - Review cards: R(t,S) = (1 + t/(9S))^(-1), where t = days since last review, S = stability
+   * - null if stability/lastReview data is unavailable
+   */
+  retrievability: number | null;
 }
 
 export interface ReviewSubmissionDto {
@@ -594,6 +620,13 @@ export interface StudyOptionsDto {
   cardId: number;
   /** All rating options */
   options: RatingOptionDto[];
+  /**
+   * Current retrievability (memory recall probability, 0-1).
+   * - New cards: 1
+   * - Review cards: R(t,S) = (1 + t/(9S))^(-1)
+   * - null if unavailable
+   */
+  retrievability: number | null;
 }
 
 export interface UndoResultDto {
@@ -798,7 +831,7 @@ export interface EchoeDeckConfigPresetDto {
       perDay?: number;
       learnAhead?: number;
       minSpace?: number;
-     leechThreshold?: number;
+      leechThreshold?: number;
     };
     rev?: {
       perDay?: number;
@@ -811,6 +844,7 @@ export interface EchoeDeckConfigPresetDto {
       minInt?: number;
       leechAction?: number;
     };
+    fsrs?: Partial<EchoeFsrsConfigDto>;
     timer?: number;
     autoplay?: boolean;
     replayq?: boolean;
