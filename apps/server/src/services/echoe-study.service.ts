@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
 import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes } from '../db/schema/index.js';
 import type { Card } from 'ts-fsrs';
@@ -7,8 +7,11 @@ import { z } from 'zod';
 
 import { FSRSService, Rating, State } from './fsrs.service.js';
 import { EchoeDeckService } from './echoe-deck.service.js';
+import { DEFAULT_FSRS_RUNTIME_CONFIG } from './fsrs-default-config.js';
 import { logger } from '../utils/logger.js';
 import { calculateRetrievability } from '../utils/fsrs-retrievability.js';
+import { generateRevlogId } from '../utils/id.js';
+import { parseStepToMinutes, minutesToFsrsSteps } from '../utils/fsrs-steps.js';
 import type { FSRSConfig, FSRSInput } from './fsrs.service.js';
 
 import type {
@@ -39,17 +42,6 @@ const FSRS_MAX_INTERVAL_SCHEMA = z.coerce.number().int().min(1).max(36500);
 const FSRS_BOOLEAN_SCHEMA = z.boolean();
 const FSRS_STEPS_SCHEMA = z.array(z.union([z.number(), z.string()])).min(1).max(20);
 const FSRS_LEGACY_DIFFICULTY_FALLBACK = 2.5;
-
-const DEFAULT_FSRS_CONFIG: Required<
-  Pick<FSRSConfig, 'learningSteps' | 'relearningSteps' | 'maxInterval' | 'requestRetention' | 'enableFuzz' | 'enableShortTerm'>
-> = {
-  learningSteps: ['1m', '10m'],
-  relearningSteps: ['10m'],
-  maxInterval: 36500,
-  requestRetention: 0.9,
-  enableFuzz: true,
-  enableShortTerm: false,
-};
 
 @Service()
 export class EchoeStudyService {
@@ -105,7 +97,13 @@ export class EchoeStudyService {
       .select()
       .from(echoeCards)
       .where(and(...conditions))
-      .orderBy(desc(echoeCards.due))
+      .orderBy(
+        // 优先级：learning(1)/relearning(3) > review(2) > new(0)，同优先级按 due 升序（最早到期优先）
+        sql`CASE WHEN ${echoeCards.queue} IN (1, 3) THEN 0
+                 WHEN ${echoeCards.queue} = 2 THEN 1
+                 ELSE 2 END`,
+        asc(echoeCards.due)
+      )
       .limit(limit);
 
     // Get note data for each card
@@ -175,7 +173,7 @@ export class EchoeStudyService {
   /**
    * Submit a review for a card
    */
-  async submitReview(dto: ReviewSubmissionDto): Promise<ReviewResultDto> {
+  async submitReview(dto: ReviewSubmissionDto, uid?: string): Promise<ReviewResultDto> {
     const db = getDatabase();
     const now = new Date();
 
@@ -237,7 +235,7 @@ export class EchoeStudyService {
 
     // Calculate next due time in milliseconds
     const nextDue = schedulingResult.nextDue.getTime();
-    const graduated = newState === State.Review && card.type !== 2;
+    const graduated = newState === State.Review && card.type === State.Learning;
 
     // Preview mode: skip updating card state and writing revlog
     if (dto.preview) {
@@ -277,7 +275,7 @@ export class EchoeStudyService {
         factor: Math.round(schedulingResult.stability * 1000),
         reps: card.reps + 1,
         lapses: schedulingResult.state === State.Relearning ? card.lapses + 1 : card.lapses,
-        left: 0, // Reset steps
+        left: schedulingResult.learningSteps, // 写回 ts-fsrs 管理的步骤计数，保留 Learning 步骤进度
         type: newState,
         queue: newQueue,
         mod: Math.floor(now.getTime() / 1000),
@@ -289,11 +287,13 @@ export class EchoeStudyService {
       })
       .where(eq(echoeCards.id, dto.cardId));
 
-    // Log the review (type=4 for custom study)
-    const reviewTime = Math.floor(Date.now() / 1000);
+    const revlogType = this.resolveRevlogType(card, deck);
+
+    // Log the review using pre-review card state
     await db.insert(echoeRevlog).values({
-      id: reviewTime * 1000,
+      id: generateRevlogId(),
       cid: dto.cardId,
+      uid: uid ?? null,
       nid: card.nid,
       lid: 0,
       ease: dto.rating,
@@ -301,7 +301,7 @@ export class EchoeStudyService {
       lastIvl: card.ivl,
       factor: Math.round(schedulingResult.stability * 1000),
       time: dto.timeTaken,
-      type: 4, // Custom study type
+      type: revlogType,
       // FSRS fields (post-review state)
       stability: schedulingResult.stability,
       difficulty: schedulingResult.difficulty,
@@ -423,7 +423,7 @@ export class EchoeStudyService {
   /**
    * Undo the last review
    */
-  async undo(reviewId?: number): Promise<UndoResultDto> {
+  async undo(uid: string, reviewId?: number): Promise<UndoResultDto> {
     const db = getDatabase();
 
     // Get the most recent revlog entry
@@ -436,6 +436,22 @@ export class EchoeStudyService {
       return {
         success: false,
         message: 'No review to undo',
+      };
+    }
+
+    // Verify ownership: the revlog uid must match the current user.
+    // For legacy records without uid, we allow the undo to proceed (backward compatibility).
+    if (lastReview.uid !== null && lastReview.uid !== undefined && lastReview.uid !== uid) {
+      logger.warn('Undo ownership mismatch', {
+        event: 'undo_ownership_mismatch',
+        requestUid: uid,
+        revlogUid: lastReview.uid,
+        revlogId: lastReview.id,
+        cardId: lastReview.cid,
+      });
+      return {
+        success: false,
+        message: 'Permission denied: this review does not belong to you',
       };
     }
 
@@ -535,31 +551,54 @@ export class EchoeStudyService {
   }
 
   /**
-   * Forget cards (reset to new)
+   * Forget cards (reset to new) via FSRSService.forgetCard() to ensure
+   * all FSRS fields (including factor = stability * 1000) are correctly reset.
    */
   async forgetCards(cardIds: number[]): Promise<void> {
     const db = getDatabase();
-    const now = Math.floor(Date.now() / 1000);
-    const newDue = Math.floor(Date.now() / 1000) * 1000; // Current time in ms
+    const now = new Date();
+    const nowSec = Math.floor(now.getTime() / 1000);
 
-    await db
-      .update(echoeCards)
-      .set({
-        due: newDue,
-        ivl: 0,
-        factor: 2500,
-        reps: 0,
-        lapses: 0,
-        left: 0,
-        type: 0, // New
-        queue: 0, // New queue
-        mod: now,
-        usn: -1,
-        stability: 0,
-        difficulty: 0,
-        lastReview: 0,
-      })
-      .where(sql`${echoeCards.id} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`);
+    for (const cardId of cardIds) {
+      const card = await db.query.echoeCards.findFirst({
+        where: eq(echoeCards.id, cardId),
+      });
+      if (!card) continue;
+
+      const fsCard = this.fsrsService.toFSCard({
+        due: new Date(card.due),
+        stability: card.stability ?? 0,
+        difficulty: card.difficulty ?? 0,
+        elapsed_days: 0,
+        scheduled_days: card.ivl,
+        learning_steps: card.left,
+        reps: card.reps,
+        lapses: card.lapses,
+        state: card.type as State,
+        last_review: card.lastReview ? new Date(card.lastReview) : undefined,
+      });
+
+      const resetCard = this.fsrsService.forgetCard(fsCard, now, false);
+
+      await db
+        .update(echoeCards)
+        .set({
+          due: resetCard.due.getTime(),
+          ivl: resetCard.scheduled_days,
+          factor: Math.round(resetCard.stability * 1000), // stability=0 → factor=0，与 submitReview 语义一致
+          reps: resetCard.reps,
+          lapses: resetCard.lapses,
+          left: resetCard.learning_steps,
+          type: resetCard.state,
+          queue: 0,
+          mod: nowSec,
+          usn: -1,
+          stability: resetCard.stability,
+          difficulty: resetCard.difficulty,
+          lastReview: 0,
+        })
+        .where(eq(echoeCards.id, cardId));
+    }
   }
 
   /**
@@ -976,6 +1015,44 @@ export class EchoeStudyService {
   }
 
   /**
+   * Resolve revlog.type from pre-review card state.
+   * 0=learning/new, 1=review, 2=relearning, 4=custom/filtered.
+   */
+  private resolveRevlogType(
+    card: Pick<typeof echoeCards.$inferSelect, 'id' | 'queue' | 'type'>,
+    deck: Pick<typeof echoeDecks.$inferSelect, 'dyn'>
+  ): number {
+    if (deck.dyn === 1) {
+      return 4;
+    }
+
+    if (card.queue === 3 || card.type === State.Relearning) {
+      return 2;
+    }
+
+    if (card.queue === 2 || card.type === State.Review) {
+      return 1;
+    }
+
+    if (
+      card.queue === 0
+      || card.queue === 1
+      || card.type === State.New
+      || card.type === State.Learning
+    ) {
+      return 0;
+    }
+
+    logger.warn('Unknown pre-review state, fallback revlog.type to custom study', {
+      cardId: card.id,
+      queue: card.queue,
+      type: card.type,
+    });
+
+    return 4;
+  }
+
+  /**
    * Build FSRS config from deck config
    */
   private getFSRSConfig(deckConfig: any): FSRSConfig {
@@ -988,39 +1065,39 @@ export class EchoeStudyService {
     return {
       learningSteps: this.resolveFsrsSteps(
         [fsrsSubConfig.learningSteps, newConfig.steps, newConfig.delays, newConfig.newSteps],
-        DEFAULT_FSRS_CONFIG.learningSteps,
+        DEFAULT_FSRS_RUNTIME_CONFIG.learningSteps,
         'learningSteps',
         deckConfigId
       ),
       relearningSteps: this.resolveFsrsSteps(
         [fsrsSubConfig.relearningSteps, lapseConfig.steps, lapseConfig.delays],
-        DEFAULT_FSRS_CONFIG.relearningSteps,
+        DEFAULT_FSRS_RUNTIME_CONFIG.relearningSteps,
         'relearningSteps',
         deckConfigId
       ),
       maxInterval: this.resolveFsrsNumber(
         [fsrsSubConfig.maxInterval, revConfig.maxInterval],
         FSRS_MAX_INTERVAL_SCHEMA,
-        DEFAULT_FSRS_CONFIG.maxInterval,
+        DEFAULT_FSRS_RUNTIME_CONFIG.maxInterval,
         'maxInterval',
         deckConfigId
       ),
       requestRetention: this.resolveFsrsNumber(
         [fsrsSubConfig.requestRetention],
         FSRS_REQUEST_RETENTION_SCHEMA,
-        DEFAULT_FSRS_CONFIG.requestRetention,
+        DEFAULT_FSRS_RUNTIME_CONFIG.requestRetention,
         'requestRetention',
         deckConfigId
       ),
       enableFuzz: this.resolveFsrsBoolean(
         [fsrsSubConfig.enableFuzz],
-        DEFAULT_FSRS_CONFIG.enableFuzz,
+        DEFAULT_FSRS_RUNTIME_CONFIG.enableFuzz,
         'enableFuzz',
         deckConfigId
       ),
       enableShortTerm: this.resolveFsrsBoolean(
         [fsrsSubConfig.enableShortTerm],
-        DEFAULT_FSRS_CONFIG.enableShortTerm,
+        DEFAULT_FSRS_RUNTIME_CONFIG.enableShortTerm,
         'enableShortTerm',
         deckConfigId
       ),
@@ -1059,15 +1136,15 @@ export class EchoeStudyService {
         continue;
       }
 
-      const normalizedSteps: string[] = [];
+      const minutes: number[] = [];
       let hasInvalidStep = false;
       for (const rawStep of parsedList.data) {
-        const normalizedStep = this.normalizeStepToken(rawStep);
-        if (!normalizedStep) {
+        const minute = parseStepToMinutes(rawStep);
+        if (minute === undefined) {
           hasInvalidStep = true;
           break;
         }
-        normalizedSteps.push(normalizedStep);
+        minutes.push(minute);
       }
 
       if (hasInvalidStep) {
@@ -1075,33 +1152,10 @@ export class EchoeStudyService {
         continue;
       }
 
-      return normalizedSteps;
+      return minutesToFsrsSteps(minutes);
     }
 
     return [...fallback];
-  }
-
-  private normalizeStepToken(step: string | number): string | null {
-    if (typeof step === 'number') {
-      if (!Number.isFinite(step) || step <= 0) {
-        return null;
-      }
-      return `${step}m`;
-    }
-
-    const trimmed = step.trim().toLowerCase();
-    const match = trimmed.match(/^(\d+(?:\.\d+)?)(m|h)?$/);
-    if (!match) {
-      return null;
-    }
-
-    const value = Number(match[1]);
-    if (!Number.isFinite(value) || value <= 0) {
-      return null;
-    }
-
-    const minutes = match[2] === 'h' ? value * 60 : value;
-    return `${minutes}m`;
   }
 
   private resolveFsrsNumber(

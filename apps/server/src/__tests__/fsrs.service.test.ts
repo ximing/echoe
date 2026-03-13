@@ -156,38 +156,6 @@ describe('FSRSService', () => {
     });
   });
 
-  describe('scheduleCard - delayed review', () => {
-    it('should handle delayed review correctly', () => {
-      const card = service.createCard(new Date('2024-01-01'));
-      const reviewed = service.scheduleCard(card, Rating.Good, new Date('2024-01-02'));
-
-      const reviewedCard = {
-        due: reviewed.nextDue,
-        stability: reviewed.stability,
-        difficulty: reviewed.difficulty,
-        elapsed_days: 0,
-        scheduled_days: reviewed.interval,
-        learning_steps: 0,
-        reps: 1,
-        lapses: 0,
-        state: State.Review,
-      };
-
-      // Simulate delayed review - 3 days late
-      const delayedDate = new Date(reviewed.nextDue);
-      delayedDate.setDate(delayedDate.getDate() + 3);
-
-      const delayedResult = service.handleDelayedReview(
-        reviewedCard,
-        Rating.Good,
-        delayedDate
-      );
-
-      expect(delayedResult).toBeDefined();
-      expect(delayedResult.interval).toBeGreaterThanOrEqual(0);
-    });
-  });
-
   describe('scheduleCard - parameter configuration', () => {
     it('should accept custom config', () => {
       const card = service.createCard(new Date('2024-01-01'));
@@ -331,33 +299,6 @@ describe('FSRSService', () => {
       expect(forgotten.state).toBe(State.New);
       // Stability should be reset
       expect(forgotten.stability).toBe(0);
-    });
-  });
-
-  describe('getIntervalText', () => {
-    it('should format minutes correctly', () => {
-      expect(service.getIntervalText(0.01)).toBe('14m');
-      expect(service.getIntervalText(0.02)).toBe('29m');
-    });
-
-    it('should format hours correctly', () => {
-      expect(service.getIntervalText(0.5)).toBe('12h');
-      expect(service.getIntervalText(0.8)).toBe('19h');
-    });
-
-    it('should format days correctly', () => {
-      expect(service.getIntervalText(1)).toBe('1d');
-      expect(service.getIntervalText(15)).toBe('15d');
-    });
-
-    it('should format weeks correctly', () => {
-      expect(service.getIntervalText(30)).toBe('4w');
-      expect(service.getIntervalText(60)).toBe('9w');
-    });
-
-    it('should format years correctly', () => {
-      expect(service.getIntervalText(400)).toBe('1.1y');
-      expect(service.getIntervalText(730)).toBe('2y');
     });
   });
 

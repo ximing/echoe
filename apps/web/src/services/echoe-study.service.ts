@@ -128,7 +128,6 @@ export class EchoeStudyService extends Service {
       this.error = 'Failed to load study queue';
       this.queue = [];
       resolve(ToastService).show('Failed to load study queue', { type: 'error' });
-      console.error('Load queue error:', err);
     } finally {
       this.isLoading = false;
     }
@@ -317,7 +316,6 @@ export class EchoeStudyService extends Service {
       return true;
     } catch (err) {
       this.error = 'Failed to submit review';
-      console.error('Submit review error:', err);
       return false;
     }
   }
@@ -346,7 +344,6 @@ export class EchoeStudyService extends Service {
       return true;
     } catch (err) {
       this.error = 'Failed to undo';
-      console.error('Undo error:', err);
       return false;
     }
   }
@@ -378,7 +375,6 @@ export class EchoeStudyService extends Service {
       return true;
     } catch (err) {
       this.error = 'Failed to bury card';
-      console.error('Bury card error:', err);
       return false;
     }
   }
@@ -403,7 +399,6 @@ export class EchoeStudyService extends Service {
       return true;
     } catch (err) {
       this.error = 'Failed to forget card';
-      console.error('Forget card error:', err);
       return false;
     }
   }
@@ -462,8 +457,20 @@ export class EchoeStudyService extends Service {
   }
 
   private formatIntervalText(interval: number): string {
+    if (interval <= 0) {
+      return '<1m';
+    }
+
+    if (interval < 1 / 24) {
+      // 小于 1 小时，显示分钟
+      const minutes = Math.round(interval * 24 * 60);
+      return minutes > 0 ? `${minutes}m` : '<1m';
+    }
+
     if (interval < 1) {
-      return '<1d';
+      // 小于 1 天，显示小时
+      const hours = Math.round(interval * 24);
+      return `${hours}h`;
     }
 
     if (interval < 30) {

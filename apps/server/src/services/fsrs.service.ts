@@ -10,6 +10,8 @@ import {
   formatDate,
 } from 'ts-fsrs';
 
+import { DEFAULT_FSRS_RUNTIME_CONFIG } from './fsrs-default-config.js';
+
 export { Rating, State };
 
 export interface FSRSInput {
@@ -32,6 +34,7 @@ export interface FSRSOutput {
   difficulty: number;
   state: State;
   scheduledDays: number;
+  learningSteps: number; // ts-fsrs Card.learning_steps，Learning/Relearning 阶段的步骤计数器
 }
 
 export interface FSRSConfig {
@@ -43,31 +46,22 @@ export interface FSRSConfig {
   enableShortTerm?: boolean;
 }
 
-const DEFAULT_CONFIG: FSRSConfig = {
-  learningSteps: ['1m', '10m'] as const,
-  relearningSteps: ['10m'] as const,
-  maxInterval: 36500,
-  requestRetention: 0.9,
-  enableFuzz: true,
-  enableShortTerm: false,
-};
-
 @Service()
 export class FSRSService {
   private defaultParams: FSRSParameters;
 
   constructor() {
-    this.defaultParams = this.buildParams(DEFAULT_CONFIG);
+    this.defaultParams = this.buildParams(DEFAULT_FSRS_RUNTIME_CONFIG);
   }
 
   private buildParams(config: FSRSConfig): FSRSParameters {
     return generatorParameters({
       learning_steps: config.learningSteps as any,
       relearning_steps: config.relearningSteps as any,
-      maximum_interval: config.maxInterval ?? DEFAULT_CONFIG.maxInterval,
-      request_retention: config.requestRetention ?? DEFAULT_CONFIG.requestRetention,
-      enable_fuzz: config.enableFuzz ?? DEFAULT_CONFIG.enableFuzz,
-      enable_short_term: config.enableShortTerm ?? DEFAULT_CONFIG.enableShortTerm,
+      maximum_interval: config.maxInterval ?? DEFAULT_FSRS_RUNTIME_CONFIG.maxInterval,
+      request_retention: config.requestRetention ?? DEFAULT_FSRS_RUNTIME_CONFIG.requestRetention,
+      enable_fuzz: config.enableFuzz ?? DEFAULT_FSRS_RUNTIME_CONFIG.enableFuzz,
+      enable_short_term: config.enableShortTerm ?? DEFAULT_FSRS_RUNTIME_CONFIG.enableShortTerm,
     });
   }
 
@@ -134,6 +128,7 @@ export class FSRSService {
       difficulty: result.card.difficulty,
       state: result.card.state,
       scheduledDays: result.card.scheduled_days,
+      learningSteps: result.card.learning_steps,
     };
   }
 
@@ -162,58 +157,11 @@ export class FSRSService {
         difficulty: item.card.difficulty,
         state: item.card.state,
         scheduledDays: item.card.scheduled_days,
+        learningSteps: item.card.learning_steps,
       };
     }
 
     return options;
-  }
-
-  /**
-   * Handle delayed review - card reviewed after due date
-   * Adjusts the card's elapsed days to account for the delay
-   */
-  handleDelayedReview(
-    card: Card,
-    rating: number,
-    now?: Date,
-    config?: FSRSConfig
-  ): FSRSOutput {
-    const currentTime = now ?? new Date();
-
-    const dueDate = new Date(card.due);
-    const delayDays = Math.floor(
-      (currentTime.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (delayDays > 0) {
-      card.elapsed_days += delayDays;
-    }
-
-    return this.scheduleCard(card, rating, currentTime, config);
-  }
-
-  /**
-   * Handle relearning queue - card failed review and needs to relearn
-   */
-  handleRelearning(card: Card, rating: number, now?: Date, config?: FSRSConfig): FSRSOutput {
-    if (card.state !== State.Relearning) {
-      card.state = State.Relearning;
-      card.learning_steps = 0;
-    }
-
-    return this.scheduleCard(card, rating, now, config);
-  }
-
-  /**
-   * Handle learning queue - new card in learning steps
-   */
-  handleLearning(card: Card, rating: number, now?: Date, config?: FSRSConfig): FSRSOutput {
-    if (card.state !== State.Learning) {
-      card.state = State.Learning;
-      card.learning_steps = 0;
-    }
-
-    return this.scheduleCard(card, rating, now, config);
   }
 
   /**
@@ -263,25 +211,4 @@ export class FSRSService {
     return f.forget(card, currentTime, keepStats).card;
   }
 
-  /**
-   * Get interval text for display (e.g., "10m", "3d", "1w")
-   */
-  getIntervalText(days: number): string {
-    if (days < 1) {
-      const minutes = Math.round(days * 24 * 60);
-      if (minutes < 60) {
-        return `${minutes}m`;
-      }
-      const hours = Math.round(minutes / 60);
-      return `${hours}h`;
-    } else if (days < 30) {
-      return `${Math.round(days)}d`;
-    } else if (days < 365) {
-      const weeks = Math.round(days / 7);
-      return `${weeks}w`;
-    } else {
-      const years = Math.round(days / 365 * 10) / 10;
-      return `${years}y`;
-    }
-  }
 }

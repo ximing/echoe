@@ -32,12 +32,20 @@ export function calculateRetrievability(
 }
 
 /**
- * Build SQL expression for FSRS retrievability, intended for aggregate queries.
+ * Build SQL expression for FSRS retrievability.
+ * - New cards (lastReview <= 0 or stability <= 0) return NULL.
+ * - Future lastReview (clock drift) is clamped to 1.
  */
 export function getRetrievabilitySqlExpr(
   nowMs: number,
   lastReviewExpr: unknown,
   stabilityExpr: unknown
 ) {
-  return sql<number>`POWER(1 + (${nowMs} - ${lastReviewExpr}) / (${RETRIEVABILITY_SCALE} * ${stabilityExpr} * ${DAY_MS}), -1)`;
+  return sql<number | null>`
+    CASE
+      WHEN ${lastReviewExpr} <= 0 OR ${stabilityExpr} <= 0 THEN NULL
+      WHEN (${nowMs} - ${lastReviewExpr}) < 0 THEN 1
+      ELSE POWER(1 + (${nowMs} - ${lastReviewExpr}) / (${RETRIEVABILITY_SCALE} * ${stabilityExpr} * ${DAY_MS}), -1)
+    END
+  `;
 }

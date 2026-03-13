@@ -43,6 +43,13 @@
       "when": 1773288478292,
       "tag": "0005_powerful_moon_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1773419456468,
+      "tag": "0006_brief_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

@@ -4,10 +4,12 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+import { sql } from 'drizzle-orm';
+
 import { EchoeStudyService } from '../services/echoe-study.service.js';
 import { State } from '../services/fsrs.service.js';
 import { getDatabase } from '../db/connection.js';
-import { calculateRetrievability } from '../utils/fsrs-retrievability.js';
+import { calculateRetrievability, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
 
 const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
@@ -272,7 +274,7 @@ describe('EchoeStudyService - FSRS input building', () => {
   });
 });
 
-describe('EchoeStudyService - forgetCards', () => {
+describe('EchoeStudyService - revlog type mapping', () => {
   let service: EchoeStudyService;
 
   beforeEach(() => {
@@ -287,35 +289,374 @@ describe('EchoeStudyService - forgetCards', () => {
     );
   });
 
-  it('should reset FSRS core fields when forgetting cards', async () => {
+  const resolveRevlogType = (cardOverrides: Record<string, unknown>, deckOverrides: Record<string, unknown> = {}) => {
+    return (service as any).resolveRevlogType(
+      {
+        id: 1001,
+        queue: 0,
+        type: State.New,
+        ...cardOverrides,
+      },
+      {
+        dyn: 0,
+        ...deckOverrides,
+      }
+    );
+  };
+
+  it('should map new and learning states to revlog learn type', () => {
+    expect(resolveRevlogType({ queue: 0, type: State.New })).toBe(0);
+    expect(resolveRevlogType({ queue: 1, type: State.Learning })).toBe(0);
+  });
+
+  it('should map review state to revlog review type', () => {
+    expect(resolveRevlogType({ queue: 2, type: State.Review })).toBe(1);
+  });
+
+  it('should map relearning state to revlog relearn type', () => {
+    expect(resolveRevlogType({ queue: 3, type: State.Relearning })).toBe(2);
+  });
+
+  it('should keep custom study type for filtered decks', () => {
+    expect(resolveRevlogType({ queue: 2, type: State.Review }, { dyn: 1 })).toBe(4);
+  });
+});
+
+describe('EchoeStudyService - forgetCards', () => {
+  let service: EchoeStudyService;
+  let forgetCardMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+
+    // forgetCard returns a reset Card with stability=0, difficulty=0
+    forgetCardMock = jest.fn((_card, _now, _keepStats) => ({
+      due: new Date('2026-03-13T00:00:00.000Z'),
+      stability: 0,
+      difficulty: 0,
+      elapsed_days: 0,
+      scheduled_days: 0,
+      learning_steps: 0,
+      reps: 0,
+      lapses: 0,
+      state: 0, // State.New
+      last_review: undefined,
+    }));
+
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+        toFSCard: jest.fn((input) => input),
+        forgetCard: forgetCardMock,
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should reset FSRS core fields when forgetting cards, factor must be 0 not 2500', async () => {
     const whereMock = jest.fn().mockResolvedValue(undefined);
     const setMock = jest.fn().mockReturnValue({ where: whereMock });
     const updateMock = jest.fn().mockReturnValue({ set: setMock });
 
+    const mockCard = {
+      id: 1001,
+      due: new Date('2026-03-10T00:00:00.000Z').getTime(),
+      stability: 12.5,
+      difficulty: 2.35,
+      ivl: 30,
+      left: 0,
+      reps: 10,
+      lapses: 1,
+      type: 2, // State.Review
+      lastReview: new Date('2026-03-01T00:00:00.000Z').getTime(),
+    };
+
     mockedGetDatabase.mockReturnValue({
       update: updateMock,
+      query: {
+        echoeCards: {
+          findFirst: jest.fn().mockResolvedValue(mockCard),
+        },
+      },
     } as any);
 
-    await service.forgetCards([1001, 1002]);
+    await service.forgetCards([1001]);
+
+    expect(forgetCardMock).toHaveBeenCalledTimes(1);
+    expect(forgetCardMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Date),
+      false
+    );
 
     expect(updateMock).toHaveBeenCalledTimes(1);
     expect(setMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        factor: 0,       // ← stability=0 → factor=0，修复前错误值为 2500
+        stability: 0,
+        difficulty: 0,
         ivl: 0,
         reps: 0,
         lapses: 0,
         type: 0,
         queue: 0,
-        stability: 0,
-        difficulty: 0,
         lastReview: 0,
       })
     );
     expect(whereMock).toHaveBeenCalledTimes(1);
   });
+
+  it('should skip cards that are not found in database', async () => {
+    const updateMock = jest.fn();
+
+    mockedGetDatabase.mockReturnValue({
+      update: updateMock,
+      query: {
+        echoeCards: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as any);
+
+    await service.forgetCards([9999]);
+
+    expect(forgetCardMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('should process each card individually', async () => {
+    const whereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    const makeCard = (id: number) => ({
+      id,
+      due: Date.now(),
+      stability: 5,
+      difficulty: 3,
+      ivl: 10,
+      left: 0,
+      reps: 5,
+      lapses: 0,
+      type: 2,
+      lastReview: Date.now() - 86400000,
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      update: updateMock,
+      query: {
+        echoeCards: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(makeCard(1001))
+            .mockResolvedValueOnce(makeCard(1002)),
+        },
+      },
+    } as any);
+
+    await service.forgetCards([1001, 1002]);
+
+    expect(forgetCardMock).toHaveBeenCalledTimes(2);
+    expect(updateMock).toHaveBeenCalledTimes(2);
+    expect(whereMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('EchoeStudyService - submitReview learning_steps persistence', () => {
+  let service: EchoeStudyService;
+  let scheduleCardMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+
+    scheduleCardMock = jest.fn();
+
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+        scheduleCard: scheduleCardMock,
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  const buildDbCard = (overrides: Record<string, unknown> = {}) => ({
+    id: 1001,
+    nid: 2001,
+    did: 3001,
+    ord: 0,
+    due: Date.now() - 1000,
+    ivl: 0,
+    factor: 0,
+    reps: 1,
+    lapses: 0,
+    left: 1, // 当前处于第 2 步（还剩 1 步）
+    type: State.Learning,
+    queue: 1,
+    stability: 0.5,
+    difficulty: 5.0,
+    lastReview: Date.now() - 60000,
+    mod: 0,
+    usn: -1,
+    ...overrides,
+  });
+
+  const buildMockSchedulingResult = (learningSteps: number) => ({
+    nextDue: new Date(Date.now() + 600000), // 10 分钟后
+    interval: 0,
+    stability: 0.8,
+    difficulty: 5.0,
+    state: State.Learning,
+    scheduledDays: 0,
+    learningSteps, // ts-fsrs 更新后的步骤计数
+  });
+
+  it('should persist learning_steps from FSRS output to card.left', async () => {
+    // Learning 阶段，第一步答 Good → ts-fsrs 返回 learningSteps=1（还剩第 2 步）
+    const expectedLearningSteps = 1;
+    scheduleCardMock.mockReturnValue(buildMockSchedulingResult(expectedLearningSteps));
+
+    const whereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+    const insertIntoValuesMock = jest.fn().mockResolvedValue(undefined);
+    const insertMock = jest.fn().mockReturnValue({ values: insertIntoValuesMock });
+
+    const updatedCard = { ...buildDbCard({ left: expectedLearningSteps }) };
+
+    mockedGetDatabase.mockReturnValue({
+      update: updateMock,
+      insert: insertMock,
+      query: {
+        echoeCards: {
+          findFirst: jest.fn()
+            .mockResolvedValueOnce(buildDbCard())   // 第 1 次：获取原始卡片
+            .mockResolvedValueOnce(updatedCard),    // 第 2 次：获取更新后卡片
+        },
+        echoeNotes: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            fieldsJson: { Front: 'Question', Back: 'Answer' },
+            mod: 0, csum: 0,
+          }),
+        },
+        echoeDecks: {
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+        },
+        echoeDeckConfig: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        echoeNotetypes: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 4001, type: 0,
+            tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
+          }),
+        },
+      },
+    } as any);
+
+    await service.submitReview({ cardId: 1001, rating: 3, timeTaken: 5000 });
+
+    // 断言写库时 left = learningSteps（来自 FSRS 结果），而非硬编码 0
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        left: expectedLearningSteps,
+      })
+    );
+  });
+
+  it('should write left=0 when FSRS output has learningSteps=0 (graduated)', async () => {
+    // Learning 阶段最后一步答 Good → 毕业，ts-fsrs 返回 learningSteps=0
+    const expectedLearningSteps = 0;
+    scheduleCardMock.mockReturnValue({
+      ...buildMockSchedulingResult(expectedLearningSteps),
+      state: State.Review,
+      interval: 1,
+      scheduledDays: 1,
+    });
+
+    const whereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+    const insertIntoValuesMock = jest.fn().mockResolvedValue(undefined);
+    const insertMock = jest.fn().mockReturnValue({ values: insertIntoValuesMock });
+
+    const updatedCard = { ...buildDbCard({ left: 0, type: State.Review, queue: 2 }) };
+
+    mockedGetDatabase.mockReturnValue({
+      update: updateMock,
+      insert: insertMock,
+      query: {
+        echoeCards: {
+          findFirst: jest.fn()
+            .mockResolvedValueOnce(buildDbCard({ left: 1 }))
+            .mockResolvedValueOnce(updatedCard),
+        },
+        echoeNotes: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            fieldsJson: { Front: 'Question', Back: 'Answer' },
+            mod: 0, csum: 0,
+          }),
+        },
+        echoeDecks: {
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+        },
+        echoeDeckConfig: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        echoeNotetypes: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 4001, type: 0,
+            tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
+          }),
+        },
+      },
+    } as any);
+
+    await service.submitReview({ cardId: 1001, rating: 3, timeTaken: 5000 });
+
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        left: 0,
+      })
+    );
+  });
 });
 
 describe('fsrs-retrievability utility', () => {
+  const extractSqlText = (expr: unknown): string => {
+    const chunks = (expr as { queryChunks?: unknown[] } | null | undefined)?.queryChunks;
+    if (!Array.isArray(chunks)) {
+      return '';
+    }
+
+    return chunks
+      .flatMap((chunk: unknown) => {
+        if (typeof chunk === 'string') {
+          return [chunk];
+        }
+
+        const value = (chunk as { value?: unknown } | null | undefined)?.value;
+        if (Array.isArray(value)) {
+          return value.filter((item): item is string => typeof item === 'string');
+        }
+
+        if (typeof value === 'string') {
+          return [value];
+        }
+
+        return [];
+      })
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   it('should return null for uninitialized cards', () => {
     const now = new Date('2026-03-13T00:00:00.000Z').getTime();
 
@@ -362,5 +703,31 @@ describe('fsrs-retrievability utility', () => {
     expect(result.value).not.toBeNull();
     expect(result.value!).toBeGreaterThanOrEqual(0);
     expect(result.value!).toBeLessThanOrEqual(1);
+  });
+
+  it('should keep SQL helper guard semantics aligned with TS', () => {
+    const now = new Date('2026-03-13T00:00:00.000Z').getTime();
+
+    expect(calculateRetrievability(0, 10, now)).toEqual({
+      value: null,
+      isNew: true,
+    });
+    expect(calculateRetrievability(now - 1000, 0, now)).toEqual({
+      value: null,
+      isNew: true,
+    });
+    expect(calculateRetrievability(now + 1000, 10, now)).toEqual({
+      value: 1,
+      isNew: false,
+    });
+
+    const retrievabilityExpr = getRetrievabilitySqlExpr(now, sql.raw('lastReview'), sql.raw('stability'));
+    const sqlText = extractSqlText(retrievabilityExpr);
+
+    expect(sqlText).toContain('CASE');
+    expect(sqlText).toContain('<= 0 OR');
+    expect(sqlText).toContain('THEN NULL');
+    expect(sqlText).toContain('< 0 THEN 1');
+    expect(sqlText).toContain('POWER(1 +');
   });
 });

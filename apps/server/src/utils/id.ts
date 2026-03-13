@@ -3,6 +3,9 @@ import { customAlphabet } from 'nanoid';
 import { OBJECT_TYPE } from '../models/constant/type.js';
 const typeid = customAlphabet('1234567890abcdefghijklmnopqrstuvwxyz', 23);
 
+let _revlogLastMs = 0;
+let _revlogSeq = 0;
+
 export const generateUid = () => {
   return generateTypeId(OBJECT_TYPE.USER);
 };
@@ -79,3 +82,19 @@ export const generateTypeId = (type: (typeof OBJECT_TYPE)[keyof typeof OBJECT_TY
   }
   throw new Error(`Invalid type: ${type}`);
 };
+
+/**
+ * 生成唯一的 revlog ID。
+ * 格式：ms * 1000 + seq（与 Anki revlog.id "ms*1000+random" 语义对齐）。
+ * 同一毫秒内最多支持 1000 个唯一值（seq 0–999），超出后 seq 回绕仍保持唯一性（ms 必然已推进）。
+ */
+export function generateRevlogId(): number {
+  const ms = Date.now();
+  if (ms === _revlogLastMs) {
+    _revlogSeq = (_revlogSeq + 1) % 1000;
+  } else {
+    _revlogLastMs = ms;
+    _revlogSeq = 0;
+  }
+  return ms * 1000 + _revlogSeq;
+}

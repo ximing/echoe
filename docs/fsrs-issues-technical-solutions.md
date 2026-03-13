@@ -675,3 +675,127 @@ apps/web/src/
 1. **P0 立即修复**：A1、A2（直接影响调度正确性与关键统计）。
 2. **P1 本迭代修复**：A3、A4（统一语义和聚合口径）。
 3. **P2 收尾修复**：A5、A6（体验和配置一致性）。
+
+---
+
+## 新增审查结论（2026-03-13 第三轮，待修复）
+
+> 本节补充本轮复查发现的未修复项，便于直接进入开发排期。
+
+### 问题概览
+
+| 编号 | 问题 | 优先级 | 影响范围 |
+|------|------|--------|----------|
+| B1 | `submitReview` 写入 `revlog.type` 固定为 4 | P0 | 复习日志统计、Anki 兼容分析 |
+| B2 | `submitReview` 参数校验会误杀 `timeTaken=0` | P1 | 学习提交流程稳定性 |
+| B3 | Web 端 Service 注册模式偏离页面级规范 | P1 | 前端状态隔离与生命周期管理 |
+| B4 | retrievability 新卡语义未在 SQL Helper 固化 | P2 | 后续统计实现一致性 |
+
+### B1：`submitReview` 写入 `revlog.type` 固定为 4（P0）
+
+**问题**
+- `apps/server/src/services/echoe-study.service.ts` 在插入 `echoeRevlog` 时固定写入 `type: 4`。
+- 无论是新卡学习、复习、重新学习，日志类型均被归为 custom study。
+
+**影响**
+- 无法按类型区分学习行为，统计结果失真。
+- 与 Anki revlog 类型语义不一致，影响兼容分析与后续导出链路。
+
+**修复建议**
+- 按复习前卡片状态映射 revlog 类型（学习/复习/重学）。
+- 保留 `type: 4` 仅用于真正的 custom/filtered 场景。
+- 增加单测覆盖三种状态输入下的 revlog.type 输出。
+
+### B2：`submitReview` 参数校验会误杀 `timeTaken=0`（P1）
+
+**问题**
+- `apps/server/src/controllers/v1/echoe-study.controller.ts` 当前校验：`if (!dto.cardId || !dto.rating || !dto.timeTaken)`。
+- `timeTaken=0` 会被判为假值，导致返回参数错误。
+
+**影响**
+- 快速作答（或前端上报 0ms）会被错误拒绝，形成偶发提交流程失败。
+
+**修复建议**
+- 改为显式空值判断：`dto.timeTaken == null`。
+- 增加边界校验：允许 `0`，拒绝负数和非数值。
+- 补充控制器参数校验单测。
+
+### B4：retrievability 新卡语义未在 SQL Helper 固化（P2）
+
+**问题**
+- `calculateRetrievability()` 对新卡返回 `null`，语义清晰。
+- `getRetrievabilitySqlExpr()` 仅返回公式表达式，未内置新卡保护分支；当前靠调用方手写 `CASE WHEN lastReview > 0 AND stability > 0`。
+
+**影响**
+- 目前现有调用点可用，但 Helper 语义不自解释。
+- 后续新增 SQL 统计时容易遗漏保护条件，导致口径漂移。
+
+**修复建议**
+- 在 SQL Helper 层提供带保护分支的统一表达式（或新增安全版函数）。
+- 明确约定：新卡 retrievability 一律按 `NULL` 处理，不纳入均值。
+- 补充单测锁定 SQL/TS 口径一致性。
+
+### 本轮优先级建议
+
+1. **P0 立即修复**：B1（日志类型语义错误，直接影响统计可靠性）。
+2. **P1 本迭代修复**：B2（提交流程稳定性）。
+3. **P2 收尾修复**：B4（统一口径，降低后续扩展风险）。
+
+---
+
+## 新增审查结论（2026-03-13 第四轮，架构一致性）
+
+> 本节补充本轮针对“FSRS 规范一致性 + 前后端架构一致性”的复查结果。
+
+### 问题概览
+
+| 编号 | 问题 | 优先级 | 影响范围 |
+|------|------|--------|----------|
+| C1 | Web 端 Service 生命周期与页面级注册规范不一致 | P1 | 学习页状态隔离、并发学习场景 |
+| C2 | FSRS 默认配置在多处重复定义 | P2 | 配置维护一致性、后续演进风险 |
+| C3 | `revlog.id` 生成策略与 schema 注释语义不一致 | P1 | 复习日志唯一性、Anki 兼容链路 |
+
+### C1：Web 端 Service 生命周期与页面级注册规范不一致（P1）
+
+**修复结果（已完成）**
+- `apps/web/src/main.tsx` 已移除全局 `register(EchoeStudyService)`，不再将学习态 Service 作为应用级单例。
+- `apps/web/src/pages/cards/study.tsx` 已改为页面级 Domain 注册：`export default bindServices(StudyPageContent, [EchoeStudyService])`。
+- 页面内容与子组件继续通过 `useService(EchoeStudyService)` 从当前页面 Domain 获取实例，符合“页面统一注册、子组件按 Domain 获取”的约定。
+
+**修复影响**
+- 学习会话状态（queue/currentIndex/undoStack 等）生命周期与学习页绑定，页面卸载后自动释放。
+- 路由切换与并发学习场景下的状态隔离边界更清晰，可降低隐性竞态风险。
+
+### C2：FSRS 默认配置在多处重复定义（P2）
+
+**修复结果（已完成）**
+- 新增 `apps/server/src/services/fsrs-default-config.ts` 作为 FSRS 默认值单一来源。
+- `apps/server/src/services/fsrs.service.ts` 改为引用 `DEFAULT_FSRS_RUNTIME_CONFIG`，调度参数默认值不再本地重复声明。
+- `apps/server/src/services/echoe-study.service.ts` 与 `apps/server/src/services/echoe-deck.service.ts` 统一改为引用共享默认值；DTO 兜底使用 `DEFAULT_FSRS_DTO_CONFIG`，仅负责解析与回退。
+
+**修复影响**
+- FSRS 默认参数的维护入口收敛到单文件，后续调整不会出现多处漂移。
+- 学习调度链路（FSRS 计算）与配置读取链路（Deck Config 映射）默认口径保持一致，降低回归风险。
+
+### C3：`revlog.id` 生成策略与 schema 注释语义不一致（P1）
+
+**问题**
+- `apps/server/src/db/schema/echoe-revlog.ts` 注释约定 `id` 语义为“Unix ms * 1000 + random”。
+- `apps/server/src/services/echoe-study.service.ts` 当前写入为 `floor(Date.now()/1000) * 1000`，实际只有秒级精度，且值域为 13 位毫秒时间戳（尾部固定 `000`）。
+- 统计链路（`apps/server/src/services/echoe-stats.service.ts`）按 `id >= startMs * 1000` 与 `new Date(id / 1000)` 读取，隐含前提是 `revlog.id` 采用“ms * 1000”尺度。
+
+**影响**
+- 同秒多次复习会产生主键冲突风险。
+- `revlog.id` 尺度与统计查询假设不一致时，会导致当日统计/历史统计漏数或为 0。
+- 与 schema 注释及 Anki 兼容链路的时间语义不一致，增加导入导出与排障成本。
+
+**修复建议（已细化）**
+- 在 `apps/server/src/utils/id.ts` 统一提供 `generateRevlogId()`：`Date.now() * 1000 + sequence(0~999)`，确保同毫秒内单调唯一。
+- `apps/server/src/services/echoe-study.service.ts` 仅调用 `generateRevlogId()` 写入，禁止在业务代码中手写时间戳拼接。
+- 补充单测覆盖：同毫秒连续生成唯一性、`id / 1000` 可还原毫秒时间、统计查询能命中当天复习记录。
+
+### 本轮优先级建议
+
+1. **P1 本迭代修复**：C1（生命周期与页面级服务边界）。
+2. **P1 本迭代修复**：C3（revlog id 唯一性与兼容语义）。
+3. **P2 已完成**：C2（配置单一事实源治理）。

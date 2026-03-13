@@ -5,6 +5,7 @@ import {
   index,
   double,
   text,
+  varchar,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -17,6 +18,7 @@ export const echoeRevlog = mysqlTable(
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Unique ID (Unix timestamp in ms * 1000 + random)
     cid: bigint('cid', { mode: 'number' }).notNull(), // Card ID
+    uid: varchar('uid', { length: 191 }), // User ID (owner of this review record)
     usn: int('usn').notNull(), // Update sequence number (sync)
     ease: int('ease').notNull(), // Ease factor chosen: 1 Again, 2 Hard, 3 Good, 4 Easy
     ivl: int('ivl').notNull(), // Interval (days) after this review
@@ -44,6 +46,7 @@ export const echoeRevlog = mysqlTable(
   (table) => ({
     cidIdx: index('cid_idx').on(table.cid),
     usnIdx: index('usn_idx').on(table.usn),
+    uidIdx: index('uid_idx').on(table.uid),
   })
 );
 

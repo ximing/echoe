@@ -1,4 +1,4 @@
-import { view, useService } from '@rabjs/react';
+import { bindServices, view, useService } from '@rabjs/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { EchoeStudyService } from '../../services/echoe-study.service';
@@ -252,10 +252,6 @@ function CardContent({
  * Study Session Page
  * Route: /echoe/study/:deckId?
  */
-export default function StudyPage() {
-  return <StudyPageContent />;
-}
-
 const StudyPageContent = view(() => {
   const { deckId } = useParams<{ deckId?: string }>();
   const navigate = useNavigate();
@@ -688,3 +684,5 @@ function SessionCompleteView({
     </div>
   );
 }
+
+export default bindServices(StudyPageContent, [EchoeStudyService]);

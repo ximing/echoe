@@ -1,4 +1,4 @@
-import { JsonController, Get, Post, Body, QueryParam, Param } from 'routing-controllers';
+import { JsonController, Get, Post, Body, QueryParam, Param, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -13,6 +13,7 @@ import type {
   BuryCardsDto,
   ForgetCardsDto,
   StudyOptionsDto,
+  UserInfoDto,
 } from '@echoe/dto';
 
 @Service()
@@ -52,17 +53,25 @@ export class EchoeStudyController {
    * Submit a card review
    */
   @Post('/review')
-  async submitReview(@Body() dto: ReviewSubmissionDto) {
+  async submitReview(@Body() dto: ReviewSubmissionDto, @CurrentUser() userDto: UserInfoDto) {
     try {
-      if (!dto.cardId || !dto.rating || !dto.timeTaken) {
+      if (dto == null || dto.cardId == null || dto.rating == null || dto.timeTaken == null) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      if (dto.rating < 1 || dto.rating > 4) {
+      if (!Number.isFinite(dto.cardId) || dto.cardId <= 0) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId must be a positive number');
+      }
+
+      if (!Number.isInteger(dto.rating) || dto.rating < 1 || dto.rating > 4) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'Rating must be 1-4');
       }
 
-      const result = await this.echoeStudyService.submitReview(dto);
+      if (!Number.isFinite(dto.timeTaken) || dto.timeTaken < 0) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'timeTaken must be a non-negative number');
+      }
+
+      const result = await this.echoeStudyService.submitReview(dto, userDto?.uid);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Submit review error:', error);
@@ -78,9 +87,13 @@ export class EchoeStudyController {
    * Undo the last review
    */
   @Post('/undo')
-  async undo(@QueryParam('reviewId') reviewId?: number) {
+  async undo(@QueryParam('reviewId') reviewId?: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
-      const result = await this.echoeStudyService.undo(reviewId);
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      const result = await this.echoeStudyService.undo(userDto.uid, reviewId);
       if (!result.success) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, result.message);
       }

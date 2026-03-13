@@ -10,6 +10,8 @@ import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { logger } from '../utils/logger.js';
 import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
+import { DEFAULT_FSRS_DTO_CONFIG } from './fsrs-default-config.js';
+import { parseStepToMinutes } from '../utils/fsrs-steps.js';
 
 import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
@@ -29,15 +31,6 @@ import type {
   FilteredDeckPreviewDto,
   EchoeCardListItemDto,
 } from '@echoe/dto';
-
-const DEFAULT_FSRS_CONFIG: EchoeFsrsConfigDto = {
-  requestRetention: 0.9,
-  maxInterval: 36500,
-  enableFuzz: true,
-  enableShortTerm: false,
-  learningSteps: [1, 10],
-  relearningSteps: [10],
-};
 
 @Service()
 export class EchoeDeckService {
@@ -77,8 +70,8 @@ export class EchoeDeckService {
         // R < 0.9 => 1 + t/(9S) > 10/9 => t/(9S) > 1/9 => t > S
         // Therefore difficult condition is: (now - lastReview) > stability * DAY_MS
         difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS}) THEN 1 ELSE 0 END)`,
-        retrievabilityEligibleCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN 1 ELSE 0 END)`,
-        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
+        retrievabilityEligibleCount: sql<number>`SUM(CASE WHEN ${retrievabilityExpr} IS NULL THEN 0 ELSE 1 END)`,
+        averageRetrievability: sql<number>`AVG(${retrievabilityExpr})`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
@@ -282,7 +275,8 @@ export class EchoeDeckService {
         totalCount: sql<number>`COUNT(*)`,
         matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
         difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS}) THEN 1 ELSE 0 END)`,
-        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
+        retrievabilityEligibleCount: sql<number>`SUM(CASE WHEN ${retrievabilityExpr} IS NULL THEN 0 ELSE 1 END)`,
+        averageRetrievability: sql<number>`AVG(${retrievabilityExpr})`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
@@ -294,6 +288,7 @@ export class EchoeDeckService {
       totalCount: 0,
       matureCount: 0,
       difficultCount: 0,
+      retrievabilityEligibleCount: 0,
       averageRetrievability: 0,
       lastStudiedAt: null,
     };
@@ -672,29 +667,6 @@ export class EchoeDeckService {
     return typeof value === 'boolean' ? value : undefined;
   }
 
-  private parseStepMinutes(step: unknown): number | undefined {
-    const numeric = this.parseNumeric(step);
-    if (numeric !== undefined) {
-      return numeric > 0 ? numeric : undefined;
-    }
-
-    if (typeof step !== 'string') {
-      return undefined;
-    }
-
-    const match = step.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)(m|h)?$/);
-    if (!match) {
-      return undefined;
-    }
-
-    const value = Number(match[1]);
-    if (!Number.isFinite(value) || value <= 0) {
-      return undefined;
-    }
-
-    return match[2] === 'h' ? value * 60 : value;
-  }
-
   private normalizeSteps(value: unknown): number[] | undefined {
     if (!Array.isArray(value) || value.length === 0) {
       return undefined;
@@ -702,7 +674,7 @@ export class EchoeDeckService {
 
     const steps: number[] = [];
     for (const step of value) {
-      const minutes = this.parseStepMinutes(step);
+      const minutes = parseStepToMinutes(step);
       if (minutes === undefined) {
         return undefined;
       }
@@ -743,21 +715,21 @@ export class EchoeDeckService {
     const rawFsrs = this.asRecord(revConfig.fsrs);
 
     const requestRetention = this.parseRequestRetention(rawFsrs.requestRetention)
-      ?? DEFAULT_FSRS_CONFIG.requestRetention;
+      ?? DEFAULT_FSRS_DTO_CONFIG.requestRetention;
     const maxInterval = this.parseMaxInterval(rawFsrs.maxInterval)
       ?? this.parseMaxInterval(revConfig.maxInterval)
-      ?? DEFAULT_FSRS_CONFIG.maxInterval;
-    const enableFuzz = this.parseBoolean(rawFsrs.enableFuzz) ?? DEFAULT_FSRS_CONFIG.enableFuzz;
-    const enableShortTerm = this.parseBoolean(rawFsrs.enableShortTerm) ?? DEFAULT_FSRS_CONFIG.enableShortTerm;
+      ?? DEFAULT_FSRS_DTO_CONFIG.maxInterval;
+    const enableFuzz = this.parseBoolean(rawFsrs.enableFuzz) ?? DEFAULT_FSRS_DTO_CONFIG.enableFuzz;
+    const enableShortTerm = this.parseBoolean(rawFsrs.enableShortTerm) ?? DEFAULT_FSRS_DTO_CONFIG.enableShortTerm;
     const learningSteps = this.normalizeSteps(rawFsrs.learningSteps)
       ?? this.normalizeSteps(newConfig.steps)
       ?? this.normalizeSteps(newConfig.delays)
       ?? this.normalizeSteps(newConfig.newSteps)
-      ?? DEFAULT_FSRS_CONFIG.learningSteps;
+      ?? DEFAULT_FSRS_DTO_CONFIG.learningSteps;
     const relearningSteps = this.normalizeSteps(rawFsrs.relearningSteps)
       ?? this.normalizeSteps(lapseConfig.steps)
       ?? this.normalizeSteps(lapseConfig.delays)
-      ?? DEFAULT_FSRS_CONFIG.relearningSteps;
+      ?? DEFAULT_FSRS_DTO_CONFIG.relearningSteps;
 
     return {
       requestRetention,
