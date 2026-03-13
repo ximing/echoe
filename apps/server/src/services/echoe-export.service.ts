@@ -126,7 +126,7 @@ export class EchoeExportService {
 
       // Generate filename
       const deckName = deckId
-        ? decksToExport.find((d) => d.id === deckId)?.name || 'deck'
+        ? decksToExport.find((d: { id: number; name: string }) => d.id === deckId)?.name || 'deck'
         : 'all_decks';
       const sanitizedName = deckName.replace(/[^a-zA-Z0-9_]/g, '_');
       const date = new Date().toISOString().split('T')[0];
@@ -198,7 +198,7 @@ export class EchoeExportService {
 
       // Generate filename
       const deckName = deckId
-        ? decksToExport.find((d) => d.id === deckId)?.name || 'deck'
+        ? decksToExport.find((d: { id: number; name: string }) => d.id === deckId)?.name || 'deck'
         : 'all_decks';
       const sanitizedName = deckName.replace(/[^a-zA-Z0-9_]/g, '_');
       const date = new Date().toISOString().split('T')[0];
@@ -234,7 +234,7 @@ export class EchoeExportService {
         .from(echoeDecks)
         .where(eq(echoeDecks.dyn, 0)); // Exclude filtered decks
 
-      return subDecks.filter((d) => d.name.startsWith(deckName + '::') || d.name === deckName);
+      return subDecks.filter((d: { name: string }) => d.name.startsWith(deckName + '::') || d.name === deckName);
     }
 
     // Export all decks (excluding filtered decks)
@@ -263,7 +263,7 @@ export class EchoeExportService {
       .where(inArray(echoeCards.did, deckIds));
 
     // Get unique note IDs (convert bigint to number)
-    const noteIds = [...new Set(cards.map((c) => Number(c.nid)))] as number[];
+    const noteIds = [...new Set(cards.map((c: { nid: number | string | bigint }) => Number(c.nid)))] as number[];
 
     if (noteIds.length === 0) return [];
 
@@ -852,7 +852,7 @@ export class EchoeExportService {
       stmt.run(nt.id, nt.name, mtime, nt.mod, -1, nt.sortf, nt.did, nt.tmpls, nt.flds, nt.css, nt.type, nt.latexPre, nt.latexPost, nt.req);
     }
 
-    return notetypes.map((nt) => nt.id);
+    return notetypes.map((nt: { id: number }) => nt.id);
   }
 
   /**
@@ -1044,7 +1044,7 @@ export class EchoeExportService {
 
     if (cards.length === 0) return;
 
-    const cardIds = cards.map((c) => c.id);
+    const cardIds = cards.map((c: { id: number }) => c.id);
 
     // Get revlog entries for these cards
     const revlogs = await db.select().from(echoeRevlog).where(inArray(echoeRevlog.cid, cardIds));

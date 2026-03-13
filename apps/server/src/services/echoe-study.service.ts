@@ -336,7 +336,7 @@ export class EchoeStudyService {
         ));
 
       if (siblings.length > 0) {
-        const siblingIds = siblings.map(s => s.id);
+        const siblingIds = siblings.map((s: { id: number }) => s.id);
         await db
           .update(echoeCards)
           .set({
@@ -344,7 +344,7 @@ export class EchoeStudyService {
             mod: Math.floor(now.getTime() / 1000),
             usn: -1,
           })
-          .where(sql`${echoeCards.id} IN (${sql.join(siblingIds.map(id => sql`${id}`), sql`, `)})`);
+          .where(sql`${echoeCards.id} IN (${sql.join(siblingIds.map((id: number) => sql`${id}`), sql`, `)})`);
       }
     }
 
@@ -599,7 +599,7 @@ export class EchoeStudyService {
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
       .where(and(...newConditions))
-      .then((r) => r[0]?.count || 0);
+      .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     // Learning cards (queue=1 or queue=3)
     const learnConditions = deckFilter
@@ -609,7 +609,7 @@ export class EchoeStudyService {
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
       .where(and(...learnConditions))
-      .then((r) => r[0]?.count || 0);
+      .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     // Review cards (queue=2 and due <= now)
     const reviewConditions = deckFilter
@@ -619,7 +619,7 @@ export class EchoeStudyService {
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
       .where(and(...reviewConditions))
-      .then((r) => r[0]?.count || 0);
+      .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     return {
       newCount,

@@ -12,6 +12,8 @@ import { logger } from '../utils/logger.js';
 
 import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
+import type { EchoeCards } from '../db/schema/echoe-cards.js';
+import type { EchoeNotes } from '../db/schema/echoe-notes.js';
 import type {
   EchoeDeckWithCountsDto,
   CreateEchoeDeckDto,
@@ -102,7 +104,7 @@ export class EchoeDeckService {
     }
 
     // Convert to DTOs with counts
-    const decksWithCounts: EchoeDeckWithCountsDto[] = decks.map((deck) => {
+    const decksWithCounts: EchoeDeckWithCountsDto[] = decks.map((deck: EchoeDecks) => {
       const counts = countsMap.get(Number(deck.id)) || { newCount: 0, learnCount: 0, reviewCount: 0 };
       const fsrs = fsrsMap.get(Number(deck.id)) || {
         totalCount: 0,
@@ -424,7 +426,7 @@ export class EchoeDeckService {
 
       // Find notes in these decks
       const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.did, deckIds));
-      const noteIds: number[] = Array.from(new Set(cards.map((c) => Number(c.nid))));
+      const noteIds: number[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid))));
 
       if (noteIds.length > 0) {
         // Add notes to graves
@@ -804,7 +806,7 @@ export class EchoeDeckService {
         // Filter by deck name
         const deckName = term.substring(5).replace(/"/g, '');
         const decks = await db.select().from(echoeDecks).where(sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`);
-        const deckIds = decks.map((d) => Number(d.id));
+        const deckIds = decks.map((d: Pick<EchoeDecks, 'id'>) => Number(d.id));
         if (deckIds.length > 0) {
           conditions.push(inArray(echoeCards.did, deckIds));
         }
@@ -812,7 +814,7 @@ export class EchoeDeckService {
         // Filter by tag
         const tag = term.substring(4).replace(/"/g, '');
         const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`);
-        const noteIds = notes.map((n) => n.id);
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
         } else {
@@ -845,7 +847,7 @@ export class EchoeDeckService {
           .select({ id: echoeNotes.id })
           .from(echoeNotes)
           .where(sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`);
-        const noteIds = notes.map((n) => n.id);
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
         } else {
@@ -858,7 +860,7 @@ export class EchoeDeckService {
           .select({ id: echoeNotes.id })
           .from(echoeNotes)
           .where(sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`);
-        const noteIds = notes.map((n) => n.id);
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
         } else {
@@ -878,7 +880,7 @@ export class EchoeDeckService {
         for (const cond of conditions) {
           if (cond && typeof cond === 'object' && 'constructor' in cond) {
             const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(cond);
-            noteIds = [...noteIds, ...notes.map((n) => n.id)];
+            noteIds = [...noteIds, ...notes.map((n: Pick<EchoeNotes, 'id'>) => n.id)];
           }
         }
         // Remove duplicates

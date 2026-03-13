@@ -14,9 +14,13 @@ export const ResponseUtil = {
 
   error(code: number = ErrorCode.SYSTEM_ERROR, message?: string): ApiResponse<null> {
     logger.error('ResponseUtil Error', { code, message });
+    const defaultMessage = ErrorMessage[ErrorCode.SYSTEM_ERROR];
+    const mappedMessage = Object.prototype.hasOwnProperty.call(ErrorMessage, code)
+      ? ErrorMessage[code as keyof typeof ErrorMessage]
+      : undefined;
     return {
       code,
-      msg: message || ErrorMessage[code] || ErrorMessage[ErrorCode.SYSTEM_ERROR],
+      msg: message || mappedMessage || defaultMessage,
       data: null,
     };
   },

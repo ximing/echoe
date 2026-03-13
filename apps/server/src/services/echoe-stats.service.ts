@@ -436,7 +436,7 @@ export class EchoeStatsService {
 
     // Find all sub-decks
     const findSubdecks = (parentId: number) => {
-      const parentDeck = decks.find((d) => Number(d.id) === parentId);
+      const parentDeck = decks.find((d: { id: number | string | bigint }) => Number(d.id) === parentId);
       if (!parentDeck) return;
 
       const prefix = parentDeck.name + '::';

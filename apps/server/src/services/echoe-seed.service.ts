@@ -372,12 +372,12 @@ export class EchoeSeedService {
         .select({ count: sql<number>`COUNT(*)` })
         .from(echoeCards)
         .where(and(eq(echoeCards.queue, 2), gt(echoeCards.due, 0), lt(echoeCards.due, LEGACY_DAY_DUE_MAX)))
-        .then((rows) => Number(rows[0]?.count ?? 0)),
+        .then((rows: Array<{ count: number | string | bigint }>) => Number(rows[0]?.count ?? 0)),
       db
         .select({ count: sql<number>`COUNT(*)` })
         .from(echoeCards)
         .where(and(inArray(echoeCards.queue, [1, 3]), gt(echoeCards.due, 0), lt(echoeCards.due, LEGACY_SECOND_DUE_MAX)))
-        .then((rows) => Number(rows[0]?.count ?? 0)),
+        .then((rows: Array<{ count: number | string | bigint }>) => Number(rows[0]?.count ?? 0)),
       db
         .select({ count: sql<number>`COUNT(*)` })
         .from(echoeCards)
@@ -388,7 +388,7 @@ export class EchoeSeedService {
             lt(echoeCards.due, LEGACY_SECOND_DUE_MAX)
           )
         )
-        .then((rows) => Number(rows[0]?.count ?? 0)),
+        .then((rows: Array<{ count: number | string | bigint }>) => Number(rows[0]?.count ?? 0)),
     ]);
 
     const [legacyRevlogReviewPreDue, legacyRevlogLearningPreDue] = await Promise.all([
@@ -396,7 +396,7 @@ export class EchoeSeedService {
         .select({ count: sql<number>`COUNT(*)` })
         .from(echoeRevlog)
         .where(and(eq(echoeRevlog.preQueue, 2), gt(echoeRevlog.preDue, 0), lt(echoeRevlog.preDue, LEGACY_DAY_DUE_MAX)))
-        .then((rows) => Number(rows[0]?.count ?? 0)),
+        .then((rows: Array<{ count: number | string | bigint }>) => Number(rows[0]?.count ?? 0)),
       db
         .select({ count: sql<number>`COUNT(*)` })
         .from(echoeRevlog)
@@ -407,7 +407,7 @@ export class EchoeSeedService {
             lt(echoeRevlog.preDue, LEGACY_SECOND_DUE_MAX)
           )
         )
-        .then((rows) => Number(rows[0]?.count ?? 0)),
+        .then((rows: Array<{ count: number | string | bigint }>) => Number(rows[0]?.count ?? 0)),
     ]);
 
     if (legacyReviewCards > 0) {

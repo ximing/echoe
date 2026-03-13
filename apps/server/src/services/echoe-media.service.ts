@@ -139,7 +139,16 @@ export class EchoeMediaService {
     const db = getDatabase();
     const results = await db.select().from(echoeMedia);
 
-    return results.map((row) => ({
+    return results.map((row: {
+      id: number;
+      filename: string;
+      originalFilename: string;
+      size: number;
+      mimeType: string;
+      hash: string;
+      createdAt: number;
+      usedInCards: number;
+    }) => ({
       id: row.id,
       filename: row.filename,
       originalFilename: row.originalFilename,
@@ -191,8 +200,8 @@ export class EchoeMediaService {
 
     // Find files that are not referenced
     const unusedFiles = allMedia
-      .map((m) => m.filename)
-      .filter((filename) => !referencedFiles.has(filename));
+      .map((m: { filename: string }) => m.filename)
+      .filter((filename: string) => !referencedFiles.has(filename));
 
     return { unusedFiles };
   }

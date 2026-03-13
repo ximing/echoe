@@ -99,9 +99,11 @@ export class EchoeCsvImportService {
           // Build fields object based on mapping
           const fields: Record<string, string> = {};
 
-          for (const [colIdx, fieldName] of Object.entries(fieldMap)) {
-            if (fieldName && fieldName !== 'Ignore' && row[colIdx]) {
-              fields[fieldName] = row[colIdx];
+          for (const [colIdxRaw, fieldName] of Object.entries(fieldMap)) {
+            const colIdx = Number(colIdxRaw);
+            const cellValue = row[colIdx];
+            if (fieldName && fieldName !== 'Ignore' && cellValue) {
+              fields[fieldName] = cellValue;
             }
           }
 

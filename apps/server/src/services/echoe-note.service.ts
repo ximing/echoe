@@ -13,6 +13,10 @@ import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 import type { RichTextFields } from '../types/note-fields.js';
+import type { EchoeCards } from '../db/schema/echoe-cards.js';
+import type { EchoeNotes } from '../db/schema/echoe-notes.js';
+import type { EchoeNotetypes } from '../db/schema/echoe-notetypes.js';
+import type { EchoeTemplates } from '../db/schema/echoe-templates.js';
 
 import type {
   EchoeNoteDto,
@@ -52,7 +56,7 @@ export class EchoeNoteService {
         .from(echoeCards)
         .where(inArray(echoeCards.did, deckIds));
 
-      const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
+      const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
       if (noteIds.length > 0) {
         conditions.push(inArray(echoeNotes.id, noteIds));
       } else {
@@ -99,7 +103,7 @@ export class EchoeNoteService {
 
       if (cardConditions) {
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(cardConditions);
-        const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
         } else {
@@ -130,7 +134,7 @@ export class EchoeNoteService {
       .offset(offset);
 
     return {
-      notes: notes.map((n) => this.mapNoteToDto(n)),
+      notes: notes.map((n: EchoeNotes) => this.mapNoteToDto(n)),
       total,
     };
   }
@@ -152,7 +156,7 @@ export class EchoeNoteService {
 
     return {
       ...this.mapNoteToDto(note[0]),
-      cards: cards.map((c) => this.mapCardToDto(c)),
+      cards: cards.map((c: EchoeCards) => this.mapCardToDto(c)),
     };
   }
 
@@ -421,7 +425,7 @@ export class EchoeNoteService {
             .from(echoeNotes)
             .where(sql`${echoeNotes.tags} LIKE '%"leech"%'`);
 
-          const leechNoteIds = leechNotes.map((n) => n.id);
+          const leechNoteIds = leechNotes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
           if (leechNoteIds.length > 0) {
             cardConditions.push(inArray(echoeCards.nid, leechNoteIds));
           } else {
@@ -539,7 +543,7 @@ export class EchoeNoteService {
           mod: note?.mod || card.mod,
         };
       })
-      .filter((item): item is EchoeCardListItemDto => item !== null);
+      .filter((item: EchoeCardListItemDto | null): item is EchoeCardListItemDto => item !== null);
 
     return { cards: result, total };
   }
@@ -593,27 +597,27 @@ export class EchoeNoteService {
         const cards = await db.select().from(echoeCards).where(inArray(echoeCards.id, cardIds));
 
         // Batch update by type
-        const type0Cards = cards.filter((c) => c.type === 0);
-        const type1Cards = cards.filter((c) => c.type === 1);
-        const type2Cards = cards.filter((c) => c.type === 2);
+        const type0Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 0);
+        const type1Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 1);
+        const type2Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 2);
 
         if (type0Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 0, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type0Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type0Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         if (type1Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 1, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type1Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type1Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         if (type2Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 2, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type2Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type2Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         affected = cards.length;
         break;
@@ -633,27 +637,27 @@ export class EchoeNoteService {
         const cards = await db.select().from(echoeCards).where(inArray(echoeCards.id, cardIds));
 
         // Batch update by type
-        const type0Cards = cards.filter((c) => c.type === 0);
-        const type1Cards = cards.filter((c) => c.type === 1);
-        const type2Cards = cards.filter((c) => c.type === 2);
+        const type0Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 0);
+        const type1Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 1);
+        const type2Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 2);
 
         if (type0Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 0, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type0Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type0Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         if (type1Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 1, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type1Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type1Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         if (type2Cards.length > 0) {
           await db
             .update(echoeCards)
             .set({ queue: 2, mod: now, usn: 0 })
-            .where(inArray(echoeCards.id, type2Cards.map((c) => c.id)));
+            .where(inArray(echoeCards.id, type2Cards.map((c: Pick<EchoeCards, 'id'>) => c.id)));
         }
         affected = cards.length;
         break;
@@ -697,7 +701,7 @@ export class EchoeNoteService {
         }
         // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.id, cardIds));
-        const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
 
         if (noteIds.length === 0) {
           break;
@@ -727,7 +731,7 @@ export class EchoeNoteService {
         }
         // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.id, cardIds));
-        const noteIds = Array.from(new Set(cards.map((c) => Number(c.nid)))) as number[];
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
 
         if (noteIds.length === 0) {
           break;
@@ -767,7 +771,7 @@ export class EchoeNoteService {
     }
 
     // Batch query all templates in one call
-    const noteTypeIds = notetypes.map((nt) => Number(nt.id));
+    const noteTypeIds = notetypes.map((nt: Pick<EchoeNotetypes, 'id'>) => Number(nt.id));
     const allTemplates = await db
       .select()
       .from(echoeTemplates)
@@ -809,7 +813,7 @@ export class EchoeNoteService {
         mod: nt.mod,
         sortf: nt.sortf,
         did: Number(nt.did),
-        tmpls: templates.map((t) => ({
+        tmpls: templates.map((t: EchoeTemplates) => ({
           id: Number(t.id),
           name: t.name,
           ord: t.ord,
@@ -1106,7 +1110,7 @@ export class EchoeNoteService {
       mod: notetype[0].mod,
       sortf: notetype[0].sortf,
       did: Number(notetype[0].did),
-      tmpls: templates.map((t) => ({
+      tmpls: templates.map((t: EchoeTemplates) => ({
         id: Number(t.id),
         name: t.name,
         ord: t.ord,
