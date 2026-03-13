@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import AuthPage from './pages/auth';
 import HomePage from './pages/cards';
 import StudyPage from './pages/cards/study';
+import DeckConfigPage from './pages/cards/deck-config.tsx';
 import CardEditorPage from './pages/cards/card-editor';
 import CardBrowserPage from './pages/cards/browser';
 import StatsPage from './pages/cards/stats';
@@ -77,6 +78,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <HomePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cards/decks/:deckId/config"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DeckConfigPage />
               </Layout>
             </ProtectedRoute>
           }

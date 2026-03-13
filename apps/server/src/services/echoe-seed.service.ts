@@ -170,6 +170,14 @@ function createDefaultDeckConfig() {
       minSpace: 1,
       mult: 1,
       perDay: 200,
+      fsrs: {
+        requestRetention: 0.9,
+        maxInterval: 36500,
+        enableFuzz: true,
+        enableShortTerm: false,
+        learningSteps: [1, 10],
+        relearningSteps: [10],
+      },
     }),
     lapseConfig: JSON.stringify({
       bury: true,

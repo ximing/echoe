@@ -64,6 +64,7 @@ export class EchoeStudyService extends Service {
 
   // Study options (rating previews from FSRS)
   currentCardOptions: RatingOptionDto[] = [];
+  currentRetrievability: number | null = null;
   isLoadingStudyOptions = false;
   studyOptionsError: string | null = null;
 
@@ -216,6 +217,7 @@ export class EchoeStudyService extends Service {
       }
 
       this.currentCardOptions = response.data?.options ?? [];
+      this.currentRetrievability = response.data?.retrievability ?? null;
     } catch (error: unknown) {
       const latestCardId = this.getCurrentCard()?.cardId;
       if (latestCardId !== requestCardId) {
@@ -223,6 +225,7 @@ export class EchoeStudyService extends Service {
       }
 
       this.currentCardOptions = [];
+      this.currentRetrievability = null;
       const optionsError = error as { msg?: string; message?: string };
       this.studyOptionsError = optionsError.msg || optionsError.message || 'Failed to load study options';
     } finally {
@@ -242,6 +245,7 @@ export class EchoeStudyService extends Service {
 
   private resetStudyOptionsState(): void {
     this.currentCardOptions = [];
+    this.currentRetrievability = null;
     this.isLoadingStudyOptions = false;
     this.studyOptionsError = null;
   }

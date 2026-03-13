@@ -202,6 +202,20 @@ describe('FSRSService', () => {
       expect(result).toBeDefined();
     });
 
+    it('should respect custom request retention', () => {
+      const now = new Date('2024-01-01');
+      const card = service.createCard(now);
+
+      const relaxed = service.scheduleCard(card, Rating.Good, now, {
+        requestRetention: 0.8,
+      });
+      const conservative = service.scheduleCard(card, Rating.Good, now, {
+        requestRetention: 0.95,
+      });
+
+      expect(conservative.interval).toBeLessThanOrEqual(relaxed.interval);
+    });
+
     it('should respect custom max interval', () => {
       const card = service.createCard(new Date('2024-01-01'));
       const config = {

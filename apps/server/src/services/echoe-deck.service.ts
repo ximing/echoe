@@ -9,6 +9,7 @@ import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { logger } from '../utils/logger.js';
+import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
 
 import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
@@ -21,12 +22,22 @@ import type {
   UpdateEchoeDeckDto,
   EchoeDeckConfigDto,
   UpdateEchoeDeckConfigDto,
+  EchoeFsrsConfigDto,
   EchoeNewCardConfigDto,
   EchoeReviewConfigDto,
   EchoeLapseConfigDto,
   FilteredDeckPreviewDto,
   EchoeCardListItemDto,
 } from '@echoe/dto';
+
+const DEFAULT_FSRS_CONFIG: EchoeFsrsConfigDto = {
+  requestRetention: 0.9,
+  maxInterval: 36500,
+  enableFuzz: true,
+  enableShortTerm: false,
+  learningSteps: [1, 10],
+  relearningSteps: [10],
+};
 
 @Service()
 export class EchoeDeckService {
@@ -55,7 +66,7 @@ export class EchoeDeckService {
 
     // Get FSRS stats grouped by deck
     const now = Date.now();
-    const dayMs = 86400000;
+    const retrievabilityExpr = getRetrievabilitySqlExpr(now, echoeCards.lastReview, echoeCards.stability);
     const cardsWithFsrsStats = await db
       .select({
         did: echoeCards.did,
@@ -66,8 +77,8 @@ export class EchoeDeckService {
         // For performance, we use a simplified check: if stability > 0 and (1 + (now-last_review)/(9*stability*dayMs))^-1 < 0.9
         // This simplifies to: last_review > 0 AND stability > 0 AND (now - last_review) > stability * dayMs * (1/0.9 - 1) = stability * dayMs * 0.111...
         // Actually: R < 0.9 means (1 + t/(9S))^-1 < 0.9 => 1 + t/(9S) > 1/0.9 => t/(9S) > 0.111... => t > S * dayMs * 0.111...
-        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${dayMs} * 0.111111111) THEN 1 ELSE 0 END)`,
-        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN POWER(1 + (${now} - ${echoeCards.lastReview}) / (9 * ${echoeCards.stability} * ${dayMs}), -1) ELSE NULL END)`,
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS} * 0.111111111) THEN 1 ELSE 0 END)`,
+        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
@@ -254,14 +265,14 @@ export class EchoeDeckService {
 
     // Get FSRS stats for this deck
     const now = Date.now();
-    const dayMs = 86400000;
+    const retrievabilityExpr = getRetrievabilitySqlExpr(now, echoeCards.lastReview, echoeCards.stability);
     const fsrsStats = await db
       .select({
         did: echoeCards.did,
         totalCount: sql<number>`COUNT(*)`,
         matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
-        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${dayMs} * 0.111111111) THEN 1 ELSE 0 END)`,
-        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN POWER(1 + (${now} - ${echoeCards.lastReview}) / (9 * ${echoeCards.stability} * ${dayMs}), -1) ELSE NULL END)`,
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS} * 0.111111111) THEN 1 ELSE 0 END)`,
+        averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
@@ -530,6 +541,10 @@ export class EchoeDeckService {
       usn: 0,
     };
 
+    const currentNewConfig = this.safeParseConfigObject(config[0].newConfig);
+    const currentRevConfig = this.safeParseConfigObject(config[0].revConfig);
+    const currentLapseConfig = this.safeParseConfigObject(config[0].lapseConfig);
+
     if (dto.name !== undefined) {
       updates.name = dto.name;
     }
@@ -553,16 +568,28 @@ export class EchoeDeckService {
       updates.ttsSpeed = Math.round(speed * 2);
     }
     if (dto.newConfig !== undefined) {
-      const current = JSON.parse(config[0].newConfig);
-      updates.newConfig = JSON.stringify({ ...current, ...dto.newConfig });
+      updates.newConfig = JSON.stringify({ ...currentNewConfig, ...dto.newConfig });
     }
+
+    let nextRevConfig: Record<string, unknown> | null = null;
     if (dto.revConfig !== undefined) {
-      const current = JSON.parse(config[0].revConfig);
-      updates.revConfig = JSON.stringify({ ...current, ...dto.revConfig });
+      nextRevConfig = { ...currentRevConfig, ...dto.revConfig };
     }
+    if (dto.fsrsConfig !== undefined) {
+      const revConfigForFsrs = nextRevConfig ?? { ...currentRevConfig };
+      const currentFsrsConfig = this.asRecord(revConfigForFsrs.fsrs);
+      revConfigForFsrs.fsrs = {
+        ...currentFsrsConfig,
+        ...dto.fsrsConfig,
+      };
+      nextRevConfig = revConfigForFsrs;
+    }
+    if (nextRevConfig) {
+      updates.revConfig = JSON.stringify(nextRevConfig);
+    }
+
     if (dto.lapseConfig !== undefined) {
-      const current = JSON.parse(config[0].lapseConfig);
-      updates.lapseConfig = JSON.stringify({ ...current, ...dto.lapseConfig });
+      updates.lapseConfig = JSON.stringify({ ...currentLapseConfig, ...dto.lapseConfig });
     }
 
     await db.update(echoeDeckConfig).set(updates).where(eq(echoeDeckConfig.id, deck[0].conf));
@@ -583,6 +610,10 @@ export class EchoeDeckService {
     // Convert tinyint (0-4) to speed (0.5-2.0)
     const ttsSpeed = config.ttsSpeed ? config.ttsSpeed / 2 : 1;
 
+    const newConfig = this.safeParseConfigObject(config.newConfig);
+    const revConfig = this.safeParseConfigObject(config.revConfig);
+    const lapseConfig = this.safeParseConfigObject(config.lapseConfig);
+
     return {
       id: Number(config.id),
       name: config.name,
@@ -592,9 +623,139 @@ export class EchoeDeckService {
       autoplay: autoplayStr,
       ttsSpeed,
       mod: config.mod,
-      newConfig: JSON.parse(config.newConfig) as EchoeNewCardConfigDto,
-      revConfig: JSON.parse(config.revConfig) as EchoeReviewConfigDto,
-      lapseConfig: JSON.parse(config.lapseConfig) as EchoeLapseConfigDto,
+      newConfig: newConfig as unknown as EchoeNewCardConfigDto,
+      revConfig: revConfig as unknown as EchoeReviewConfigDto,
+      lapseConfig: lapseConfig as unknown as EchoeLapseConfigDto,
+      fsrsConfig: this.extractFsrsConfig(newConfig, revConfig, lapseConfig),
+    };
+  }
+
+  private safeParseConfigObject(json: string): Record<string, unknown> {
+    try {
+      const parsed = JSON.parse(json) as unknown;
+      return this.asRecord(parsed);
+    } catch {
+      return {};
+    }
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
+
+  private parseNumeric(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+    }
+    return undefined;
+  }
+
+  private parseBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private parseStepMinutes(step: unknown): number | undefined {
+    const numeric = this.parseNumeric(step);
+    if (numeric !== undefined) {
+      return numeric > 0 ? numeric : undefined;
+    }
+
+    if (typeof step !== 'string') {
+      return undefined;
+    }
+
+    const match = step.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)(m|h)?$/);
+    if (!match) {
+      return undefined;
+    }
+
+    const value = Number(match[1]);
+    if (!Number.isFinite(value) || value <= 0) {
+      return undefined;
+    }
+
+    return match[2] === 'h' ? value * 60 : value;
+  }
+
+  private normalizeSteps(value: unknown): number[] | undefined {
+    if (!Array.isArray(value) || value.length === 0) {
+      return undefined;
+    }
+
+    const steps: number[] = [];
+    for (const step of value) {
+      const minutes = this.parseStepMinutes(step);
+      if (minutes === undefined) {
+        return undefined;
+      }
+      steps.push(minutes);
+    }
+
+    return steps;
+  }
+
+  private parseRequestRetention(value: unknown): number | undefined {
+    const numeric = this.parseNumeric(value);
+    if (numeric === undefined || numeric < 0.7 || numeric > 0.99) {
+      return undefined;
+    }
+
+    return Math.round(numeric * 10000) / 10000;
+  }
+
+  private parseMaxInterval(value: unknown): number | undefined {
+    const numeric = this.parseNumeric(value);
+    if (numeric === undefined) {
+      return undefined;
+    }
+
+    const normalized = Math.floor(numeric);
+    if (normalized < 1 || normalized > 36500) {
+      return undefined;
+    }
+
+    return normalized;
+  }
+
+  private extractFsrsConfig(
+    newConfig: Record<string, unknown>,
+    revConfig: Record<string, unknown>,
+    lapseConfig: Record<string, unknown>
+  ): EchoeFsrsConfigDto {
+    const rawFsrs = this.asRecord(revConfig.fsrs);
+
+    const requestRetention = this.parseRequestRetention(rawFsrs.requestRetention)
+      ?? DEFAULT_FSRS_CONFIG.requestRetention;
+    const maxInterval = this.parseMaxInterval(rawFsrs.maxInterval)
+      ?? this.parseMaxInterval(revConfig.maxInterval)
+      ?? DEFAULT_FSRS_CONFIG.maxInterval;
+    const enableFuzz = this.parseBoolean(rawFsrs.enableFuzz) ?? DEFAULT_FSRS_CONFIG.enableFuzz;
+    const enableShortTerm = this.parseBoolean(rawFsrs.enableShortTerm) ?? DEFAULT_FSRS_CONFIG.enableShortTerm;
+    const learningSteps = this.normalizeSteps(rawFsrs.learningSteps)
+      ?? this.normalizeSteps(newConfig.steps)
+      ?? this.normalizeSteps(newConfig.delays)
+      ?? this.normalizeSteps(newConfig.newSteps)
+      ?? DEFAULT_FSRS_CONFIG.learningSteps;
+    const relearningSteps = this.normalizeSteps(rawFsrs.relearningSteps)
+      ?? this.normalizeSteps(lapseConfig.steps)
+      ?? this.normalizeSteps(lapseConfig.delays)
+      ?? DEFAULT_FSRS_CONFIG.relearningSteps;
+
+    return {
+      requestRetention,
+      maxInterval,
+      enableFuzz,
+      enableShortTerm,
+      learningSteps: [...learningSteps],
+      relearningSteps: [...relearningSteps],
     };
   }
 

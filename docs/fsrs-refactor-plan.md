@@ -4,7 +4,7 @@
 
 当前 FSRS 主链路已可用，但在“调度准确性、初始化策略、可观测性、可配置性”四个维度仍有改进空间。本文将以下四个问题收敛为可执行重构计划：
 
-- ❌ 问题 2：`elapsed_days` 计算不准确
+- ✅ 问题 2：`elapsed_days` 计算不准确（已修复，见 Phase P0-1）
 - ⚠️ 问题 3：新卡片初始化值不够准确
 - ✅ 问题 5：缺少 retrievability 的实时计算展示
 - ❌ 问题 6：FSRS 配置参数未充分暴露
@@ -47,7 +47,7 @@
 
 ## 4. 分阶段重构计划
 
-## Phase P0-1：修正 `elapsed_days` 计算口径（Issue 2）
+## Phase P0-1：修正 `elapsed_days` 计算口径（Issue 2）✅
 
 ### 目标
 
@@ -55,24 +55,24 @@
 
 ### 实施任务
 
-- 抽取统一函数（建议命名：`buildFsrsTimingContext`），集中计算：
+- [x] 抽取统一函数 `buildFsrsTimingContext`，集中计算：
   - `elapsed_days`
   - `last_review`
   - 时间边界保护（未来时间、负数、极端值）
-- `submitReview` 与 `getOptions` 强制复用同一构建函数，禁止双份逻辑分叉。
-- 延迟复习场景（late review）补充明确策略：
+- [x] `submitReview` 与 `getOptions` 强制复用同一构建函数，禁止双份逻辑分叉。
+- [x] 延迟复习场景（late review）统一策略：
   - 统一用 `now - last_review` 推导；
   - 不依赖 `ivl` 反推 elapsed。
-- 为边界场景增加单测（跨天、跨时区、系统时间漂移、last_review=0）。
+- [ ] 为边界场景增加单测（跨天、跨时区、系统时间漂移、last_review=0）。
 
 ### 验收标准
 
-- 同一时刻、同一卡片：`/study/options` 与 `/study/review` 结果一致（允许毫秒级时间差）。
-- 不再出现 `elapsed_days` 由 `ivl` 兜底覆盖主路径。
+- [x] 同一时刻、同一卡片：`/study/options` 与 `/study/review` 使用同一 FSRS 输入构建逻辑（允许毫秒级时间差）。
+- [x] 不再出现 `elapsed_days` 由 `ivl` 兜底覆盖主路径。
 
 ---
 
-## Phase P0-2：修正新卡初始化策略（Issue 3）
+## Phase P0-2：修正新卡初始化策略（Issue 3）✅
 
 ### 目标
 
@@ -80,15 +80,15 @@
 
 ### 实施任务
 
-- 在 `buildFSRSCardInput` 中区分“新卡初始化路径”和“历史卡片路径”：
+- [x] 在 `buildFSRSCardInput` 中区分“新卡初始化路径”和“历史卡片路径”：
   - 新卡：使用 FSRS 原生初始化能力（`createEmptyCard` 或等价方式）；
   - 历史卡：优先使用真实 `stability/difficulty/last_review`。
-- 对 legacy 卡片保留兼容分支，但明确为降级路径，并增加观测日志（比例监控）。
-- 保持数据库语义一致：`stability/difficulty/last_review = 0` 表示未初始化，不混入伪值。
+- [x] 对 legacy 卡片保留兼容分支，但明确为降级路径，并增加观测日志（比例监控）。
+- [x] 保持数据库语义一致：`stability/difficulty/last_review = 0` 表示未初始化，不混入伪值。
 
 ### 验收标准
 
-- 新卡首次学习不再依赖硬编码初始化值作为主路径。
+- [x] 新卡首次学习不再依赖硬编码初始化值作为主路径。
 - legacy 分支命中率可被监控，且可逐步下降。
 
 ---
@@ -230,9 +230,30 @@
 
 ## 9. 交付物 Checklist
 
-- [ ] 统一 FSRS 输入构建函数（后端）
-- [ ] 新卡初始化路径改造（后端）
+- [x] 统一 FSRS 输入构建函数（后端）
+- [x] 新卡初始化路径改造（后端）
 - [ ] retrievability DTO/API 与前端展示
 - [ ] FSRS 配置 DTO/API 与前端配置页
 - [ ] 单元测试与集成测试补齐
 - [ ] 回归验证记录（options/review/decks 三口径）
+
+---
+
+## 10. 新增审查问题清单（2026-03-13）
+
+以下问题来自当前代码审查，建议作为下一轮修复项：
+
+1. **`forgetCards` 未重置 FSRS 核心字段（P0）**  
+   `apps/server/src/services/echoe-study.service.ts` 的 `forgetCards()` 仅重置了 `ivl/reps/lapses/type/queue`，未重置 `stability/difficulty/lastReview`，会导致“忘记后”卡片仍带旧记忆状态。
+
+2. **retrievability 计算入口分散，存在口径漂移风险（P1）**  
+   目前在 `echoe-study.service.ts`、`echoe-stats.service.ts`、`echoe-deck.service.ts(SQL)` 三处分别实现/内联公式，后续维护容易出现语义不一致。
+
+3. **新卡 retrievability 语义不一致（P1）**  
+   `echoe-study.service.ts` 对新卡返回 `null`，而 `echoe-stats.service.ts` 中逻辑为返回 `1`（100%），同一概念在不同接口语义不统一。
+
+4. **`echoe-stats.service.ts` 存在未使用的 retrievability 方法（P2）**  
+   `calculateRetrievability()` 已定义但在该服务主流程中未实际使用，属于冗余实现，建议删除或统一接入。
+
+5. **边界单测仍不完整（P2）**  
+   已覆盖 `last_review=0`、未来时间、极端漂移，但仍缺“跨天边界/跨时区”用例，和计划中 P0-1 的单测目标尚有差距。

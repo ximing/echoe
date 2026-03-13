@@ -554,9 +554,9 @@ export interface StudyQueueItemDto {
   clozeOrdinal: number;
   /**
    * Current retrievability (memory recall probability, 0-1).
-   * - New cards: 1 (full retrievability)
+   * - New cards: null (uninitialized stability, retrievability undefined)
    * - Review cards: R(t,S) = (1 + t/(9S))^(-1), where t = days since last review, S = stability
-   * - null if stability/lastReview data is unavailable
+   * - Range: [0, 1] for calculated values
    */
   retrievability: number | null;
 }
@@ -622,9 +622,9 @@ export interface StudyOptionsDto {
   options: RatingOptionDto[];
   /**
    * Current retrievability (memory recall probability, 0-1).
-   * - New cards: 1
+   * - New cards: null (uninitialized stability, retrievability undefined)
    * - Review cards: R(t,S) = (1 + t/(9S))^(-1)
-   * - null if unavailable
+   * - Range: [0, 1] for calculated values
    */
   retrievability: number | null;
 }

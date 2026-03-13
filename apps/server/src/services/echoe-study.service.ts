@@ -2,14 +2,14 @@ import { Service } from 'typedi';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
 import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes } from '../db/schema/index.js';
+import type { Card } from 'ts-fsrs';
+import { z } from 'zod';
+
 import { FSRSService, Rating, State } from './fsrs.service.js';
 import { EchoeDeckService } from './echoe-deck.service.js';
+import { logger } from '../utils/logger.js';
+import { calculateRetrievability } from '../utils/fsrs-retrievability.js';
 import type { FSRSConfig, FSRSInput } from './fsrs.service.js';
-
-/**
- * Internal type for FSRS card input built from database card
- */
-type FSRSCardInput = FSRSInput;
 
 import type {
   StudyQueueParams,
@@ -22,6 +22,33 @@ import type {
   StudyOptionsDto,
   RatingOptionDto,
 } from '@echoe/dto';
+
+/**
+ * Internal type for FSRS card input built from database card.
+ * For new cards we pass through native FSRS Card initialization.
+ */
+type FSRSCardInput = FSRSInput | Card;
+
+type FsrsTimingContext = {
+  elapsedDays: number;
+  lastReview?: Date;
+};
+
+const FSRS_REQUEST_RETENTION_SCHEMA = z.coerce.number().min(0.7).max(0.99);
+const FSRS_MAX_INTERVAL_SCHEMA = z.coerce.number().int().min(1).max(36500);
+const FSRS_BOOLEAN_SCHEMA = z.boolean();
+const FSRS_STEPS_SCHEMA = z.array(z.union([z.number(), z.string()])).min(1).max(20);
+
+const DEFAULT_FSRS_CONFIG: Required<
+  Pick<FSRSConfig, 'learningSteps' | 'relearningSteps' | 'maxInterval' | 'requestRetention' | 'enableFuzz' | 'enableShortTerm'>
+> = {
+  learningSteps: ['1m', '10m'],
+  relearningSteps: ['10m'],
+  maxInterval: 36500,
+  requestRetention: 0.9,
+  enableFuzz: true,
+  enableShortTerm: false,
+};
 
 @Service()
 export class EchoeStudyService {
@@ -116,6 +143,9 @@ export class EchoeStudyService {
       const backTemplate = this.injectFrontSide(template.afmt || template.qfmt, front);
       const back = this.renderTemplate(backTemplate, fieldMap, 'back', clozeOrdinal);
 
+      // Calculate retrievability for this card (use Date.now() for current time)
+      const retrievability = calculateRetrievability(card.lastReview, card.stability, now).value;
+
       result.push({
         cardId: card.id,
         noteId: card.nid,
@@ -134,6 +164,7 @@ export class EchoeStudyService {
         templateOrd: card.ord,
         notetypeType: noteType.type || 0,
         clozeOrdinal,
+        retrievability,
       });
     }
 
@@ -523,6 +554,9 @@ export class EchoeStudyService {
         queue: 0, // New queue
         mod: now,
         usn: -1,
+        stability: 0,
+        difficulty: 0,
+        lastReview: 0,
       })
       .where(sql`${echoeCards.id} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`);
   }
@@ -697,72 +731,118 @@ export class EchoeStudyService {
       }
     }
 
+    // Calculate current retrievability for this card
+    const retrievability = calculateRetrievability(card.lastReview, card.stability, now.getTime()).value;
+
     return {
       cardId,
       options,
+      retrievability,
     };
   }
 
   /**
-   * Build FSRS card input from database card
-   * Priority: use real FSRS fields (stability/difficulty/last_review) if available,
-   * otherwise initialize for new cards or use minimal fallback for legacy cards.
+   * Build normalized timing context for FSRS time fields.
+   * - elapsed_days uses now - last_review
+   * - future timestamps are clamped to now
+   * - elapsed_days is capped to avoid extreme clock-drift outliers
+   */
+  private buildFsrsTimingContext(lastReviewMs: number, now: Date): FsrsTimingContext {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const maxElapsedDays = 36500; // 100 years, aligns with default maxInterval
+
+    if (!Number.isFinite(lastReviewMs) || lastReviewMs <= 0) {
+      return {
+        elapsedDays: 0,
+        lastReview: undefined,
+      };
+    }
+
+    const nowMs = now.getTime();
+    const normalizedLastReviewMs = Math.min(lastReviewMs, nowMs);
+    const elapsedDays = Math.min(
+      Math.max(0, (nowMs - normalizedLastReviewMs) / msPerDay),
+      maxElapsedDays
+    );
+
+    return {
+      elapsedDays,
+      lastReview: new Date(normalizedLastReviewMs),
+    };
+  }
+
+  /**
+   * Build FSRS card input from database card.
+   * Priority:
+   * 1. Historical cards with real FSRS snapshots.
+   * 2. New cards using native FSRS initialization (createEmptyCard path).
+   * 3. Legacy compatibility fallback (degraded estimate path).
    */
   private buildFSRSCardInput(card: typeof echoeCards.$inferSelect, now: Date): FSRSCardInput {
-    const dayMs = 24 * 60 * 60 * 1000;
+    const hasFsrsHistory =
+      Number.isFinite(card.stability)
+      && Number.isFinite(card.difficulty)
+      && Number.isFinite(card.lastReview)
+      && card.stability > 0
+      && card.difficulty > 0
+      && card.lastReview > 0;
 
-    // Calculate elapsed_days from last_review (in milliseconds)
-    // lastReview is stored as Unix timestamp in milliseconds
-    const elapsedDays = card.lastReview && card.lastReview > 0
-      ? Math.max(0, (now.getTime() - card.lastReview) / dayMs)
-      : 0;
-
-    // Priority 1: Use real FSRS fields if available
-    if (card.stability != null && card.stability > 0) {
+    if (hasFsrsHistory) {
+      const timing = this.buildFsrsTimingContext(card.lastReview, now);
       return {
         due: new Date(card.due),
         stability: card.stability,
-        difficulty: card.difficulty ?? 0.3, // Default difficulty if not set
-        elapsed_days: elapsedDays,
-        scheduled_days: card.ivl,
-        learning_steps: card.left,
+        difficulty: card.difficulty,
+        elapsed_days: timing.elapsedDays,
+        scheduled_days: Math.max(0, card.ivl),
+        learning_steps: Math.max(0, card.left),
         reps: card.reps,
         lapses: card.lapses,
         state: card.type as State,
-        last_review: card.lastReview && card.lastReview > 0 ? new Date(card.lastReview) : undefined,
+        last_review: timing.lastReview,
       };
     }
 
-    // Priority 2: New card - use FSRS defaults for initialization
-    if (card.type === 0 || card.ivl === 0) {
-      // FSRS will initialize stability and difficulty based on first review
-      return {
-        due: new Date(card.due),
-        stability: 1, // Initial stability (will be overwritten by FSRS)
-        difficulty: 0.3, // Initial difficulty (will be overwritten by FSRS)
-        elapsed_days: 0,
-        scheduled_days: 0,
-        learning_steps: card.left,
-        reps: card.reps,
-        lapses: card.lapses,
-        state: State.New,
-        last_review: undefined,
-      };
+    const isUninitializedNewCard =
+      card.type === State.New
+      && card.reps === 0
+      && card.ivl === 0
+      && card.lastReview <= 0
+      && card.stability <= 0
+      && card.difficulty <= 0;
+
+    if (isUninitializedNewCard) {
+      // Delegate to ts-fsrs native initialization, avoid injecting pseudo memory values.
+      return this.fsrsService.createCard(now);
     }
 
-    // Priority 3: Legacy card without FSRS fields - use conservative defaults
-    // This path should be rare after the migration script runs
+    const timing = this.buildFsrsTimingContext(card.lastReview, now);
+
+    logger.warn('FSRS legacy fallback path hit', {
+      event: 'fsrs_legacy_fallback',
+      cardId: card.id,
+      deckId: card.did,
+      cardType: card.type,
+      queue: card.queue,
+      reps: card.reps,
+      ivl: card.ivl,
+      stability: card.stability,
+      difficulty: card.difficulty,
+      lastReview: card.lastReview,
+    });
+
+    // Compatibility path for old cards missing FSRS snapshots.
     return {
       due: new Date(card.due),
-      stability: Math.max(1, card.ivl), // Use interval as rough stability estimate
-      difficulty: 0.3, // Neutral difficulty
-      elapsed_days: elapsedDays,
-      scheduled_days: card.ivl,
-      learning_steps: card.left,
+      stability: Math.max(1, card.ivl),
+      difficulty: 0.3,
+      elapsed_days: timing.elapsedDays,
+      scheduled_days: Math.max(0, card.ivl),
+      learning_steps: Math.max(0, card.left),
       reps: card.reps,
       lapses: card.lapses,
       state: card.type as State,
-      last_review: card.lastReview && card.lastReview > 0 ? new Date(card.lastReview) : undefined,
+      last_review: timing.lastReview,
     };
   }
 
@@ -898,21 +978,182 @@ export class EchoeStudyService {
    * Build FSRS config from deck config
    */
   private getFSRSConfig(deckConfig: any): FSRSConfig {
-    if (!deckConfig) {
+    const deckConfigId = typeof deckConfig?.id === 'number' ? deckConfig.id : null;
+    const newConfig = this.parseDeckConfigSection(deckConfig?.newConfig);
+    const revConfig = this.parseDeckConfigSection(deckConfig?.revConfig);
+    const lapseConfig = this.parseDeckConfigSection(deckConfig?.lapseConfig);
+    const fsrsSubConfig = this.getRecord(revConfig.fsrs);
+
+    return {
+      learningSteps: this.resolveFsrsSteps(
+        [fsrsSubConfig.learningSteps, newConfig.steps, newConfig.delays, newConfig.newSteps],
+        DEFAULT_FSRS_CONFIG.learningSteps,
+        'learningSteps',
+        deckConfigId
+      ),
+      relearningSteps: this.resolveFsrsSteps(
+        [fsrsSubConfig.relearningSteps, lapseConfig.steps, lapseConfig.delays],
+        DEFAULT_FSRS_CONFIG.relearningSteps,
+        'relearningSteps',
+        deckConfigId
+      ),
+      maxInterval: this.resolveFsrsNumber(
+        [fsrsSubConfig.maxInterval, revConfig.maxInterval],
+        FSRS_MAX_INTERVAL_SCHEMA,
+        DEFAULT_FSRS_CONFIG.maxInterval,
+        'maxInterval',
+        deckConfigId
+      ),
+      requestRetention: this.resolveFsrsNumber(
+        [fsrsSubConfig.requestRetention],
+        FSRS_REQUEST_RETENTION_SCHEMA,
+        DEFAULT_FSRS_CONFIG.requestRetention,
+        'requestRetention',
+        deckConfigId
+      ),
+      enableFuzz: this.resolveFsrsBoolean(
+        [fsrsSubConfig.enableFuzz],
+        DEFAULT_FSRS_CONFIG.enableFuzz,
+        'enableFuzz',
+        deckConfigId
+      ),
+      enableShortTerm: this.resolveFsrsBoolean(
+        [fsrsSubConfig.enableShortTerm],
+        DEFAULT_FSRS_CONFIG.enableShortTerm,
+        'enableShortTerm',
+        deckConfigId
+      ),
+    };
+  }
+
+  private parseDeckConfigSection(rawConfig: unknown): Record<string, unknown> {
+    if (typeof rawConfig !== 'string' || rawConfig.trim() === '') {
       return {};
     }
 
-    const newConfig = deckConfig.newConfig ? JSON.parse(deckConfig.newConfig) : null;
-    const revConfig = deckConfig.revConfig ? JSON.parse(deckConfig.revConfig) : null;
-    const lapseConfig = deckConfig.lapseConfig ? JSON.parse(deckConfig.lapseConfig) : null;
+    const parsed = this.safeJsonParse<unknown>(rawConfig, {});
+    return this.getRecord(parsed);
+  }
 
-    return {
-      learningSteps: newConfig?.steps ? newConfig.steps.map((s: number) => `${s}m`) : ['1m', '10m'],
-      relearningSteps: lapseConfig?.steps ? lapseConfig.steps.map((s: number) => `${s}m`) : ['10m'],
-      graduatingInterval: newConfig?.graduatingInterval || 1,
-      easyIntervalMultiplier: newConfig?.easyInterval || 1.3,
-      intervalMultiplier: revConfig?.intervalModifier || 2.5,
-      maxInterval: revConfig?.maxInterval || 36500,
-    };
+  private getRecord(value: unknown): Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
+
+  private resolveFsrsSteps(
+    candidates: unknown[],
+    fallback: readonly string[],
+    field: 'learningSteps' | 'relearningSteps',
+    deckConfigId: number | null
+  ): string[] {
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) {
+        continue;
+      }
+
+      const parsedList = FSRS_STEPS_SCHEMA.safeParse(candidate);
+      if (!parsedList.success) {
+        this.logInvalidFsrsConfigValue(deckConfigId, field, candidate);
+        continue;
+      }
+
+      const normalizedSteps: string[] = [];
+      let hasInvalidStep = false;
+      for (const rawStep of parsedList.data) {
+        const normalizedStep = this.normalizeStepToken(rawStep);
+        if (!normalizedStep) {
+          hasInvalidStep = true;
+          break;
+        }
+        normalizedSteps.push(normalizedStep);
+      }
+
+      if (hasInvalidStep) {
+        this.logInvalidFsrsConfigValue(deckConfigId, field, candidate);
+        continue;
+      }
+
+      return normalizedSteps;
+    }
+
+    return [...fallback];
+  }
+
+  private normalizeStepToken(step: string | number): string | null {
+    if (typeof step === 'number') {
+      if (!Number.isFinite(step) || step <= 0) {
+        return null;
+      }
+      return `${step}m`;
+    }
+
+    const trimmed = step.trim().toLowerCase();
+    const match = trimmed.match(/^(\d+(?:\.\d+)?)(m|h)?$/);
+    if (!match) {
+      return null;
+    }
+
+    const value = Number(match[1]);
+    if (!Number.isFinite(value) || value <= 0) {
+      return null;
+    }
+
+    const minutes = match[2] === 'h' ? value * 60 : value;
+    return `${minutes}m`;
+  }
+
+  private resolveFsrsNumber(
+    candidates: unknown[],
+    schema: z.ZodType<number>,
+    fallback: number,
+    field: 'maxInterval' | 'requestRetention',
+    deckConfigId: number | null
+  ): number {
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) {
+        continue;
+      }
+
+      const parsed = schema.safeParse(candidate);
+      if (parsed.success) {
+        return parsed.data;
+      }
+
+      this.logInvalidFsrsConfigValue(deckConfigId, field, candidate);
+    }
+
+    return fallback;
+  }
+
+  private resolveFsrsBoolean(
+    candidates: unknown[],
+    fallback: boolean,
+    field: 'enableFuzz' | 'enableShortTerm',
+    deckConfigId: number | null
+  ): boolean {
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) {
+        continue;
+      }
+
+      const parsed = FSRS_BOOLEAN_SCHEMA.safeParse(candidate);
+      if (parsed.success) {
+        return parsed.data;
+      }
+
+      this.logInvalidFsrsConfigValue(deckConfigId, field, candidate);
+    }
+
+    return fallback;
+  }
+
+  private logInvalidFsrsConfigValue(deckConfigId: number | null, field: string, value: unknown): void {
+    logger.warn('Invalid FSRS deck config detected, fallback to default', {
+      event: 'fsrs_config_fallback',
+      deckConfigId,
+      field,
+      value,
+    });
   }
 }

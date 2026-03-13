@@ -166,23 +166,6 @@ export class EchoeStatsService {
   }
 
   /**
-   * Calculate retrievability: R(t,S) = (1 + t/(9S))^(-1)
-   * @param lastReview - Last review timestamp (Unix ms)
-   * @param stability - Stability in days
-   * @returns Retrievability between 0 and 1
-   */
-  private calculateRetrievability(lastReview: number, stability: number): number {
-    if (stability <= 0 || lastReview === 0) {
-      return 1; // New cards have full retrievability
-    }
-    const dayMs = 86400000;
-    const now = Date.now();
-    const t = (now - lastReview) / dayMs; // days since last review
-    const S = stability;
-    return 1 / (1 + t / (9 * S));
-  }
-
-  /**
    * Get card maturity distribution using FSRS stability
    */
   async getMaturity(deckId?: number): Promise<CardMaturityDto> {

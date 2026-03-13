@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Clock,
   Volume2,
+  Brain,
 } from 'lucide-react';
 import type { StudyQueueItemDto } from '@echoe/dto';
 
@@ -434,6 +435,16 @@ const StudyPageContent = view(() => {
             {progress.current} / {progress.total}
           </span>
         </div>
+
+        {/* Retrievability Display */}
+        {currentCard.retrievability !== null && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-dark-700 rounded-full">
+            <Brain className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {Math.round(currentCard.retrievability * 100)}%
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500 dark:text-gray-400">
