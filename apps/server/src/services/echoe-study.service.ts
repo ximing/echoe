@@ -38,6 +38,7 @@ const FSRS_REQUEST_RETENTION_SCHEMA = z.coerce.number().min(0.7).max(0.99);
 const FSRS_MAX_INTERVAL_SCHEMA = z.coerce.number().int().min(1).max(36500);
 const FSRS_BOOLEAN_SCHEMA = z.boolean();
 const FSRS_STEPS_SCHEMA = z.array(z.union([z.number(), z.string()])).min(1).max(20);
+const FSRS_LEGACY_DIFFICULTY_FALLBACK = 2.5;
 
 const DEFAULT_FSRS_CONFIG: Required<
   Pick<FSRSConfig, 'learningSteps' | 'relearningSteps' | 'maxInterval' | 'requestRetention' | 'enableFuzz' | 'enableShortTerm'>
@@ -835,7 +836,7 @@ export class EchoeStudyService {
     return {
       due: new Date(card.due),
       stability: Math.max(1, card.ivl),
-      difficulty: 0.3,
+      difficulty: FSRS_LEGACY_DIFFICULTY_FALLBACK,
       elapsed_days: timing.elapsedDays,
       scheduled_days: Math.max(0, card.ivl),
       learning_steps: Math.max(0, card.left),

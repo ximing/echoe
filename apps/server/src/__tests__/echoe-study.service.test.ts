@@ -46,7 +46,7 @@ describe('EchoeStudyService - FSRS input building', () => {
     queue: 2,
     due: new Date('2026-03-20T00:00:00.000Z').getTime(),
     stability: 12.5,
-    difficulty: 0.35,
+    difficulty: 2.35,
     lastReview: new Date('2026-03-10T00:00:00.000Z').getTime(),
     ivl: 30,
     left: 0,
@@ -163,7 +163,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
     expect(fsCardInput.elapsed_days).toBeCloseTo(3, 8);
     expect(fsCardInput.scheduled_days).toBe(42);
-    expect(fsCardInput.difficulty).toBe(0.3);
+    expect(fsCardInput.difficulty).toBe(2.5);
     expect(fsCardInput.last_review?.toISOString()).toBe('2026-03-10T00:00:00.000Z');
     expect(createCardMock).not.toHaveBeenCalled();
   });

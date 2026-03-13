@@ -390,7 +390,7 @@ export interface EchoeCardDto {
   usn: number;
   /** Stability (days) - represents how well the card is remembered */
   stability: number;
-  /** Difficulty (0-1) - probability of forgetting */
+  /** FSRS difficulty (ts-fsrs raw scale, not a probability) */
   difficulty: number;
   /** Last review timestamp (Unix ms) */
   lastReview: number;

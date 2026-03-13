@@ -46,6 +46,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const SECOND_MS = 1000;
 const LEGACY_DAY_DUE_MAX = 10_000_000;
 const LEGACY_SECOND_DUE_MAX = 100_000_000_000;
+const REVLOG_ID_MICROSECOND_MIN = 100_000_000_000_000;
+const REVLOG_ID_MILLISECOND_MIN = 100_000_000_000;
+const FSRS_DIFFICULTY_FALLBACK = 2.5;
 
 interface EchoeDeckRow {
   id: number;
@@ -613,7 +616,7 @@ export class EchoeImportService {
   private async importRevlogFromStandardAnki(sourceDb: Database.Database): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(rows, { difficultyFallback: 2.5, clampDifficulty: false });
+      return this.importRevlogRows(rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -832,7 +835,7 @@ export class EchoeImportService {
   private async importRevlog(sourceDb: Database.Database): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(rows, { difficultyFallback: 0.3, clampDifficulty: true });
+      return this.importRevlogRows(rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -952,6 +955,30 @@ export class EchoeImportService {
     return { added, updated, skipped, errors };
   }
 
+  /**
+   * Resolve review timestamp from revlog id.
+   *
+   * Supported id formats in imported datasets:
+   * 1. Unix ms (Anki standard)
+   * 2. Unix ms * 1000 (+ random suffix)
+   * 3. Unix seconds (legacy edge cases)
+   */
+  private resolveRevlogReviewTimestamp(revlogId: number): number {
+    if (!Number.isFinite(revlogId) || revlogId <= 0) {
+      return 0;
+    }
+
+    if (revlogId >= REVLOG_ID_MICROSECOND_MIN) {
+      return Math.floor(revlogId / SECOND_MS);
+    }
+
+    if (revlogId >= REVLOG_ID_MILLISECOND_MIN) {
+      return revlogId;
+    }
+
+    return revlogId * SECOND_MS;
+  }
+
   private buildLatestRevlogMap(sourceDb: Database.Database, warnMessage: string): Map<number, EchoeRevlogRow> {
     const latestRevlogMap = new Map<number, EchoeRevlogRow>();
 
@@ -975,10 +1002,11 @@ export class EchoeImportService {
     now: number
   ): { stability: number; difficulty: number; lastReview: number; source: 'revlog' | 'new' | 'heuristic' } {
     if (latestRevlog) {
+      const reviewTimestamp = this.resolveRevlogReviewTimestamp(latestRevlog.id);
       return {
         stability: latestRevlog.ivl > 0 ? latestRevlog.ivl : 1,
-        difficulty: latestRevlog.factor > 0 ? Math.max(0.1, Math.min(1, latestRevlog.factor / 1000)) : 0.3,
-        lastReview: latestRevlog.time,
+        difficulty: this.resolveRevlogDifficulty(latestRevlog.factor, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK }),
+        lastReview: reviewTimestamp > 0 ? reviewTimestamp : (row.mod > 0 ? row.mod * SECOND_MS : now),
         source: 'revlog',
       };
     }
@@ -994,7 +1022,7 @@ export class EchoeImportService {
 
     return {
       stability: row.ivl > 0 ? row.ivl : 1,
-      difficulty: row.factor > 0 ? Math.max(0.1, Math.min(1, row.factor / 1000)) : 0.3,
+      difficulty: this.resolveRevlogDifficulty(row.factor, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK }),
       lastReview: row.mod > 0 ? row.mod * 1000 : now,
       source: 'heuristic',
     };
@@ -1126,18 +1154,14 @@ export class EchoeImportService {
 
   private resolveRevlogDifficulty(
     factor: number,
-    options: { difficultyFallback: number; clampDifficulty: boolean }
+    options: { difficultyFallback: number }
   ): number {
-    const rawDifficulty = factor > 0 ? factor / 1000 : options.difficultyFallback;
-    if (!options.clampDifficulty) {
-      return rawDifficulty;
-    }
-    return Math.max(0.1, Math.min(1, rawDifficulty));
+    return factor > 0 ? factor / 1000 : options.difficultyFallback;
   }
 
   private async importRevlogRows(
     rows: EchoeRevlogRow[],
-    options: { difficultyFallback: number; clampDifficulty: boolean }
+    options: { difficultyFallback: number }
   ): Promise<number> {
     if (rows.length === 0) {
       return 0;
@@ -1160,9 +1184,9 @@ export class EchoeImportService {
 
         const difficulty = this.resolveRevlogDifficulty(row.factor, options);
         const stability = row.ivl > 0 ? row.ivl : 1;
-        const lastReview = row.time;
+        const lastReview = this.resolveRevlogReviewTimestamp(row.id);
         const preStability = row.lastIvl > 0 ? row.lastIvl : 1;
-        const preLastReview = row.time - (row.lastIvl * DAY_MS);
+        const preLastReview = lastReview - (row.lastIvl * DAY_MS);
 
         const newRevlog: NewEchoeRevlog = {
           id: row.id,

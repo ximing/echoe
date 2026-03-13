@@ -37,9 +37,6 @@ export interface FSRSOutput {
 export interface FSRSConfig {
   learningSteps?: readonly string[];
   relearningSteps?: readonly string[];
-  graduatingInterval?: number;
-  easyIntervalMultiplier?: number;
-  intervalMultiplier?: number;
   maxInterval?: number;
   requestRetention?: number;
   enableFuzz?: boolean;
@@ -49,9 +46,6 @@ export interface FSRSConfig {
 const DEFAULT_CONFIG: FSRSConfig = {
   learningSteps: ['1m', '10m'] as const,
   relearningSteps: ['10m'] as const,
-  graduatingInterval: 1,
-  easyIntervalMultiplier: 1.3,
-  intervalMultiplier: 2.5,
   maxInterval: 36500,
   requestRetention: 0.9,
   enableFuzz: true,

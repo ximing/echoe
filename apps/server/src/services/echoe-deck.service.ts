@@ -73,11 +73,11 @@ export class EchoeDeckService {
         totalCount: sql<number>`COUNT(*)`,
         matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
         // Retrievability R(t,S) = (1 + t/(9S))^(-1), difficult if R < 0.9
-        // t = (now - last_review) / dayMs, S = stability
-        // For performance, we use a simplified check: if stability > 0 and (1 + (now-last_review)/(9*stability*dayMs))^-1 < 0.9
-        // This simplifies to: last_review > 0 AND stability > 0 AND (now - last_review) > stability * dayMs * (1/0.9 - 1) = stability * dayMs * 0.111...
-        // Actually: R < 0.9 means (1 + t/(9S))^-1 < 0.9 => 1 + t/(9S) > 1/0.9 => t/(9S) > 0.111... => t > S * dayMs * 0.111...
-        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS} * 0.111111111) THEN 1 ELSE 0 END)`,
+        // t = (now - lastReview) / DAY_MS, S = stability
+        // R < 0.9 => 1 + t/(9S) > 10/9 => t/(9S) > 1/9 => t > S
+        // Therefore difficult condition is: (now - lastReview) > stability * DAY_MS
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS}) THEN 1 ELSE 0 END)`,
+        retrievabilityEligibleCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN 1 ELSE 0 END)`,
         averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
@@ -104,14 +104,18 @@ export class EchoeDeckService {
         lastStudiedAt: number | null;
       }
     >();
+    const retrievabilityEligibleCountMap = new Map<number, number>();
     for (const card of cardsWithFsrsStats) {
-      fsrsMap.set(Number(card.did), {
+      const did = Number(card.did);
+      const retrievabilityEligibleCount = Number(card.retrievabilityEligibleCount) || 0;
+      fsrsMap.set(did, {
         totalCount: Number(card.totalCount) || 0,
         matureCount: Number(card.matureCount) || 0,
         difficultCount: Number(card.difficultCount) || 0,
         averageRetrievability: Number(card.averageRetrievability) || 0,
         lastStudiedAt: card.lastStudiedAt ? Number(card.lastStudiedAt) : null,
       });
+      retrievabilityEligibleCountMap.set(did, retrievabilityEligibleCount);
     }
 
     // Convert to DTOs with counts
@@ -148,13 +152,16 @@ export class EchoeDeckService {
     });
 
     // Build hierarchy
-    return this.buildDeckHierarchy(decksWithCounts);
+    return this.buildDeckHierarchy(decksWithCounts, retrievabilityEligibleCountMap);
   }
 
   /**
    * Build deck hierarchy from flat list with aggregated stats from child decks
    */
-  private buildDeckHierarchy(decks: EchoeDeckWithCountsDto[]): EchoeDeckWithCountsDto[] {
+  private buildDeckHierarchy(
+    decks: EchoeDeckWithCountsDto[],
+    directRetrievabilityEligibleCountMap: Map<number, number>
+  ): EchoeDeckWithCountsDto[] {
     const deckMap = new Map<number, EchoeDeckWithCountsDto>();
     const rootDecks: EchoeDeckWithCountsDto[] = [];
 
@@ -184,7 +191,7 @@ export class EchoeDeckService {
 
     // Third pass: aggregate stats from children to parents (post-order traversal)
     for (const root of rootDecks) {
-      this.aggregateChildStats(root);
+      this.aggregateChildStats(root, directRetrievabilityEligibleCountMap);
     }
 
     return rootDecks.sort((a, b) => a.name.localeCompare(b.name));
@@ -194,48 +201,51 @@ export class EchoeDeckService {
    * Recursively aggregate stats from child decks to parent
    * - newCount, learnCount, reviewCount: sum of direct + children
    * - totalCount, matureCount, difficultCount: sum of direct + children
-   * - averageRetrievability: weighted average by totalCount
+   * - averageRetrievability: weighted average by retrievability-eligible cards
    * - lastStudiedAt: max of self and children
+   *
+   * Returns the total retrievability-eligible card count for this subtree.
    */
-  private aggregateChildStats(deck: EchoeDeckWithCountsDto): void {
-    // First aggregate all children
+  private aggregateChildStats(
+    deck: EchoeDeckWithCountsDto,
+    directRetrievabilityEligibleCountMap: Map<number, number>
+  ): number {
+    let totalNewCount = deck.newCount;
+    let totalLearnCount = deck.learnCount;
+    let totalReviewCount = deck.reviewCount;
+    let totalTotalCount = deck.totalCount;
+    let totalMatureCount = deck.matureCount;
+    let totalDifficultCount = deck.difficultCount;
+    let totalRetrievabilityEligibleCount = directRetrievabilityEligibleCountMap.get(deck.id) || 0;
+    let totalRetrievabilitySum = deck.averageRetrievability * totalRetrievabilityEligibleCount;
+    let maxLastStudiedAt = deck.lastStudiedAt;
+
     for (const child of deck.children) {
-      this.aggregateChildStats(child);
-    }
-
-    // Then aggregate this deck's stats with children
-    if (deck.children.length > 0) {
-      let totalNewCount = deck.newCount;
-      let totalLearnCount = deck.learnCount;
-      let totalReviewCount = deck.reviewCount;
-      let totalTotalCount = deck.totalCount;
-      let totalMatureCount = deck.matureCount;
-      let totalDifficultCount = deck.difficultCount;
-      let totalRetrievabilitySum = deck.averageRetrievability * deck.totalCount;
-      let maxLastStudiedAt = deck.lastStudiedAt;
-
-      for (const child of deck.children) {
-        totalNewCount += child.newCount;
-        totalLearnCount += child.learnCount;
-        totalReviewCount += child.reviewCount;
-        totalTotalCount += child.totalCount;
-        totalMatureCount += child.matureCount;
-        totalDifficultCount += child.difficultCount;
-        totalRetrievabilitySum += child.averageRetrievability * child.totalCount;
-        if (child.lastStudiedAt !== null && (maxLastStudiedAt === null || child.lastStudiedAt > maxLastStudiedAt)) {
-          maxLastStudiedAt = child.lastStudiedAt;
-        }
+      const childRetrievabilityEligibleCount = this.aggregateChildStats(child, directRetrievabilityEligibleCountMap);
+      totalNewCount += child.newCount;
+      totalLearnCount += child.learnCount;
+      totalReviewCount += child.reviewCount;
+      totalTotalCount += child.totalCount;
+      totalMatureCount += child.matureCount;
+      totalDifficultCount += child.difficultCount;
+      totalRetrievabilityEligibleCount += childRetrievabilityEligibleCount;
+      totalRetrievabilitySum += child.averageRetrievability * childRetrievabilityEligibleCount;
+      if (child.lastStudiedAt !== null && (maxLastStudiedAt === null || child.lastStudiedAt > maxLastStudiedAt)) {
+        maxLastStudiedAt = child.lastStudiedAt;
       }
-
-      deck.newCount = totalNewCount;
-      deck.learnCount = totalLearnCount;
-      deck.reviewCount = totalReviewCount;
-      deck.totalCount = totalTotalCount;
-      deck.matureCount = totalMatureCount;
-      deck.difficultCount = totalDifficultCount;
-      deck.averageRetrievability = totalTotalCount > 0 ? totalRetrievabilitySum / totalTotalCount : 0;
-      deck.lastStudiedAt = maxLastStudiedAt;
     }
+
+    deck.newCount = totalNewCount;
+    deck.learnCount = totalLearnCount;
+    deck.reviewCount = totalReviewCount;
+    deck.totalCount = totalTotalCount;
+    deck.matureCount = totalMatureCount;
+    deck.difficultCount = totalDifficultCount;
+    deck.averageRetrievability =
+      totalRetrievabilityEligibleCount > 0 ? totalRetrievabilitySum / totalRetrievabilityEligibleCount : 0;
+    deck.lastStudiedAt = maxLastStudiedAt;
+
+    return totalRetrievabilityEligibleCount;
   }
 
   /**
@@ -271,7 +281,7 @@ export class EchoeDeckService {
         did: echoeCards.did,
         totalCount: sql<number>`COUNT(*)`,
         matureCount: sql<number>`SUM(CASE WHEN ${echoeCards.stability} >= 21 THEN 1 ELSE 0 END)`,
-        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS} * 0.111111111) THEN 1 ELSE 0 END)`,
+        difficultCount: sql<number>`SUM(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 AND (${now} - ${echoeCards.lastReview}) > (${echoeCards.stability} * ${DAY_MS}) THEN 1 ELSE 0 END)`,
         averageRetrievability: sql<number>`AVG(CASE WHEN ${echoeCards.lastReview} > 0 AND ${echoeCards.stability} > 0 THEN ${retrievabilityExpr} ELSE NULL END)`,
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })

@@ -244,15 +244,22 @@ describe('FSRSService', () => {
       expect(finalResult.interval).toBeLessThanOrEqual(7);
     });
 
-    it('should respect custom graduating interval', () => {
-      const config = {
-        graduatingInterval: 3,
-      };
+    it('should map supported config fields to generator params', () => {
+      const params = service.getParams({
+        learningSteps: ['2m', '5m'],
+        relearningSteps: ['20m'],
+        maxInterval: 123,
+        requestRetention: 0.91,
+        enableFuzz: false,
+        enableShortTerm: true,
+      });
 
-      const card = service.createCard(new Date('2024-01-01'));
-      const result = service.scheduleCard(card, Rating.Good, new Date('2024-01-01'), config);
-
-      expect(result.interval).toBeGreaterThanOrEqual(1);
+      expect(params.learning_steps).toEqual(['2m', '5m']);
+      expect(params.relearning_steps).toEqual(['20m']);
+      expect(params.maximum_interval).toBe(123);
+      expect(params.request_retention).toBe(0.91);
+      expect(params.enable_fuzz).toBe(false);
+      expect(params.enable_short_term).toBe(true);
     });
   });
 

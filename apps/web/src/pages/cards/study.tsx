@@ -436,12 +436,12 @@ const StudyPageContent = view(() => {
           </span>
         </div>
 
-        {/* Retrievability Display */}
-        {currentCard.retrievability !== null && (
+        {/* Retrievability Display - use real-time value from /study/options */}
+        {studyService.currentRetrievability !== null && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-dark-700 rounded-full">
             <Brain className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {Math.round(currentCard.retrievability * 100)}%
+              {Math.round(studyService.currentRetrievability * 100)}%
             </span>
           </div>
         )}

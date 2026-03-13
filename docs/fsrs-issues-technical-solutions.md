@@ -564,3 +564,114 @@ apps/web/src/
 └── pages/cards/
     └── study.tsx                   # 问题 3（前端适配）
 ```
+
+---
+
+## 新增审查结论（2026-03-13 第二轮）
+
+> 本节补充本轮代码审查发现的 FSRS 规范偏差与架构口径不一致问题。
+
+### 问题概览
+
+| 编号 | 问题 | 优先级 | 影响范围 |
+|------|------|--------|----------|
+| A1 | 导入链路误用 `revlog.time` 作为 `lastReview` | P0 | 导入后调度准确性 |
+| A2 | `difficultCount` 的阈值推导错误（约 9 倍偏差） | P0 | 卡组统计与难卡识别 |
+| A3 | 父子牌组 `averageRetrievability` 聚合分母不一致 | P1 | 掌握率展示 |
+| A4 | `difficulty` 语义在 ts-fsrs/DTO/导入回填三处不一致 | P1 | 调度一致性与可解释性 |
+| A5 | 学习页 retrievability 展示与实时接口数据源不一致 | P2 | 学习页体验一致性 |
+| A6 | `FSRSConfig` 暴露未生效字段 | P2 | 配置层一致性 |
+
+### A1：导入链路误用 `revlog.time` 作为 `lastReview`（P0）
+
+**问题**
+- `echoe-import.service.ts` 在 `resolveCardFsrsBackfill()` 中，把 `latestRevlog.time` 写入 `lastReview`。
+- 但 `echoe-revlog` schema 明确 `time` 为答题耗时（ms），不是复习时间戳。
+
+**影响**
+- 导入后的 `lastReview` 可能是几百/几千毫秒，导致 `elapsed_days` 被放大到异常值。
+- 进一步影响 FSRS 调度与 retrievability 计算。
+
+**修复结果（2026-03-13，已落地）**
+- [x] 卡片回填 `lastReview` 改为基于 `latestRevlog.id` 推导真实复习时间，不再使用 `revlog.time`（答题耗时）。
+- [x] `importRevlogRows()` 中 `lastReview` 改为基于 `row.id` 推导，并同步修正 `preLastReview` 的计算基准。
+- [x] 新增统一的 revlog 时间解析函数，兼容 `Unix ms`、`Unix ms * 1000`、`Unix seconds` 三种导入数据格式。
+
+### A2：`difficultCount` 阈值推导错误（P0）
+
+**问题**
+- 当前 SQL 使用：`(now - lastReview) > stability * DAY_MS * 0.111111111` 来判定 `R < 0.9`。
+- 对公式 `R(t,S) = 1 / (1 + t/(9S))` 推导后应为：`R < 0.9` 等价 `t > S`（天）。
+
+**影响**
+- 现有阈值比正确阈值严格约 9 倍，导致 difficult 卡数量明显虚高。
+
+**修复结果（2026-03-13，已落地）**
+- [x] `EchoeDeckService.getAllDecks()` 的 difficult 判定阈值已改为：`(now - lastReview) > stability * DAY_MS`。
+- [x] `EchoeDeckService.getDeckById()` 的 difficult 判定阈值同步改为：`(now - lastReview) > stability * DAY_MS`。
+- [x] 已修正公式注释，明确 `R < 0.9` 推导为 `t > S`，避免后续维护再次引入 9 倍偏差。
+
+### A3：父子牌组 `averageRetrievability` 聚合口径不一致（P1）
+
+**问题**
+- 叶子层 SQL 对 `lastReview > 0 AND stability > 0` 才参与 `AVG`。
+- 树聚合时却按 `totalCount`（含新卡）加权平均。
+
+**影响**
+- 父级牌组掌握率会因新卡比例被错误稀释。
+
+**修复结果（2026-03-13，已落地）**
+- [x] `EchoeDeckService.getAllDecks()` 的叶子层 FSRS 统计已新增 `retrievabilityEligibleCount`（`lastReview > 0 AND stability > 0`）。
+- [x] 父子树聚合已改为按 `retrievabilityEligibleCount` 加权 `averageRetrievability`，不再按 `totalCount`（含新卡）稀释。
+- [x] 新增 `apps/server/src/__tests__/echoe-deck.service.test.ts`，覆盖「新卡不稀释父级掌握率」与「无可计算卡时返回 0」两类断言。
+
+### A4：`difficulty` 语义不一致（P1）
+
+**问题**
+- DTO 注释和导入回填将 difficulty 视为 `0~1` 概率。
+- 运行 `ts-fsrs` 可见其 difficulty 输出并非该量纲（示例值 `2.11810397`）。
+- 同时 legacy fallback 仍使用硬编码 `difficulty: 0.3`。
+
+**影响**
+- 新学习卡、导入卡、legacy 卡进入不同 difficulty 语义空间，调度结果不可比。
+
+**修复结果（2026-03-13，已落地）**
+- [x] `EchoeImportService` 已移除 difficulty 的 `0~1` clamp，revlog/heuristic 回填统一按 `factor / 1000`（缺省回退 `2.5`）写入，保持同一量纲。
+- [x] `EchoeStudyService.buildFSRSCardInput()` 的 legacy fallback 已从 `difficulty: 0.3` 调整为 `2.5`，与导入回填语义保持一致。
+- [x] `EchoeCardDto` 与 `echoe_cards` schema 注释已更新为“ts-fsrs 原生 difficulty 量纲（非概率）”，去除 `0~1` 概率口径。
+- [x] 新增 `apps/server/src/__tests__/echoe-import.service.test.ts`，并更新 `echoe-study.service.test.ts` 覆盖相关回归断言。
+
+### A5：学习页 retrievability 展示数据源不一致（P2）
+
+**问题**
+- 前端已通过 `/study/options` 获取实时 `currentRetrievability`。
+- 页面展示仍使用 `currentCard.retrievability`（来自 queue 快照）。
+
+**影响**
+- UI 可能显示旧值，与当前请求返回值不一致。
+
+**修复结果（2026-03-13，已落地）**
+- [x] `study.tsx` 状态栏展示已从 `currentCard.retrievability` 改为 `studyService.currentRetrievability`。
+- [x] 展示时机：仅在答案面展示后调用 `/study/options` 时获得实时值，避免使用队列快照值。
+- [x] 无值时默认不显示 Brain 图标与百分比区域，符合“无值时不展示”原则。
+
+### A6：`FSRSConfig` 暴露未生效字段（P2）
+
+**问题**
+- `FSRSConfig` 包含 `graduatingInterval/easyIntervalMultiplier/intervalMultiplier`。
+- `buildParams()` 未将这些字段映射到 `generatorParameters()`。
+
+**影响**
+- 配置接口“可见但无效”，增加理解成本和错误预期。
+
+**修复结果（2026-03-13，已落地）**
+- [x] `FSRSService` 的 `FSRSConfig` 已移除未生效字段 `graduatingInterval/easyIntervalMultiplier/intervalMultiplier`，仅保留 `ts-fsrs` 实际支持的配置项。
+- [x] `DEFAULT_CONFIG` 已同步删除上述字段，避免默认值制造“看似可配置”的误导。
+- [x] `fsrs.service.test.ts` 已移除无效字段相关断言，并新增受支持字段到 `generatorParameters()` 的映射校验。
+- [x] 前端与 DTO 侧的 `EchoeFsrsConfigDto` 本身仅暴露有效字段，无需额外结构调整。
+
+### 实施优先级建议
+
+1. **P0 立即修复**：A1、A2（直接影响调度正确性与关键统计）。
+2. **P1 本迭代修复**：A3、A4（统一语义和聚合口径）。
+3. **P2 收尾修复**：A5、A6（体验和配置一致性）。
