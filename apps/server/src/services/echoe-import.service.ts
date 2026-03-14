@@ -957,7 +957,7 @@ export class EchoeImportService {
             fldNames: normalized.fldNames,
             fieldsJson: normalized.fieldsJson,
           };
-          await db.insert(echoeNotes).values(newNote);
+          await db.insert(echoeNotes).values(newNote).ignore();
           added++;
         }
       } catch (error) {
@@ -1144,7 +1144,7 @@ export class EchoeImportService {
               difficulty: fsrs.difficulty,
               lastReview: fsrs.lastReview,
             };
-            await db.insert(echoeCards).values(newCard);
+            await db.insert(echoeCards).values(newCard).ignore();
             added++;
           }
         } catch (error) {
