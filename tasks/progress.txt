@@ -335,3 +335,27 @@
   - When refactoring ID generation, grep for Date.now() * patterns to find all call sites
   - Typecheck catches missing imports and ensures all call sites compile correctly
 ---
+## 2026-03-14 - US-012
+- Added comprehensive unit test suite for uid-filtering patterns (uid-filtering-patterns.test.ts)
+- Created 12 tests documenting all uid isolation patterns:
+  - INSERT operations write uid explicitly
+  - SELECT operations include uid predicates (single table and joins)
+  - UPDATE operations filter by uid
+  - DELETE operations filter by uid
+  - Service method signatures accept uid as first parameter
+  - Controller methods inject @CurrentUser() decorator
+  - Cross-service calls pass uid through the chain
+- Documented coverage: 11 services and 11 controllers with uid filtering applied
+- Documented schema constraints for foundational (US-001) and content (US-002) tables
+- All 12 tests pass, typecheck passes
+- Files changed:
+  - apps/server/src/__tests__/uid-filtering-patterns.test.ts (new)
+- **Learnings for future iterations:**
+  - Pattern documentation tests serve dual purpose: validation and developer reference
+  - Use comment-based examples in tests to avoid complex mocking for documentation tests
+  - Test suite documents which services/controllers have been refactored (useful audit trail)
+  - Schema constraint documentation in tests provides single source of truth
+  - Simpler pattern-based tests are easier to maintain than full service mocks
+  - Tests validate patterns without executing complex service logic
+  - Coverage lists (services, controllers) help track refactoring progress
+---
