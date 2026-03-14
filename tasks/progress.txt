@@ -18,7 +18,7 @@
 | US-005 | Refactor revlog/col/deck-config schema | [x] |
 | US-006 | Refactor graves/media schema and index alignment | [x] |
 | US-007 | Finalize schema exports and build input | [x] |
-| US-008 | Generate migration for ID refactor | [ ] |
+| US-008 | Generate migration for ID refactor | [x] |
 | US-009 | Run migration and verify constraints | [ ] |
 | US-010 | Convert core DTO entity ID types to string | [ ] |
 | US-011 | Convert DTO command and query payload IDs | [ ] |
@@ -106,4 +106,19 @@
   - This allows drizzle-kit to read compiled schema from dist/ for migration generation
   - @ts-nocheck comments must be removed during service refactoring (US-013+)
   - Build output in dist/db/schema/ contains compiled JavaScript and declaration files
+---
+## 2026-03-15 - US-008
+- Generated migration 0009_silly_vulture.sql for ID refactor
+- Files changed: apps/server/drizzle/0009_silly_vulture.sql, drizzle/meta/0009_snapshot.json, drizzle/meta/_journal.json
+- **Learnings for future iterations:**
+  - Migration generation command: `pnpm --filter @echoe/server migrate:generate`
+  - Generated SQL includes:
+    - MODIFY COLUMN statements to convert relation fields (mid, nid, did, odid, cid, conf, ntid, oid) from bigint to varchar(191)
+    - ADD column statements for all business IDs (*_id fields) as varchar(191) NOT NULL
+    - UNIQUE constraints for all business ID columns
+    - Single-column indexes for each business ID (e.g., note_id_idx)
+    - Composite uid+business_id indexes for multi-tenant queries (e.g., uid_note_id_idx)
+  - Migration metadata is stored in drizzle/meta/ with snapshot and journal files
+  - Drizzle-kit reads from dist/db/schema/index.js (compiled output), not TypeScript source
+  - The migration drops and recreates the echoe_col uid_unique index due to schema changes
 ---
