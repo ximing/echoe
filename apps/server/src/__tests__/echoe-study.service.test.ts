@@ -1107,3 +1107,146 @@ describe('fsrs-retrievability utility', () => {
     expect(sqlText).toContain('POWER(1 +');
   });
 });
+
+describe('EchoeStudyService - applyNewCardDailyLimit', () => {
+  let service: EchoeStudyService;
+  let mockDb: {
+    select: jest.Mock;
+    from: jest.Mock;
+    innerJoin: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+    then: jest.Mock;
+  };
+
+  const uid = 'test-uid';
+
+  function buildChainableMock(returnValue: unknown) {
+    const chain: Record<string, jest.Mock> = {};
+    const methods = ['select', 'from', 'innerJoin', 'where', 'limit', 'groupBy'];
+    for (const method of methods) {
+      chain[method] = jest.fn().mockReturnValue(chain);
+    }
+    // then is the terminal operation that resolves the query
+    chain['then'] = jest.fn((fn: (v: unknown) => unknown) => Promise.resolve(fn(returnValue)));
+    // Make the chain itself thenable (for await)
+    Object.assign(chain, {
+      [Symbol.toPrimitive]: undefined,
+    });
+    // Allow the chain object to be awaited directly (for cases without .then())
+    const chainProxy = new Proxy(chain, {
+      get(target, prop) {
+        if (prop === Symbol.iterator || prop === 'then') {
+          return target['then'];
+        }
+        return target[prop as string] ?? jest.fn().mockReturnValue(chainProxy);
+      },
+    });
+    return chainProxy;
+  }
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+
+    service = new EchoeStudyService(
+      { createCard: jest.fn() } as any,
+      { getDeckAndSubdeckIds: jest.fn() } as any
+    );
+  });
+
+  it('should return 0 immediately when rawNewCount is 0', async () => {
+    // No DB queries needed
+    const result = await service.applyNewCardDailyLimit(uid, 0);
+    expect(result).toBe(0);
+  });
+
+  it('should cap newCount when raw count exceeds remaining daily limit', async () => {
+    // perDay=20, todayNewReviewed=15 => remaining=5, rawNewCount=100 => result=5
+    const selectChainForConfig = buildChainableMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const selectChainForRevlog = buildChainableMock([{ count: 15 }]);
+
+    let callCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return selectChainForConfig;
+        return selectChainForRevlog;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 100);
+    expect(result).toBe(5);
+  });
+
+  it('should return rawNewCount when daily limit is not reached', async () => {
+    // perDay=20, todayNewReviewed=5 => remaining=15, rawNewCount=10 => result=10
+    const selectChainForConfig = buildChainableMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const selectChainForRevlog = buildChainableMock([{ count: 5 }]);
+
+    let callCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return selectChainForConfig;
+        return selectChainForRevlog;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 10);
+    expect(result).toBe(10);
+  });
+
+  it('should return 0 when daily limit is already exhausted', async () => {
+    // perDay=20, todayNewReviewed=20 => remaining=0, rawNewCount=50 => result=0
+    const selectChainForConfig = buildChainableMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const selectChainForRevlog = buildChainableMock([{ count: 20 }]);
+
+    let callCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return selectChainForConfig;
+        return selectChainForRevlog;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 50);
+    expect(result).toBe(0);
+  });
+
+  it('should not return negative when todayNewReviewed exceeds perDay', async () => {
+    // perDay=20, todayNewReviewed=25 (edge case) => remaining=max(0,-5)=0 => result=0
+    const selectChainForConfig = buildChainableMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const selectChainForRevlog = buildChainableMock([{ count: 25 }]);
+
+    let callCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return selectChainForConfig;
+        return selectChainForRevlog;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 50);
+    expect(result).toBe(0);
+  });
+
+  it('should use default perDay=20 when config is missing', async () => {
+    // No config found => default perDay=20, todayNewReviewed=10 => remaining=10, rawNewCount=100 => result=10
+    const selectChainForConfig = buildChainableMock([]);
+    const selectChainForRevlog = buildChainableMock([{ count: 10 }]);
+
+    let callCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return selectChainForConfig;
+        return selectChainForRevlog;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 100);
+    expect(result).toBe(10);
+  });
+});

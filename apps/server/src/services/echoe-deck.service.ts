@@ -5,6 +5,7 @@ import { getDatabase } from '../db/connection.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
+import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
@@ -81,6 +82,12 @@ export class EchoeDeckService {
       .where(eq(echoeCards.uid, uid))
       .groupBy(echoeCards.did);
 
+    // Batch-compute today's new card reviewed count per deck (for daily limit capping)
+    const todayNewReviewedByDeck = await this.getTodayNewReviewedCountByDeck(uid);
+
+    // Batch-fetch perDay config per deck config ID
+    const perDayByConfId = await this.getPerDayByConfId(uid, decks);
+
     // Create maps for quick lookup
     const countsMap = new Map<number, { newCount: number; learnCount: number; reviewCount: number }>();
     for (const card of cardsWithCounts) {
@@ -116,6 +123,7 @@ export class EchoeDeckService {
     }
 
     // Convert to DTOs with counts
+    const DEFAULT_PER_DAY = 20;
     const decksWithCounts: EchoeDeckWithCountsDto[] = decks.map((deck: EchoeDecks) => {
       const counts = countsMap.get(Number(deck.id)) || { newCount: 0, learnCount: 0, reviewCount: 0 };
       const fsrs = fsrsMap.get(Number(deck.id)) || {
@@ -125,6 +133,13 @@ export class EchoeDeckService {
         averageRetrievability: 0,
         lastStudiedAt: null,
       };
+
+      // Apply daily new card limit: newCount = min(rawNewCount, max(0, perDay - todayNewReviewed))
+      const rawNewCount = counts.newCount;
+      const perDay = perDayByConfId.get(Number(deck.conf)) ?? DEFAULT_PER_DAY;
+      const todayNewReviewed = todayNewReviewedByDeck.get(Number(deck.id)) ?? 0;
+      const cappedNewCount = Math.min(rawNewCount, Math.max(0, perDay - todayNewReviewed));
+
       return {
         id: Number(deck.id),
         name: deck.name,
@@ -136,7 +151,7 @@ export class EchoeDeckService {
         desc: deck.desc || '',
         mid: Number(deck.mid),
         mod: deck.mod,
-        newCount: counts.newCount,
+        newCount: cappedNewCount,
         learnCount: counts.learnCount,
         reviewCount: counts.reviewCount,
         totalCount: fsrs.totalCount,
@@ -150,6 +165,81 @@ export class EchoeDeckService {
 
     // Build hierarchy
     return this.buildDeckHierarchy(decksWithCounts, retrievabilityEligibleCountMap);
+  }
+
+  /**
+   * Batch-query today's new-card reviewed count grouped by deck.
+   * Returns a Map<deckId, count>.
+   */
+  private async getTodayNewReviewedCountByDeck(uid: string): Promise<Map<number, number>> {
+    const db = getDatabase();
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayStartRevlogId = today.getTime() * 1000;
+
+    const rows = await db
+      .select({
+        did: echoeCards.did,
+        count: sql<number>`count(*)`,
+      })
+      .from(echoeRevlog)
+      .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+      .where(
+        and(
+          eq(echoeRevlog.uid, uid),
+          eq(echoeCards.uid, uid),
+          eq(echoeRevlog.type, 0),
+          sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+        )
+      )
+      .groupBy(echoeCards.did);
+
+    const result = new Map<number, number>();
+    for (const row of rows) {
+      result.set(Number(row.did), Number(row.count) || 0);
+    }
+    return result;
+  }
+
+  /**
+   * Batch-fetch perDay value from deck configs, keyed by config ID.
+   */
+  private async getPerDayByConfId(uid: string, decks: EchoeDecks[]): Promise<Map<number, number>> {
+    const DEFAULT_PER_DAY = 20;
+    if (decks.length === 0) {
+      return new Map();
+    }
+
+    const confIds = [...new Set(decks.map((d: EchoeDecks) => Number(d.conf)))];
+    const db = getDatabase();
+
+    const configs = await db
+      .select({ id: echoeDeckConfig.id, newConfig: echoeDeckConfig.newConfig })
+      .from(echoeDeckConfig)
+      .where(and(eq(echoeDeckConfig.uid, uid), inArray(echoeDeckConfig.id, confIds)));
+
+    const result = new Map<number, number>();
+    for (const config of configs) {
+      const perDay = this.parsePerDayFromNewConfig(config.newConfig, DEFAULT_PER_DAY);
+      result.set(Number(config.id), perDay);
+    }
+    return result;
+  }
+
+  /**
+   * Parse perDay value from newConfig JSON string.
+   */
+  private parsePerDayFromNewConfig(newConfigJson: string, defaultValue: number): number {
+    try {
+      const parsed = JSON.parse(newConfigJson) as Record<string, unknown>;
+      const perDay = parsed.perDay;
+      if (typeof perDay === 'number' && Number.isFinite(perDay) && perDay >= 0) {
+        return perDay;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return defaultValue;
   }
 
   /**

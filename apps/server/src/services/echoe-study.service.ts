@@ -735,20 +735,24 @@ export class EchoeStudyService {
 
     // Build conditions
     let deckFilter: any = undefined;
+    let deckIds: number[] = [];
     if (deckId) {
-      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
+      deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       deckFilter = sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`;
     }
 
-    // New cards (queue=0)
+    // New cards (queue=0) - raw count before applying daily limit
     const newConditions = deckFilter
       ? [eq(echoeCards.uid, uid), deckFilter, eq(echoeCards.queue, 0)]
       : [eq(echoeCards.uid, uid), eq(echoeCards.queue, 0)];
-    const newCount = await db
+    const rawNewCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
       .where(and(...newConditions))
       .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
+
+    // Apply daily new card limit: newCount = min(rawNewCount, max(0, perDay - todayNewReviewed))
+    const newCount = await this.applyNewCardDailyLimit(uid, rawNewCount, deckId ? deckIds : undefined);
 
     // Learning cards due now (queue=1 or queue=3 and due <= now)
     const learnConditions = deckFilter
@@ -776,6 +780,127 @@ export class EchoeStudyService {
       reviewCount,
       totalCount: newCount + learnCount + reviewCount,
     };
+  }
+
+  /**
+   * Apply daily new card limit to a raw new card count.
+   * newCount = min(rawNewCount, max(0, perDay - todayNewReviewed))
+   *
+   * @param uid - User ID
+   * @param rawNewCount - Total new cards (queue=0) without any daily limit applied
+   * @param deckIds - Optional deck IDs to scope the today-reviewed count; if undefined, all decks are included
+   */
+  async applyNewCardDailyLimit(uid: string, rawNewCount: number, deckIds?: number[]): Promise<number> {
+    if (rawNewCount === 0) {
+      return 0;
+    }
+
+    const db = getDatabase();
+
+    // Get perDay from deck config
+    const perDay = await this.getNewCardPerDay(uid, deckIds);
+
+    // Count today's new card reviews (revlog type=0, revlog id encodes ms * 1000)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayStartRevlogId = today.getTime() * 1000;
+
+    let todayNewReviewed: number;
+    if (deckIds && deckIds.length > 0) {
+      // Scope to specific decks by joining with cards table
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(echoeRevlog)
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .where(
+          and(
+            eq(echoeRevlog.uid, uid),
+            eq(echoeCards.uid, uid),
+            eq(echoeRevlog.type, 0),
+            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`,
+            sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`
+          )
+        );
+      todayNewReviewed = Number(result[0]?.count || 0);
+    } else {
+      // All decks
+      const result = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(echoeRevlog)
+        .where(
+          and(
+            eq(echoeRevlog.uid, uid),
+            eq(echoeRevlog.type, 0),
+            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+          )
+        );
+      todayNewReviewed = Number(result[0]?.count || 0);
+    }
+
+    const remaining = Math.max(0, perDay - todayNewReviewed);
+    return Math.min(rawNewCount, remaining);
+  }
+
+  /**
+   * Get the perDay new card limit for the given deck IDs (or user default).
+   * If multiple decks share different configs, returns the minimum perDay to be conservative.
+   */
+  private async getNewCardPerDay(uid: string, deckIds?: number[]): Promise<number> {
+    const DEFAULT_PER_DAY = 20;
+    const db = getDatabase();
+
+    if (!deckIds || deckIds.length === 0) {
+      // No specific deck - use the first deck config found for this user
+      const configs = await db
+        .select({ newConfig: echoeDeckConfig.newConfig })
+        .from(echoeDeckConfig)
+        .where(eq(echoeDeckConfig.uid, uid))
+        .limit(1);
+      if (configs.length === 0) {
+        return DEFAULT_PER_DAY;
+      }
+      return this.parsePerDayFromConfig(configs[0].newConfig, DEFAULT_PER_DAY);
+    }
+
+    // Get deck config IDs for the specified decks
+    const decksWithConf = await db
+      .select({ conf: echoeDecks.conf })
+      .from(echoeDecks)
+      .where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.id} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`));
+
+    if (decksWithConf.length === 0) {
+      return DEFAULT_PER_DAY;
+    }
+
+    const confIds = [...new Set(decksWithConf.map((d: { conf: number | bigint }) => Number(d.conf)))];
+    const configs = await db
+      .select({ newConfig: echoeDeckConfig.newConfig })
+      .from(echoeDeckConfig)
+      .where(and(eq(echoeDeckConfig.uid, uid), sql`${echoeDeckConfig.id} IN (${sql.join(confIds.map(id => sql`${id}`), sql`, `)})`));
+
+    if (configs.length === 0) {
+      return DEFAULT_PER_DAY;
+    }
+
+    // Use the minimum perDay across all involved configs (most conservative limit)
+    const perDayValues = configs.map((c: { newConfig: string }) => this.parsePerDayFromConfig(c.newConfig, DEFAULT_PER_DAY));
+    return Math.min(...perDayValues);
+  }
+
+  /**
+   * Parse perDay value from newConfig JSON string.
+   */
+  private parsePerDayFromConfig(newConfigJson: string, defaultValue: number): number {
+    try {
+      const parsed = JSON.parse(newConfigJson) as Record<string, unknown>;
+      const perDay = parsed.perDay;
+      if (typeof perDay === 'number' && Number.isFinite(perDay) && perDay >= 0) {
+        return perDay;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return defaultValue;
   }
 
   /**
