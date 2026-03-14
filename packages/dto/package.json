@@ -26,7 +26,7 @@
     "test": "jest"
   },
   "jest": {
-    "preset": "@soiljs/jest-presets/node"
+    "preset": "@echoe/jest-presets/node"
   },
   "devDependencies": {
     "@echoe/eslint-config": "workspace:*",

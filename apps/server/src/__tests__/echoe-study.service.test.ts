@@ -14,6 +14,20 @@ import { calculateRetrievability, getRetrievabilitySqlExpr } from '../utils/fsrs
 
 const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
+/**
+ * Helper to create a mock db object with transaction support
+ * By default, transaction just executes the callback directly (no actual transaction)
+ */
+const createMockDb = (mockDb: Record<string, any>) => {
+  return {
+    ...mockDb,
+    transaction: jest.fn().mockImplementation(async (callback: (tx: any) => Promise<any>) => {
+      // Default behavior: just execute callback with the mock db as tx
+      return callback(mockDb);
+    }),
+  };
+};
+
 describe('EchoeStudyService - FSRS input building', () => {
   let service: EchoeStudyService;
   let createCardMock: jest.Mock;
@@ -729,7 +743,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
 
     const updatedCard = { ...buildDbCard({ left: expectedLearningSteps }) };
 
-    mockedGetDatabase.mockReturnValue({
+    mockedGetDatabase.mockReturnValue(createMockDb({
       update: updateMock,
       insert: insertMock,
       query: {
@@ -758,7 +772,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
           }),
         },
       },
-    } as any);
+    }) as any);
 
     await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
 
@@ -788,7 +802,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
 
     const updatedCard = { ...buildDbCard({ left: 0, type: State.Review, queue: 2 }) };
 
-    mockedGetDatabase.mockReturnValue({
+    mockedGetDatabase.mockReturnValue(createMockDb({
       update: updateMock,
       insert: insertMock,
       query: {
@@ -817,7 +831,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
           }),
         },
       },
-    } as any);
+    }) as any);
 
     await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
 
@@ -898,7 +912,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     const card = buildLeechCard(7);
     const updatedCard = { ...card };
 
-    mockedGetDatabase.mockReturnValue({
+    mockedGetDatabase.mockReturnValue(createMockDb({
       update: updateMock,
       insert: insertMock,
       query: {
@@ -929,7 +943,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
           }),
         },
       },
-    } as any);
+    }) as any);
 
     return { updateMock, setMock, whereMock };
   };

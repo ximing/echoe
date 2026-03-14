@@ -1,6 +1,7 @@
 import { Service } from 'typedi';
 import { eq, and, sql, desc, asc, isNull, or } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/transaction.js';
 import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes, users } from '../db/schema/index.js';
 import type { Card } from 'ts-fsrs';
 import { z } from 'zod';
@@ -277,103 +278,24 @@ export class EchoeStudyService {
       };
     }
 
-    // Update the card with new scheduling
-    await db
-      .update(echoeCards)
-      .set({
-        due: nextDue,
-        ivl: schedulingResult.interval,
-        factor: Math.round(schedulingResult.stability * 1000),
-        reps: card.reps + 1,
-        lapses: schedulingResult.state === State.Relearning ? card.lapses + 1 : card.lapses,
-        left: schedulingResult.learningSteps, // 写回 ts-fsrs 管理的步骤计数，保留 Learning 步骤进度
-        type: newState,
-        queue: newQueue,
-        mod: Math.floor(now.getTime() / 1000),
-        usn: -1,
-        // FSRS fields
-        stability: schedulingResult.stability,
-        difficulty: schedulingResult.difficulty,
-        lastReview: now.getTime(),
-      })
-      .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
-
     const revlogType = this.resolveRevlogType(card, deck);
     const reviewId = generateRevlogId();
 
-    // Log the review using pre-review card state
-    await db.insert(echoeRevlog).values({
-      id: reviewId,
-      cid: dto.cardId,
-      uid,
-      usn: -1,
-      ease: dto.rating,
-      ivl: schedulingResult.interval,
-      lastIvl: card.ivl,
-      factor: Math.round(schedulingResult.stability * 1000),
-      time: dto.timeTaken,
-      type: revlogType,
-      // FSRS fields (post-review state)
-      stability: schedulingResult.stability,
-      difficulty: schedulingResult.difficulty,
-      lastReview: now.getTime(),
-      // Pre-review snapshot (for undo functionality)
-      preDue: card.due,
-      preIvl: card.ivl,
-      preFactor: card.factor,
-      preReps: card.reps,
-      preLapses: card.lapses,
-      preLeft: card.left,
-      preType: card.type,
-      preQueue: card.queue,
-      preStability: card.stability,
-      preDifficulty: card.difficulty,
-      preLastReview: card.lastReview,
-    });
-
     // Leech detection - check if card lapsed and exceeds threshold
-    let isLeech = false;
     const lapseConfig = deckConfig?.lapseConfig ? JSON.parse(deckConfig.lapseConfig) : null;
     const leechFails = lapseConfig?.leechFails || 8;
     // leechAction: 0 = suspend + tag (default), 1 = tag only (do NOT suspend)
     const leechAction = lapseConfig?.leechAction ?? 0;
     const newLapses = schedulingResult.state === State.Relearning ? card.lapses + 1 : card.lapses;
-
-    if (newLapses >= leechFails) {
-      isLeech = true;
-
-      if (leechAction === 0) {
-        // Suspend the leech card
-        await db
-          .update(echoeCards)
-          .set({
-            queue: -1, // Suspended
-            mod: Math.floor(now.getTime() / 1000),
-            usn: -1,
-          })
-          .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
-      }
-
-      // Always add 'leech' tag to the note if not already present
-      const currentTags = parseTags(note.tags);
-      if (!currentTags.includes('leech')) {
-        currentTags.push('leech');
-        await db
-          .update(echoeNotes)
-          .set({
-            tags: JSON.stringify(currentTags),
-            mod: Math.floor(now.getTime() / 1000),
-            usn: -1,
-          })
-          .where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid)));
-      }
-    }
+    const isLeech = newLapses >= leechFails;
 
     // Handle buryRelated: auto-bury siblings after review
     const newConfig = deckConfig?.newConfig ? JSON.parse(deckConfig.newConfig) : null;
     const buryRelated = newConfig?.bury || false;
+
+    // Fetch siblings before transaction (reads can stay outside)
+    let siblingIds: number[] = [];
     if (buryRelated && !isLeech) {
-      // Get all sibling cards (same note, different ordinal)
       const siblings = await db
         .select()
         .from(echoeCards)
@@ -381,15 +303,94 @@ export class EchoeStudyService {
           eq(echoeCards.uid, uid),
           eq(echoeCards.nid, card.nid),
           sql`${echoeCards.id} != ${dto.cardId}`,
-          sql`${echoeCards.queue} >= 0` // Only bury cards that are not already suspended/buried
+          sql`${echoeCards.queue} >= 0`
         ));
+      siblingIds = siblings.map((s: { id: number }) => s.id);
+    }
 
-      if (siblings.length > 0) {
-        const siblingIds = siblings.map((s: { id: number }) => s.id);
-        await db
+    // Execute all writes in a single transaction to ensure atomicity
+    const updatedCard = await withTransaction(async (tx) => {
+      // Update the card with new scheduling
+      await tx
+        .update(echoeCards)
+        .set({
+          due: nextDue,
+          ivl: schedulingResult.interval,
+          factor: Math.round(schedulingResult.stability * 1000),
+          reps: card.reps + 1,
+          lapses: schedulingResult.state === State.Relearning ? card.lapses + 1 : card.lapses,
+          left: schedulingResult.learningSteps,
+          type: newState,
+          queue: newQueue,
+          mod: Math.floor(now.getTime() / 1000),
+          usn: -1,
+          stability: schedulingResult.stability,
+          difficulty: schedulingResult.difficulty,
+          lastReview: now.getTime(),
+        })
+        .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
+
+      // Log the review using pre-review card state
+      await tx.insert(echoeRevlog).values({
+        id: reviewId,
+        cid: dto.cardId,
+        uid,
+        usn: -1,
+        ease: dto.rating,
+        ivl: schedulingResult.interval,
+        lastIvl: card.ivl,
+        factor: Math.round(schedulingResult.stability * 1000),
+        time: dto.timeTaken,
+        type: revlogType,
+        stability: schedulingResult.stability,
+        difficulty: schedulingResult.difficulty,
+        lastReview: now.getTime(),
+        preDue: card.due,
+        preIvl: card.ivl,
+        preFactor: card.factor,
+        preReps: card.reps,
+        preLapses: card.lapses,
+        preLeft: card.left,
+        preType: card.type,
+        preQueue: card.queue,
+        preStability: card.stability,
+        preDifficulty: card.difficulty,
+        preLastReview: card.lastReview,
+      });
+
+      if (isLeech) {
+        if (leechAction === 0) {
+          // Suspend the leech card
+          await tx
+            .update(echoeCards)
+            .set({
+              queue: -1,
+              mod: Math.floor(now.getTime() / 1000),
+              usn: -1,
+            })
+            .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
+        }
+
+        // Always add 'leech' tag to the note if not already present
+        const currentTags = parseTags(note.tags);
+        if (!currentTags.includes('leech')) {
+          currentTags.push('leech');
+          await tx
+            .update(echoeNotes)
+            .set({
+              tags: JSON.stringify(currentTags),
+              mod: Math.floor(now.getTime() / 1000),
+              usn: -1,
+            })
+            .where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid)));
+        }
+      }
+
+      if (siblingIds.length > 0) {
+        await tx
           .update(echoeCards)
           .set({
-            queue: -3, // Sibling buried
+            queue: -3,
             mod: Math.floor(now.getTime() / 1000),
             usn: -1,
           })
@@ -398,16 +399,16 @@ export class EchoeStudyService {
             sql`${echoeCards.id} IN (${sql.join(siblingIds.map((id: number) => sql`${id}`), sql`, `)})`
           ));
       }
-    }
 
-    // Return the updated card
-    const updatedCard = await db.query.echoeCards.findFirst({
-      where: and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)),
+      // Fetch and return the updated card within the transaction
+      const cardAfterTx = await db.query.echoeCards.findFirst({
+        where: and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)),
+      });
+      if (!cardAfterTx) {
+        throw new Error('Failed to get updated card within transaction');
+      }
+      return cardAfterTx;
     });
-
-    if (!updatedCard) {
-      throw new Error('Failed to get updated card');
-    }
 
     const fullNote = await db.query.echoeNotes.findFirst({
       where: and(eq(echoeNotes.id, updatedCard.nid), eq(echoeNotes.uid, uid)),
@@ -490,31 +491,32 @@ export class EchoeStudyService {
       };
     }
 
-    // Restore card to previous state using pre-review snapshot
+    // Execute card restore and revlog delete in a single transaction for atomicity
     const now = Math.floor(Date.now() / 1000);
-    await db
-      .update(echoeCards)
-      .set({
-        // Restore from pre-review snapshot (stored in revlog)
-        due: lastReview.preDue,
-        ivl: lastReview.preIvl,
-        factor: lastReview.preFactor,
-        reps: lastReview.preReps,
-        lapses: lastReview.preLapses,
-        left: lastReview.preLeft,
-        type: lastReview.preType,
-        queue: lastReview.preQueue,
-        // Restore FSRS fields from pre-review snapshot
-        stability: lastReview.preStability,
-        difficulty: lastReview.preDifficulty,
-        lastReview: lastReview.preLastReview,
-        mod: now,
-        usn: -1,
-      })
-      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)));
+    await withTransaction(async (tx) => {
+      // Restore card to previous state using pre-review snapshot
+      await tx
+        .update(echoeCards)
+        .set({
+          due: lastReview.preDue,
+          ivl: lastReview.preIvl,
+          factor: lastReview.preFactor,
+          reps: lastReview.preReps,
+          lapses: lastReview.preLapses,
+          left: lastReview.preLeft,
+          type: lastReview.preType,
+          queue: lastReview.preQueue,
+          stability: lastReview.preStability,
+          difficulty: lastReview.preDifficulty,
+          lastReview: lastReview.preLastReview,
+          mod: now,
+          usn: -1,
+        })
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)));
 
-    // Remove the revlog entry, include uid condition for defense in depth
-    await db.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, lastReview.id)));
+      // Remove the revlog entry
+      await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, lastReview.id)));
+    });
 
     return {
       success: true,
