@@ -137,3 +137,39 @@
   - Indexes: All 20 business ID indexes created (single-column *_id_idx + composite uid_*_id_idx)
   - Remote database at 222.128.65.91:13306 (echoe_test_db) used for testing
 ---
+## 2026-03-15 - US-010
+- Converted all core DTO entity ID types from number to string in packages/dto/src/echoe.ts
+- Updated entity DTOs: Deck, DeckConfig, NoteType, Template, Note, Card, CardListItem, StudyQueueItem, Media
+- Updated relation fields: nid, did, mid, cid, ntid, conf, oid all changed to string
+- Updated query params and command DTOs: deckId, notetypeId, cardIds, etc.
+- Files changed: packages/dto/src/echoe.ts
+- **Learnings for future iterations:**
+  - DTO ID type changes are straightforward - search for `id: number` and relation fields
+  - Keep numeric types for non-ID fields: counts, intervals, timestamps, ratings, ordinals
+  - Query params that filter by IDs also need string type updates
+  - Command DTOs with ID arrays (cardIds, deleteIds) need string[] instead of number[]
+  - Typecheck is the primary validation - no runtime changes needed for type-only updates
+---
+## 2026-03-15 - US-011
+- Verified all command and query payload DTOs already converted to string IDs in US-010
+- Query DTOs: EchoeCardQueryParams, EchoeNoteQueryParams, StudyQueueParams
+- Command DTOs: CreateEchoeNoteDto, BulkCardOperationDto, BuryCardsDto, ForgetCardsDto, ReviewSubmissionDto, CsvExecuteDto, FindDuplicatesDto, MergeDuplicatesDto
+- All numeric fields for time, counts, intervals, and ratings preserved
+- Files changed: None (completed in US-010)
+- **Learnings for future iterations:**
+  - US-010 and US-011 overlap significantly - both involve updating the same DTO file
+  - When working on DTO updates, it's efficient to update all ID types in one pass
+  - Query params and command payloads are often in the same file as entity DTOs
+---
+## 2026-03-15 - US-012
+- Built DTO package successfully with string ID contracts
+- Verified dist/index.d.ts contains string ID type definitions
+- Confirmed no stale number-based ID declarations in generated output
+- Build command: pnpm --filter @echoe/dto build
+- Files changed: packages/dto/dist/* (gitignored, not committed)
+- **Learnings for future iterations:**
+  - DTO package build output is gitignored - only source changes are committed
+  - Rollup generates both CommonJS (index.js) and ESM (index.mjs) outputs
+  - Type declarations are bundled into single dist/index.d.ts file
+  - Build must succeed before downstream apps can consume new contracts
+---
