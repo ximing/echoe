@@ -49,7 +49,7 @@ export const getDecks = () => {
 /**
  * Get a single deck by ID
  */
-export const getDeck = (id: number) => {
+export const getDeck = (id: string) => {
   return request.get<unknown, { code: number; data: EchoeDeckWithCountsDto }>(
     `/api/v1/decks/${id}`
   );
@@ -68,7 +68,7 @@ export const createDeck = (data: CreateEchoeDeckDto) => {
 /**
  * Update a deck (rename and/or update description)
  */
-export const updateDeck = (id: number, data: UpdateEchoeDeckDto) => {
+export const updateDeck = (id: string, data: UpdateEchoeDeckDto) => {
   return request.put<unknown, { code: number; data: EchoeDeckWithCountsDto }>(
     `/api/v1/decks/${id}`,
     data
@@ -78,7 +78,7 @@ export const updateDeck = (id: number, data: UpdateEchoeDeckDto) => {
 /**
  * Delete a deck
  */
-export const deleteDeck = (id: number, deleteCards: boolean = false) => {
+export const deleteDeck = (id: string, deleteCards: boolean = false) => {
   return request.delete<unknown, { code: number; data: { success: boolean } }>(
     `/api/v1/decks/${id}`,
     {
@@ -90,7 +90,7 @@ export const deleteDeck = (id: number, deleteCards: boolean = false) => {
 /**
  * Get deck configuration
  */
-export const getDeckConfig = (id: number) => {
+export const getDeckConfig = (id: string) => {
   return request.get<unknown, { code: number; data: EchoeDeckConfigDto }>(
     `/api/v1/decks/${id}/config`
   );
@@ -99,7 +99,7 @@ export const getDeckConfig = (id: number) => {
 /**
  * Update deck configuration
  */
-export const updateDeckConfig = (id: number, data: UpdateEchoeDeckConfigDto) => {
+export const updateDeckConfig = (id: string, data: UpdateEchoeDeckConfigDto) => {
   return request.put<unknown, { code: number; data: EchoeDeckConfigDto }>(
     `/api/v1/decks/${id}/config`,
     data
@@ -119,7 +119,7 @@ export const createFilteredDeck = (data: CreateFilteredDeckDto) => {
 /**
  * Rebuild a filtered deck
  */
-export const rebuildFilteredDeck = (id: number) => {
+export const rebuildFilteredDeck = (id: string) => {
   return request.post<unknown, { code: number; data: { success: boolean } }>(
     `/api/v1/decks/${id}/rebuild`
   );
@@ -128,7 +128,7 @@ export const rebuildFilteredDeck = (id: number) => {
 /**
  * Empty a filtered deck (return cards to original decks)
  */
-export const emptyFilteredDeck = (id: number) => {
+export const emptyFilteredDeck = (id: string) => {
   return request.post<unknown, { code: number; data: { success: boolean } }>(
     `/api/v1/decks/${id}/empty`
   );
@@ -151,12 +151,12 @@ export const previewFilteredDeck = (searchQuery: string, limit: number = 5) => {
 /**
  * Get study queue - cards due for review
  */
-export const getStudyQueue = (deckId?: number, limit?: number) => {
+export const getStudyQueue = (deckId?: string, limit?: number) => {
   return request.get<unknown, { code: number; data: StudyQueueItemDto[] }>(
     '/api/v1/study/queue',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
         ...(limit !== undefined && { limit: limit.toString() }),
       },
     }
@@ -176,7 +176,7 @@ export const submitReview = (data: ReviewSubmissionDto) => {
 /**
  * Undo a specific review by reviewId
  */
-export const undoReview = (reviewId?: number) => {
+export const undoReview = (reviewId?: string) => {
   return request.post<unknown, { code: number; data: { success: boolean; card?: StudyQueueItemDto } }>(
     '/api/v1/study/undo',
     undefined,
@@ -189,7 +189,7 @@ export const undoReview = (reviewId?: number) => {
 /**
  * Bury cards (move to buried queue)
  */
-export const buryCards = (cardIds: number[], mode: 'card' | 'note' = 'card') => {
+export const buryCards = (cardIds: string[], mode: 'card' | 'note' = 'card') => {
   return request.post<unknown, { code: number; data: { success: boolean } }>(
     '/api/v1/study/bury',
     { cardIds, mode }
@@ -199,7 +199,7 @@ export const buryCards = (cardIds: number[], mode: 'card' | 'note' = 'card') => 
 /**
  * Reset cards to new (forget scheduling)
  */
-export const forgetCards = (cardIds: number[]) => {
+export const forgetCards = (cardIds: string[]) => {
   return request.post<unknown, { code: number; data: { success: boolean } }>(
     '/api/v1/study/forget',
     { cardIds }
@@ -209,12 +209,12 @@ export const forgetCards = (cardIds: number[]) => {
 /**
  * Get study counts for today
  */
-export const getStudyCounts = (deckId?: number) => {
+export const getStudyCounts = (deckId?: string) => {
   return request.get<unknown, { code: number; data: StudyCountsDto }>(
     '/api/v1/study/counts',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
       },
     }
   );
@@ -223,11 +223,11 @@ export const getStudyCounts = (deckId?: number) => {
 /**
  * Get rating preview options for a card (FSRS scheduling)
  */
-export const getStudyOptions = (cardId: number) => {
+export const getStudyOptions = (cardId: string) => {
   return request.get<unknown, { code: number; data: StudyOptionsDto }>(
     '/api/v1/study/options',
     {
-      params: { cardId: cardId.toString() },
+      params: { cardId },
     }
   );
 };
@@ -246,7 +246,7 @@ export const getNoteTypes = () => {
 /**
  * Get a single note type by ID
  */
-export const getNoteType = (id: number) => {
+export const getNoteType = (id: string) => {
   return request.get<unknown, { code: number; data: EchoeNoteTypeDto }>(
     `/api/v1/notetypes/${id}`
   );
@@ -265,7 +265,7 @@ export const createNoteType = (data: Partial<EchoeNoteTypeDto> & { name: string 
 /**
  * Update a note type
  */
-export const updateNoteType = (id: number, data: Partial<EchoeNoteTypeDto>) => {
+export const updateNoteType = (id: string, data: Partial<EchoeNoteTypeDto>) => {
   return request.put<unknown, { code: number; data: EchoeNoteTypeDto }>(
     `/api/v1/notetypes/${id}`,
     data
@@ -275,7 +275,7 @@ export const updateNoteType = (id: number, data: Partial<EchoeNoteTypeDto>) => {
 /**
  * Delete a note type
  */
-export const deleteNoteType = (id: number) => {
+export const deleteNoteType = (id: string) => {
   return request.delete<unknown, { code: number; data: { success: boolean } }>(
     `/api/v1/notetypes/${id}`
   );
@@ -296,7 +296,7 @@ export const getNotes = (params?: EchoeNoteQueryParams) => {
 /**
  * Get a single note by ID
  */
-export const getNote = (id: number) => {
+export const getNote = (id: string) => {
   return request.get<unknown, { code: number; data: EchoeNoteDto }>(
     `/api/v1/notes/${id}`
   );
@@ -315,7 +315,7 @@ export const createNote = (data: CreateEchoeNoteDto) => {
 /**
  * Update a note
  */
-export const updateNote = (id: number, data: UpdateEchoeNoteDto) => {
+export const updateNote = (id: string, data: UpdateEchoeNoteDto) => {
   return request.put<unknown, { code: number; data: EchoeNoteDto }>(
     `/api/v1/notes/${id}`,
     data
@@ -325,7 +325,7 @@ export const updateNote = (id: number, data: UpdateEchoeNoteDto) => {
 /**
  * Delete a note
  */
-export const deleteNote = (id: number) => {
+export const deleteNote = (id: string) => {
   return request.delete<unknown, { code: number; data: { success: boolean } }>(
     `/api/v1/notes/${id}`
   );
@@ -336,7 +336,7 @@ export const deleteNote = (id: number) => {
 /**
  * Get a single card by ID with full note data
  */
-export const getCard = (id: number) => {
+export const getCard = (id: string) => {
   return request.get<unknown, { code: number; data: EchoeCardWithNoteDto }>(
     `/api/v1/cards/${id}`
   );
@@ -415,12 +415,12 @@ export const deleteMediaBulk = (filenames: string[]) => {
 /**
  * Get today's study statistics
  */
-export const getTodayStats = (deckId?: number) => {
+export const getTodayStats = (deckId?: string) => {
   return request.get<unknown, { code: number; data: StudyTodayStatsDto }>(
     '/api/v1/stats/today',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
       },
     }
   );
@@ -429,12 +429,12 @@ export const getTodayStats = (deckId?: number) => {
 /**
  * Get study history for the last N days
  */
-export const getHistory = (deckId?: number, days?: number) => {
+export const getHistory = (deckId?: string, days?: number) => {
   return request.get<unknown, { code: number; data: StudyHistoryDayDto[] }>(
     '/api/v1/stats/history',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
         ...(days !== undefined && { days: days.toString() }),
       },
     }
@@ -444,12 +444,12 @@ export const getHistory = (deckId?: number, days?: number) => {
 /**
  * Get card maturity distribution
  */
-export const getMaturity = (deckId?: number) => {
+export const getMaturity = (deckId?: string) => {
   return request.get<unknown, { code: number; data: CardMaturityDto }>(
     '/api/v1/stats/maturity',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
       },
     }
   );
@@ -458,12 +458,12 @@ export const getMaturity = (deckId?: number) => {
 /**
  * Get forecast of due cards for the next N days
  */
-export const getForecast = (deckId?: number, days?: number) => {
+export const getForecast = (deckId?: string, days?: number) => {
   return request.get<unknown, { code: number; data: ForecastDayDto[] }>(
     '/api/v1/stats/forecast',
     {
       params: {
-        ...(deckId !== undefined && { deckId: deckId.toString() }),
+        ...(deckId !== undefined && { deckId }),
         ...(days !== undefined && { days: days.toString() }),
       },
     }
@@ -471,7 +471,7 @@ export const getForecast = (deckId?: number, days?: number) => {
 };
 
 export interface MaturityBatchDeck {
-  deckId: number;
+  deckId: string;
   new: number;
   learning: number;
   young: number;
@@ -624,8 +624,8 @@ export const executeCsvImport = (file: File, dto: CsvExecuteDto) => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('columnMapping', JSON.stringify(dto.columnMapping));
-  formData.append('notetypeId', dto.notetypeId.toString());
-  formData.append('deckId', dto.deckId.toString());
+  formData.append('notetypeId', dto.notetypeId);
+  formData.append('deckId', dto.deckId);
   formData.append('hasHeader', dto.hasHeader.toString());
 
   return request.post<unknown, { code: number; data: CsvImportResultDto }>(
