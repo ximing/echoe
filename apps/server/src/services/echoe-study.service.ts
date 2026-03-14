@@ -207,7 +207,7 @@ export class EchoeStudyService {
 
     // Get deck config
     const deckConfig = await db.query.echoeDeckConfig.findFirst({
-      where: eq(echoeDeckConfig.id, deck.conf),
+      where: and(eq(echoeDeckConfig.id, deck.conf), eq(echoeDeckConfig.uid, uid)),
     });
 
     // Build FSRS config from deck config
@@ -799,7 +799,7 @@ export class EchoeStudyService {
 
     // Get deck config
     const deckConfig = await db.query.echoeDeckConfig.findFirst({
-      where: eq(echoeDeckConfig.id, deck.conf),
+      where: and(eq(echoeDeckConfig.id, deck.conf), eq(echoeDeckConfig.uid, uid)),
     });
 
     // Build FSRS config from deck config
