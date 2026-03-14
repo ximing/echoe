@@ -25,9 +25,10 @@ describe('EchoeNoteService - bulk forget consistency', () => {
       update: updateMock,
     } as any);
 
-    const service = new EchoeNoteService({
-      forgetCards: forgetCardsMock,
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: forgetCardsMock } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [1001, 1002],
@@ -44,9 +45,10 @@ describe('EchoeNoteService - bulk forget consistency', () => {
 
     mockedGetDatabase.mockReturnValue({} as any);
 
-    const service = new EchoeNoteService({
-      forgetCards: forgetCardsMock,
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: forgetCardsMock } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [1001, 9999],
@@ -87,9 +89,10 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
   it('should restore relearning cards to queue=3 when unsuspending', async () => {
     const { setMock, whereUpdateMock } = setupQueueRestoreDb([{ id: 2001, type: 3 }]);
 
-    const service = new EchoeNoteService({
-      forgetCards: jest.fn(),
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [2001],
@@ -109,9 +112,10 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
   it('should restore relearning cards to queue=3 when unburying', async () => {
     const { setMock, whereUpdateMock } = setupQueueRestoreDb([{ id: 2002, type: 3 }]);
 
-    const service = new EchoeNoteService({
-      forgetCards: jest.fn(),
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [2002],
@@ -132,9 +136,10 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     const { setMock, whereUpdateMock } = setupQueueRestoreDb([{ id: 3001, type: 99 }]);
     const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
 
-    const service = new EchoeNoteService({
-      forgetCards: jest.fn(),
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [3001],
@@ -166,9 +171,10 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
       { id: 4004, type: 3 },
     ]);
 
-    const service = new EchoeNoteService({
-      forgetCards: jest.fn(),
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [4001, 4002, 4003, 4004],
@@ -186,9 +192,10 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     const { setMock, whereUpdateMock } = setupQueueRestoreDb([{ id: 5001, type: 98 }]);
     const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
 
-    const service = new EchoeNoteService({
-      forgetCards: jest.fn(),
-    } as any);
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
 
     const result = await service.bulkCardOperation('test-uid', {
       cardIds: [5001],

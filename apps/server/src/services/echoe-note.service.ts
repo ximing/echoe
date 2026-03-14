@@ -3,15 +3,16 @@ import { eq, and, inArray, like, sql, or, desc, asc } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { withTransaction } from '../db/transaction.js';
+import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeTemplates } from '../db/schema/echoe-templates.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
-import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
 import { EchoeStudyService } from './echoe-study.service.js';
+import { EchoeDeckService } from './echoe-deck.service.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 import { generateNoteId, generateCardId, generateNoteTypeId } from '../utils/id.js';
 import type { RichTextFields } from '../types/note-fields.js';
@@ -38,7 +39,10 @@ import type {
 
 @Service()
 export class EchoeNoteService {
-  constructor(private echoeStudyService: EchoeStudyService) {}
+  constructor(
+    private echoeStudyService: EchoeStudyService,
+    private echoeDeckService: EchoeDeckService,
+  ) {}
 
   /**
    * Get notes with optional filters
@@ -52,7 +56,7 @@ export class EchoeNoteService {
     // Filter by deck - find cards in deck, then get notes
     if (deckId !== undefined) {
       // Get all sub-deck IDs
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
 
       // Get cards in these decks
       const cards = await db
@@ -405,7 +409,7 @@ export class EchoeNoteService {
 
     // Filter by deck
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       cardConditions.push(inArray(echoeCards.did, deckIds));
     }
 
@@ -1121,35 +1125,6 @@ export class EchoeNoteService {
       req: notetype[0].req,
       noteCount,
     };
-  }
-
-  /**
-   * Get deck and all sub-deck IDs
-   */
-  private async getDeckAndSubdeckIds(uid: string, id: number): Promise<number[]> {
-    const db = getDatabase();
-
-    const deck = await db
-      .select({ name: echoeDecks.name })
-      .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)))
-      .limit(1);
-
-    if (deck.length === 0) {
-      return [];
-    }
-
-    const result: number[] = [id];
-    const subDecks = await db
-      .select({ id: echoeDecks.id })
-      .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deck[0].name}::%`)));
-
-    for (const subDeck of subDecks) {
-      result.push(Number(subDeck.id));
-    }
-
-    return result;
   }
 
   /**

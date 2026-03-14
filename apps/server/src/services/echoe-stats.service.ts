@@ -5,7 +5,7 @@ import { getDatabase } from '../db/connection.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
-import { echoeDecks } from '../db/schema/echoe-decks.js';
+import { EchoeDeckService } from './echoe-deck.service.js';
 
 import type {
   StudyTodayStatsDto,
@@ -16,6 +16,7 @@ import type {
 
 @Service()
 export class EchoeStatsService {
+  constructor(private echoeDeckService: EchoeDeckService) {}
   /**
    * Get today's study statistics
    */
@@ -31,7 +32,7 @@ export class EchoeStatsService {
     let cardFilter: ReturnType<typeof inArray> | undefined = undefined;
     if (deckId !== undefined) {
       // Get deck and sub-deck IDs
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       cardFilter = inArray(echoeCards.did, deckIds);
     }
 
@@ -115,7 +116,7 @@ export class EchoeStatsService {
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           id: echoeRevlog.id,
@@ -178,7 +179,7 @@ export class EchoeStatsService {
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           stability: echoeCards.stability,
@@ -238,7 +239,7 @@ export class EchoeStatsService {
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           due: echoeCards.due,
@@ -416,32 +417,4 @@ export class EchoeStatsService {
     };
   }
 
-  /**
-   * Get deck and all sub-deck IDs
-   */
-  private async getDeckAndSubdeckIds(uid: string, id: number): Promise<number[]> {
-    const db = getDatabase();
-    const result: number[] = [id];
-
-    // Get all decks
-    const decks = await db.select().from(echoeDecks).where(eq(echoeDecks.uid, uid));
-
-    // Find all sub-decks
-    const findSubdecks = (parentId: number) => {
-      const parentDeck = decks.find((d: { id: number | string | bigint }) => Number(d.id) === parentId);
-      if (!parentDeck) return;
-
-      const prefix = parentDeck.name + '::';
-      for (const deck of decks) {
-        if (deck.name.startsWith(prefix)) {
-          result.push(Number(deck.id));
-          findSubdecks(Number(deck.id));
-        }
-      }
-    };
-
-    findSubdecks(id);
-
-    return result;
-  }
 }
