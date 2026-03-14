@@ -14,8 +14,8 @@
 | US-002 | Finalize schema for note, card, media, and log tables | [x] |
 | US-003 | Generate and validate one-shot migration | [x] |
 | US-004 | Apply uid context to core Echoe controllers | [x] |
-| US-005 | Apply uid context to edge Echoe controllers | [ ] |
-| US-006 | Refactor foundational services for uid filtering | [ ] |
+| US-005 | Apply uid context to edge Echoe controllers | [x] |
+| US-006 | Refactor foundational services for uid filtering | [x] |
 | US-007 | Refactor study-domain services for uid filtering | [ ] |
 | US-008 | Refactor import and export services for user namespace | [ ] |
 | US-009 | Implement media storage and metadata uid isolation | [ ] |
@@ -152,4 +152,31 @@
   - All 7 edge controllers (stats, tag, media, import, export, csv-import, duplicate) now enforce uid context
   - Service methods still need refactoring (US-006-008) to accept and use uid parameters - controllers now capture uid but don't pass it yet
   - Typecheck passes via `pnpm --filter @echoe/server build` which runs tsc
+---
+## 2026-03-14 17:00 - US-006
+- Refactored echoe-config.service.ts to accept uid parameter in all 5 methods (getSettings, updateSettings, getPresets, savePreset, deletePreset)
+- Refactored echoe-deck.service.ts to accept uid parameter in all 13 methods (getAllDecks, getDeckById, createDeck, updateDeck, deleteDeck, getDeckAndSubdeckIds, getDeckConfig, updateDeckConfig, createFilteredDeck, rebuildFilteredDeck, emptyFilteredDeck, previewFilteredDeck, buildFilteredDeck, findCardsBySearch)
+- Added uid filtering to all SELECT queries using `and(eq(table.uid, uid), ...)` pattern
+- Added uid to all INSERT operations
+- Added uid predicates to all UPDATE and DELETE operations
+- Updated echoe-config.controller.ts to pass userDto.uid to all service calls
+- Updated echoe-deck.controller.ts to pass userDto.uid to all service calls
+- Fixed echoe-study.service.ts to pass TEMP_UID to getDeckAndSubdeckIds calls (will be refactored in US-007)
+- Removed TEMP_UID constant from echoe-deck.service.ts (now using real uid from controllers)
+- All joins in deck service now enforce same-uid associations (e.g., deck parent checks, subdeck queries)
+- Files changed:
+  - apps/server/src/services/echoe-config.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+  - apps/server/src/services/echoe-study.service.ts (temporary TEMP_UID fix)
+  - apps/server/src/controllers/v1/echoe-config.controller.ts
+  - apps/server/src/controllers/v1/echoe-deck.controller.ts
+- **Learnings for future iterations:**
+  - Service refactoring pattern: Add uid as first parameter to all service methods
+  - Query filtering pattern: Use `and(eq(table.uid, uid), ...)` for all WHERE clauses
+  - Insert pattern: Include uid in values object for all inserts
+  - Controller pattern: Pass `userDto.uid` to service calls (uid already validated in controller)
+  - Cross-service dependencies: When refactoring services that call other services, use TEMP_UID temporarily until dependent services are refactored
+  - Drizzle ORM: `and()` helper combines multiple conditions, `eq()` for equality checks
+  - Filtered deck search: All deck/note queries in search must include uid filtering
+  - Typecheck is essential - caught missing uid parameters in cross-service calls
 ---
