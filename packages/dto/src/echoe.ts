@@ -288,6 +288,13 @@ export interface CreateEchoeTemplateDto {
   afmt?: string;
 }
 
+export interface EchoeFieldRenameDto {
+  /** Old field name (before rename) */
+  from: string;
+  /** New field name (after rename) */
+  to: string;
+}
+
 export interface UpdateEchoeNoteTypeDto {
   /** Note type name */
   name?: string;
@@ -301,6 +308,8 @@ export interface UpdateEchoeNoteTypeDto {
   flds?: CreateEchoeFieldDto[];
   /** Templates to add */
   tmpls?: CreateEchoeTemplateDto[];
+  /** Field renames: migrate existing notes' fieldsJson keys */
+  fldRenames?: EchoeFieldRenameDto[];
 }
 
 // ===== Notes =====

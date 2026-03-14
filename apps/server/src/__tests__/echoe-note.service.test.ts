@@ -539,3 +539,257 @@ describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation'
     ).rejects.toThrow('deckId is required for move action');
   });
 });
+
+describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes fieldsJson', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+  });
+
+  /**
+   * Builds DB mock for updateNoteType with fldRenames:
+   *  select call 1: fetch notetype row
+   *  update call 1: base updates (mod/usn)
+   *  update call 2: rename flds in notetype
+   *  select call 2: fetch affected notes
+   *  update call 3+: update each note's fieldsJson
+   *  select call 3: getNoteTypeById (returns [] to simplify)
+   */
+  const buildFldRenamesDbMock = (existingFlds: any[], affectedNotes: Array<{ id: number; fieldsJson: Record<string, string> }>) => {
+    // Track all update().set() calls in order
+    const updateSetCalls: any[] = [];
+    const updateWhereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockImplementation((payload: any) => {
+      updateSetCalls.push(payload);
+      return { where: updateWhereMock };
+    });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    // select calls: 1st → notetype row, 2nd → affected notes, 3rd → getNoteTypeById returns []
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        // fetch notetype
+        const limitMock = jest.fn().mockResolvedValue([
+          {
+            id: 10,
+            uid: 'uid-test',
+            flds: JSON.stringify(existingFlds),
+            tmpls: JSON.stringify([]),
+            name: 'TestType',
+            type: 0,
+            mod: 0,
+            usn: 0,
+            sortf: 0,
+            did: null,
+            css: '',
+            latexPre: '',
+            latexPost: '',
+          },
+        ]);
+        const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+        const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+        return { from: fromMock };
+      } else if (selectCallCount === 2) {
+        // fetch affected notes
+        const whereMock = jest.fn().mockResolvedValue(affectedNotes);
+        const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+        return { from: fromMock };
+      } else {
+        // getNoteTypeById – return empty to keep test simple
+        const limitMock = jest.fn().mockResolvedValue([]);
+        const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+        const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+        return { from: fromMock };
+      }
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      update: updateMock,
+    } as any);
+
+    return { setMock, updateSetCalls };
+  };
+
+  it('should rename keys in fieldsJson of existing notes when fldRenames is provided', async () => {
+    const existingFlds = [
+      { name: 'Front', ord: 0 },
+      { name: 'Back', ord: 1 },
+    ];
+    const notes = [
+      { id: 101, fieldsJson: { Front: 'Hello', Back: 'World' } },
+      { id: 102, fieldsJson: { Front: 'Foo', Back: 'Bar' } },
+    ];
+
+    const { updateSetCalls } = buildFldRenamesDbMock(existingFlds, notes);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('uid-test', 10, {
+      fldRenames: [{ from: 'Front', to: 'Question' }],
+    } as any);
+
+    // Find calls that updated fieldsJson (note updates)
+    const noteUpdateCalls = updateSetCalls.filter((c: any) => c.fieldsJson !== undefined);
+    expect(noteUpdateCalls).toHaveLength(2);
+
+    // Note 101: Front → Question, Back unchanged
+    const call1 = noteUpdateCalls.find((c: any) => c.fieldsJson['Question'] === 'Hello');
+    expect(call1).toBeDefined();
+    expect(call1.fieldsJson['Back']).toBe('World');
+    expect(call1.fieldsJson['Front']).toBeUndefined();
+
+    // Note 102: Front → Question, Back unchanged
+    const call2 = noteUpdateCalls.find((c: any) => c.fieldsJson['Question'] === 'Foo');
+    expect(call2).toBeDefined();
+    expect(call2.fieldsJson['Back']).toBe('Bar');
+    expect(call2.fieldsJson['Front']).toBeUndefined();
+  });
+
+  it('should rename field name in notetype flds array when fldRenames is provided', async () => {
+    const existingFlds = [
+      { name: 'OldName', ord: 0 },
+      { name: 'Extra', ord: 1 },
+    ];
+
+    const { updateSetCalls } = buildFldRenamesDbMock(existingFlds, []);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('uid-test', 10, {
+      fldRenames: [{ from: 'OldName', to: 'NewName' }],
+    } as any);
+
+    // Find the notetype flds update call
+    const fldsUpdateCall = updateSetCalls.find((c: any) => c.flds !== undefined);
+    expect(fldsUpdateCall).toBeDefined();
+
+    const updatedFlds = JSON.parse(fldsUpdateCall.flds);
+    expect(updatedFlds[0].name).toBe('NewName');
+    expect(updatedFlds[1].name).toBe('Extra');
+  });
+
+  it('should skip no-op renames (from === to)', async () => {
+    // For no-op, fldRenames logic is skipped entirely, so only 2 select calls:
+    // call 1: fetch notetype, call 2: getNoteTypeById (needs limit())
+    const existingFlds = [{ name: 'Front', ord: 0 }];
+
+    const updateWhereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: updateWhereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    let noopSelectCount = 0;
+    const noopSelectMock = jest.fn().mockImplementation(() => {
+      noopSelectCount++;
+      // Both calls (fetch notetype + getNoteTypeById) need limit()
+      const limitMock = jest.fn().mockResolvedValue(
+        noopSelectCount === 1
+          ? [{
+              id: 10,
+              uid: 'uid-test',
+              flds: JSON.stringify(existingFlds),
+              tmpls: JSON.stringify([]),
+              name: 'TestType',
+              type: 0,
+              mod: 0,
+              usn: 0,
+              sortf: 0,
+              did: null,
+              css: '',
+              latexPre: '',
+              latexPost: '',
+            }]
+          : []
+      );
+      const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+      const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+      return { from: fromMock };
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: noopSelectMock,
+      update: updateMock,
+    } as any);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('uid-test', 10, {
+      fldRenames: [{ from: 'Front', to: 'Front' }],
+    } as any);
+
+    // No flds update or note fieldsJson update should happen for no-op renames
+    const fldsUpdateCall = setMock.mock.calls.find((call: any[]) => call[0]?.flds !== undefined);
+    expect(fldsUpdateCall).toBeUndefined();
+
+    const noteUpdateCall = setMock.mock.calls.find((call: any[]) => call[0]?.fieldsJson !== undefined);
+    expect(noteUpdateCall).toBeUndefined();
+  });
+
+  it('should not update notes if there are no notes for the notetype', async () => {
+    const existingFlds = [{ name: 'Front', ord: 0 }];
+
+    const { updateSetCalls } = buildFldRenamesDbMock(existingFlds, []);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('uid-test', 10, {
+      fldRenames: [{ from: 'Front', to: 'Question' }],
+    } as any);
+
+    // Only the notetype flds update should happen; no note updates
+    const noteUpdateCalls = updateSetCalls.filter((c: any) => c.fieldsJson !== undefined);
+    expect(noteUpdateCalls).toHaveLength(0);
+
+    // But the notetype flds should have been renamed
+    const fldsUpdateCall = updateSetCalls.find((c: any) => c.flds !== undefined);
+    expect(fldsUpdateCall).toBeDefined();
+    const updatedFlds = JSON.parse(fldsUpdateCall.flds);
+    expect(updatedFlds[0].name).toBe('Question');
+  });
+
+  it('should preserve values of non-renamed fields in fieldsJson', async () => {
+    const existingFlds = [
+      { name: 'Term', ord: 0 },
+      { name: 'Definition', ord: 1 },
+      { name: 'Extra', ord: 2 },
+    ];
+    const notes = [
+      {
+        id: 301,
+        fieldsJson: { Term: 'apple', Definition: 'a fruit', Extra: 'red' },
+      },
+    ];
+
+    const { updateSetCalls } = buildFldRenamesDbMock(existingFlds, notes);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('uid-test', 10, {
+      fldRenames: [{ from: 'Term', to: 'Word' }],
+    } as any);
+
+    const noteUpdateCall = updateSetCalls.find((c: any) => c.fieldsJson !== undefined);
+    expect(noteUpdateCall).toBeDefined();
+    expect(noteUpdateCall.fieldsJson).toEqual({
+      Word: 'apple',
+      Definition: 'a fruit',
+      Extra: 'red',
+    });
+  });
+});

@@ -1035,6 +1035,64 @@ export class EchoeNoteService {
       }
     }
 
+    // Rename fields in notetype flds and migrate existing notes' fieldsJson
+    if (dto.fldRenames && dto.fldRenames.length > 0) {
+      // Build a deduplicated rename map (from → to), skip no-ops
+      const renameMap = new Map<string, string>();
+      for (const r of dto.fldRenames) {
+        if (r.from && r.to && r.from !== r.to) {
+          renameMap.set(r.from, r.to);
+        }
+      }
+
+      if (renameMap.size > 0) {
+        // 1. Update field names in the notetype's flds JSON array
+        const currentFlds = JSON.parse(notetype[0].flds) as any[];
+        const updatedFlds = currentFlds.map((f: any) => {
+          const newName = renameMap.get(f.name);
+          return newName !== undefined ? { ...f, name: newName } : f;
+        });
+        await db
+          .update(echoeNotetypes)
+          .set({ flds: JSON.stringify(updatedFlds) })
+          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+
+        logger.info('Renamed fields in notetype flds', {
+          uid,
+          notetypeId: id,
+          renames: Object.fromEntries(renameMap),
+        });
+
+        // 2. Migrate fieldsJson in all notes belonging to this notetype
+        const affectedNotes = await db
+          .select({ id: echoeNotes.id, fieldsJson: echoeNotes.fieldsJson })
+          .from(echoeNotes)
+          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id)));
+
+        if (affectedNotes.length > 0) {
+          for (const note of affectedNotes) {
+            const oldFields = (note.fieldsJson ?? {}) as Record<string, string>;
+            const newFields: Record<string, string> = {};
+            for (const [key, value] of Object.entries(oldFields)) {
+              const newKey = renameMap.get(key) ?? key;
+              newFields[newKey] = value;
+            }
+            await db
+              .update(echoeNotes)
+              .set({ fieldsJson: newFields, mod: now })
+              .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
+          }
+
+          logger.info('Migrated fieldsJson for renamed fields', {
+            uid,
+            notetypeId: id,
+            affectedNotes: affectedNotes.length,
+            renames: Object.fromEntries(renameMap),
+          });
+        }
+      }
+    }
+
     // Return updated note type
     return this.getNoteTypeById(uid, id);
   }
