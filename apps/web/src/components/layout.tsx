@@ -24,7 +24,6 @@ export const Layout = view(({ children }: LayoutProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Check active routes
-  const isStudyPage = location.pathname.startsWith('/cards/study');
   const isDashboardPage = location.pathname.startsWith('/dashboard');
   const isMyDecksPage = location.pathname === '/cards';
   const isBrowseCardsPage = location.pathname.startsWith('/cards/browser');

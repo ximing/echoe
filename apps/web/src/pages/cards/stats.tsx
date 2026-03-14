@@ -39,11 +39,13 @@ const StatsPageContent = view(() => {
   useEffect(() => {
     loadDecks();
     statsService.loadAllStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reload stats when deck or time range changes
   useEffect(() => {
     statsService.setDeckId(selectedDeckId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDeckId]);
 
   const loadDecks = async () => {

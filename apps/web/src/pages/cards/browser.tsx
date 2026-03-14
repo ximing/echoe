@@ -68,6 +68,7 @@ const CardBrowserPageContent = view(() => {
   // Load cards when filters change
   useEffect(() => {
     loadCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, sortField, sortOrder, deckFilter, page]);
 
   const loadDecks = async () => {

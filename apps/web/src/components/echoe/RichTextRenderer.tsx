@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify';
 
 export interface RichTextRendererProps {
   /** Content to render (JSON or HTML string) */
-  content?: string | Record<string, any>;
+  content?: string | Record<string, unknown>;
   /** CSS class name */
   className?: string;
   /** Custom style */
@@ -39,7 +39,7 @@ const rendererExtensions = [
 /**
  * Convert Tiptap JSON to HTML string
  */
-function jsonToHtml(json: Record<string, any>): string {
+function jsonToHtml(json: Record<string, unknown>): string {
   try {
     const html = generateHTML(json, rendererExtensions);
     return html;

@@ -48,6 +48,7 @@ const TagsPageContent = view(() => {
 
   useEffect(() => {
     loadTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter tags by search

@@ -162,7 +162,7 @@ const DeckConfigPageContent = view(() => {
         const fsrsConfig = config.fsrsConfig ?? DEFAULT_FSRS_CONFIG;
         setConfigName(config.name);
         setFormState(toFormState(fsrsConfig));
-      } catch (loadError) {
+      } catch {
         if (mounted) {
           setError('加载卡组配置失败');
         }
@@ -240,7 +240,7 @@ const DeckConfigPageContent = view(() => {
       setConfigName(res.data.name);
       setFormState(toFormState(fsrsConfig));
       toastService.success('FSRS 配置已保存');
-    } catch (_saveError) {
+    } catch {
       toastService.error('保存失败，请稍后重试');
     } finally {
       setIsSaving(false);

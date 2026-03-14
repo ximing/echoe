@@ -39,6 +39,7 @@ const CsvImportPageContent = view(() => {
   useEffect(() => {
     noteTypeService.loadNoteTypes();
     deckService.loadDecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle file selection

@@ -19,7 +19,7 @@ export interface CardRendererProps {
   /** Field values */
   fields: Record<string, string>;
   /** Rich text JSON for fields (keyed by field name) */
-  richTextFields?: Record<string, Record<string, any>>;
+  richTextFields?: Record<string, Record<string, unknown>>;
   /** Which side to render */
   side: 'front' | 'back';
   /** Cloze ordinal for cloze cards (1-based) */
@@ -70,7 +70,7 @@ const rendererExtensions = [
 /**
  * Convert Tiptap JSON to HTML string
  */
-function jsonToHtml(json: Record<string, any>): string {
+function jsonToHtml(json: Record<string, unknown>): string {
   try {
     return generateHTML(json, rendererExtensions);
   } catch (error) {
@@ -97,7 +97,7 @@ function sanitizeForCard(html: string): string {
 function replaceFieldVariables(
   template: string,
   fields: Record<string, string>,
-  richTextFields?: Record<string, Record<string, any>>
+  richTextFields?: Record<string, Record<string, unknown>>
 ): string {
   // Match {{FieldName}} patterns
   return template.replace(/\{\{([^#/}]+)\}\}/g, (_match, fieldName) => {
@@ -117,7 +117,7 @@ function replaceFieldVariables(
 /**
  * Check if a field has content (either plain text or rich text)
  */
-function hasFieldContent(fieldName: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, any>>): boolean {
+function hasFieldContent(fieldName: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, unknown>>): boolean {
   const trimmedName = fieldName.trim();
 
   // Check plain text field
@@ -130,7 +130,7 @@ function hasFieldContent(fieldName: string, fields: Record<string, string>, rich
   if (richTextFields && richTextFields[trimmedName]) {
     const richTextJson = richTextFields[trimmedName];
     // Check if rich text has actual content (has non-empty text nodes)
-    if (richTextJson && richTextJson.content && richTextJson.content.length > 0) {
+    if (richTextJson && Array.isArray(richTextJson.content) && richTextJson.content.length > 0) {
       return true;
     }
   }
@@ -141,7 +141,7 @@ function hasFieldContent(fieldName: string, fields: Record<string, string>, rich
 /**
  * Process Handlebars-style conditionals {{#FieldName}}...{{/FieldName}}
  */
-function processConditionals(template: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, any>>): string {
+function processConditionals(template: string, fields: Record<string, string>, richTextFields?: Record<string, Record<string, unknown>>): string {
   // Positive conditional: {{#FieldName}}...{{/FieldName}}
   // Show block only if field is non-empty (plain text or rich text)
   let result = template.replace(
@@ -343,7 +343,7 @@ function escapeHtml(text: string): string {
 function renderTemplate(
   template: string,
   fields: Record<string, string>,
-  richTextFields: Record<string, Record<string, any>> | undefined,
+  richTextFields: Record<string, Record<string, unknown>> | undefined,
   side: 'front' | 'back',
   clozeOrdinal?: number,
   frontTemplate?: string,
@@ -546,6 +546,7 @@ export function CardRenderer({
         input.removeEventListener('change', handleChange);
       };
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processedContent, side, localTypedAnswers]);
 
   return (

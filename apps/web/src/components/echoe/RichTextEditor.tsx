@@ -25,11 +25,11 @@ import {
 
 export interface RichTextEditorProps {
   /** Editor content (HTML string or JSON) */
-  content?: string | Record<string, any>;
+  content?: string | Record<string, unknown>;
   /** Whether the editor is editable */
   editable?: boolean;
   /** Callback when content changes */
-  onChange?: (html: string, json: Record<string, any>) => void;
+  onChange?: (html: string, json: Record<string, unknown>) => void;
   /** Placeholder text */
   placeholder?: string;
   /** CSS class name */
@@ -51,11 +51,8 @@ function isValidUrl(url: string): boolean {
 }
 
 const MenuBar = ({ editor, editable }: { editor: Editor | null; editable?: boolean }) => {
-  if (!editor) {
-    return null;
-  }
-
   const addImage = useCallback(() => {
+    if (!editor) return;
     const url = window.prompt('Enter image URL');
     if (url && isValidUrl(url)) {
       editor.chain().focus().setImage({ src: url }).run();
@@ -65,6 +62,7 @@ const MenuBar = ({ editor, editable }: { editor: Editor | null; editable?: boole
   }, [editor]);
 
   const addLink = useCallback(() => {
+    if (!editor) return;
     const previousUrl = editor.getAttributes('link').href;
     const url = window.prompt('Enter URL', previousUrl);
     if (url === null) {
@@ -81,7 +79,7 @@ const MenuBar = ({ editor, editable }: { editor: Editor | null; editable?: boole
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
 
-  if (!editable) {
+  if (!editor || !editable) {
     return null;
   }
 

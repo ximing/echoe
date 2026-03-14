@@ -111,7 +111,7 @@ const CardsPageContent = view(() => {
       await echoeApi.rebuildFilteredDeck(deck.id);
       toastService.success('Filtered deck rebuilt');
       deckService.loadDecks();
-    } catch (_error) {
+    } catch {
       toastService.error('Failed to rebuild filtered deck');
     }
   };
@@ -125,7 +125,7 @@ const CardsPageContent = view(() => {
       await echoeApi.emptyFilteredDeck(deck.id);
       toastService.success('Filtered deck emptied');
       deckService.loadDecks();
-    } catch (_error) {
+    } catch {
       toastService.error('Failed to empty filtered deck');
     }
   };
@@ -961,7 +961,7 @@ const FilteredDeckDialog = view(({ onClose, onCreated }: FilteredDeckDialogProps
           if (result.code === 0) {
             setPreview(result.data);
           }
-        } catch (_error) {
+        } catch {
           setPreview(null);
         }
       } else {
@@ -988,7 +988,7 @@ const FilteredDeckDialog = view(({ onClose, onCreated }: FilteredDeckDialogProps
       } else {
         toastService.error('Failed to create filtered deck');
       }
-    } catch (error) {
+    } catch {
       toastService.error('Failed to create filtered deck');
     } finally {
       setIsSubmitting(false);

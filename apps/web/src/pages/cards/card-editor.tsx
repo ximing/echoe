@@ -43,7 +43,7 @@ const CardEditorPageContent = view(() => {
   const [selectedNotetype, setSelectedNotetype] = useState<EchoeNoteTypeDto | null>(null);
   const [selectedDeck, setSelectedDeck] = useState<EchoeDeckWithCountsDto | null>(null);
 const [fields, setFields] = useState<Record<string, string>>({});
-const [richTextFields, setRichTextFields] = useState<Record<string, Record<string, any>>>({});
+const [richTextFields, setRichTextFields] = useState<Record<string, Record<string, unknown>>>({});
 const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showSourceMode, setShowSourceMode] = useState<Record<number, boolean>>({});
@@ -56,6 +56,7 @@ const [tags, setTags] = useState<string[]>([]);
     return () => {
       noteService.clearCurrentNote();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load data on mount
@@ -74,6 +75,7 @@ const [tags, setTags] = useState<string[]>([]);
     } else if (parsedCardId) {
       noteService.loadCard(parsedCardId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parsedNoteId, parsedCardId]);
 
   // Set initial values when note loads (depends on both note and noteTypes being loaded)
@@ -95,6 +97,7 @@ const [tags, setTags] = useState<string[]>([]);
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteService.currentNote, noteService.noteTypes, parsedNoteId, parsedCardId]);
 
   // Set default notetype on first load
@@ -124,6 +127,7 @@ const [tags, setTags] = useState<string[]>([]);
       });
       setFields(newFields);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNotetype?.id]);
 
   // Handle notetype change
@@ -159,7 +163,7 @@ const [tags, setTags] = useState<string[]>([]);
   };
 
   // Check whether a rich text JSON node contains meaningful content
-  const hasRichTextContent = (node: Record<string, any> | undefined): boolean => {
+  const hasRichTextContent = (node: Record<string, unknown> | undefined): boolean => {
     if (!node || typeof node !== 'object') {
       return false;
     }
@@ -277,9 +281,9 @@ const [tags, setTags] = useState<string[]>([]);
   // Build complete richTextFields ensuring all notetype field keys are present.
   // Fields in source mode (HTML textarea) are excluded so the backend uses fields[name] instead.
   // Unedited rich-text fields get an empty ProseMirror doc so the backend can process them uniformly.
-  const buildCompleteRichTextFields = (): Record<string, Record<string, any>> => {
+  const buildCompleteRichTextFields = (): Record<string, Record<string, unknown>> => {
     if (!selectedNotetype) return richTextFields;
-    const complete: Record<string, Record<string, any>> = {};
+    const complete: Record<string, Record<string, unknown>> = {};
     for (const fld of selectedNotetype.flds) {
       if (showSourceMode[fld.ord]) {
         // Field is in source mode — skip; backend will use fields[fld.name] as plain HTML

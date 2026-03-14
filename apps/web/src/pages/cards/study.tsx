@@ -267,6 +267,7 @@ const StudyPageContent = view(() => {
   // Load queue on mount
   useEffect(() => {
     studyService.loadQueue(parsedDeckId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parsedDeckId]);
 
   // Timer interval
@@ -278,6 +279,7 @@ const StudyPageContent = view(() => {
     }, 1000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studyService.queue.length, studyService.isSessionComplete()]);
 
   // Keyboard shortcuts
@@ -316,6 +318,7 @@ const StudyPageContent = view(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studyService.isShowingAnswer, studyService.isLoading]);
 
   // Handle rating
@@ -685,4 +688,5 @@ function SessionCompleteView({
   );
 }
 
-export default bindServices(StudyPageContent, [EchoeStudyService]);
+const StudyPage = bindServices(StudyPageContent, [EchoeStudyService]);
+export default StudyPage;

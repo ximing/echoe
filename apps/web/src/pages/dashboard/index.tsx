@@ -107,6 +107,7 @@ export const DashboardPage = view(() => {
   useEffect(() => {
     deckService.loadDecks();
     dashboardService.loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const totalNew = deckService.decks.reduce((s, d) => s + d.newCount, 0);

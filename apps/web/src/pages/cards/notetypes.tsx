@@ -48,6 +48,7 @@ const NoteTypesPageContent = view(() => {
   // Load note types on mount
   useEffect(() => {
     loadNoteTypes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadNoteTypes = async () => {

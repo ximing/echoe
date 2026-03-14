@@ -47,6 +47,7 @@ const MediaPageContent = view(() => {
 
   useEffect(() => {
     loadMedia();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter media by search

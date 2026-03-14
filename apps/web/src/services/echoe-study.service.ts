@@ -103,7 +103,7 @@ export class EchoeStudyService extends Service {
       const response = await getStudyQueue(deckId);
       // Check if response is valid
       if (!response.data) {
-        const errorMsg = (response as any).msg || 'Failed to load study queue';
+        const errorMsg = (response as { msg?: string }).msg || 'Failed to load study queue';
         this.error = errorMsg;
         resolve(ToastService).show(errorMsg, { type: 'error' });
         this.queue = [];
@@ -124,7 +124,7 @@ export class EchoeStudyService extends Service {
       this.undoStack = [];
       this.sessionStartTime = Date.now();
       this.cardStartTime = Date.now();
-    } catch (err) {
+    } catch {
       this.error = 'Failed to load study queue';
       this.queue = [];
       resolve(ToastService).show('Failed to load study queue', { type: 'error' });
@@ -315,7 +315,7 @@ export class EchoeStudyService extends Service {
       }
 
       return true;
-    } catch (err) {
+    } catch {
       this.error = 'Failed to submit review';
       return false;
     }
@@ -348,7 +348,7 @@ export class EchoeStudyService extends Service {
       this.stats.studied = Math.max(0, this.stats.studied - 1);
 
       return true;
-    } catch (err) {
+    } catch {
       // Restore stack entry so user can retry if network/server transiently fails.
       this.undoStack.push(entry);
       this.error = 'Failed to undo';
@@ -381,7 +381,7 @@ export class EchoeStudyService extends Service {
       this.cardStartTime = Date.now();
 
       return true;
-    } catch (err) {
+    } catch {
       this.error = 'Failed to bury card';
       return false;
     }
@@ -405,7 +405,7 @@ export class EchoeStudyService extends Service {
       this.cardStartTime = Date.now();
 
       return true;
-    } catch (err) {
+    } catch {
       this.error = 'Failed to forget card';
       return false;
     }
