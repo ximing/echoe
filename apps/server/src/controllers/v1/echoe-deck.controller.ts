@@ -1,4 +1,4 @@
-import { JsonController, Get, Post, Put, Delete, Body, Param, QueryParam } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Body, Param, QueryParam, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -14,6 +14,7 @@ import type {
   EchoeDeckConfigDto,
   UpdateEchoeDeckConfigDto,
   FilteredDeckPreviewDto,
+  UserInfoDto,
 } from '@echoe/dto';
 
 @Service()
@@ -26,8 +27,12 @@ export class EchoeDeckController {
    * Get all decks with today's counts
    */
   @Get('/')
-  async getAllDecks() {
+  async getAllDecks(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const decks = await this.echoeDeckService.getAllDecks();
       return ResponseUtil.success(decks);
     } catch (error) {
@@ -41,8 +46,12 @@ export class EchoeDeckController {
    * Get a single deck by ID
    */
   @Get('/:id')
-  async getDeckById(@Param('id') id: number) {
+  async getDeckById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const deck = await this.echoeDeckService.getDeckById(id);
       if (!deck) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -59,8 +68,12 @@ export class EchoeDeckController {
    * Create a new deck
    */
   @Post('/')
-  async createDeck(@Body() dto: CreateEchoeDeckDto) {
+  async createDeck(@Body() dto: CreateEchoeDeckDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.name) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -81,8 +94,12 @@ export class EchoeDeckController {
    * Update a deck (rename and/or update description)
    */
   @Put('/:id')
-  async updateDeck(@Param('id') id: number, @Body() dto: UpdateEchoeDeckDto) {
+  async updateDeck(@Param('id') id: number, @Body() dto: UpdateEchoeDeckDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const deck = await this.echoeDeckService.updateDeck(id, dto);
       if (!deck) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -102,8 +119,12 @@ export class EchoeDeckController {
    * Delete a deck
    */
   @Delete('/:id')
-  async deleteDeck(@Param('id') id: number, @QueryParam('deleteCards') deleteCards: string = 'false') {
+  async deleteDeck(@Param('id') id: number, @QueryParam('deleteCards') deleteCards: string = 'false', @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const deleteCardsBool = deleteCards === 'true';
       const result = await this.echoeDeckService.deleteDeck(id, deleteCardsBool);
       if (!result) {
@@ -121,8 +142,12 @@ export class EchoeDeckController {
    * Get deck configuration
    */
   @Get('/:id/config')
-  async getDeckConfig(@Param('id') id: number) {
+  async getDeckConfig(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const config = await this.echoeDeckService.getDeckConfig(id);
       if (!config) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -139,8 +164,12 @@ export class EchoeDeckController {
    * Update deck configuration
    */
   @Put('/:id/config')
-  async updateDeckConfig(@Param('id') id: number, @Body() dto: UpdateEchoeDeckConfigDto) {
+  async updateDeckConfig(@Param('id') id: number, @Body() dto: UpdateEchoeDeckConfigDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const config = await this.echoeDeckService.updateDeckConfig(id, dto);
       if (!config) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -157,8 +186,12 @@ export class EchoeDeckController {
    * Create a filtered deck
    */
   @Post('/filtered')
-  async createFilteredDeck(@Body() dto: CreateFilteredDeckDto) {
+  async createFilteredDeck(@Body() dto: CreateFilteredDeckDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.name || !dto.searchQuery) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -176,8 +209,12 @@ export class EchoeDeckController {
    * Rebuild a filtered deck
    */
   @Post('/:id/rebuild')
-  async rebuildFilteredDeck(@Param('id') id: number) {
+  async rebuildFilteredDeck(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result = await this.echoeDeckService.rebuildFilteredDeck(id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -194,8 +231,12 @@ export class EchoeDeckController {
    * Empty a filtered deck (return cards to original decks)
    */
   @Post('/:id/empty')
-  async emptyFilteredDeck(@Param('id') id: number) {
+  async emptyFilteredDeck(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result = await this.echoeDeckService.emptyFilteredDeck(id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -212,8 +253,12 @@ export class EchoeDeckController {
    * Preview filtered deck results without creating
    */
   @Get('/preview')
-  async previewFilteredDeck(@QueryParam('q') searchQuery: string, @QueryParam('limit') limit: number = 5) {
+  async previewFilteredDeck(@QueryParam('q') searchQuery: string, @QueryParam('limit') limit: number = 5, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!searchQuery) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }

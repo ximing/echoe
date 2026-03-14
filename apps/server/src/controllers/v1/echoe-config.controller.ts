@@ -1,4 +1,4 @@
-import { JsonController, Get, Put, Body, Post, Delete, Param } from 'routing-controllers';
+import { JsonController, Get, Put, Body, Post, Delete, Param, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -6,7 +6,7 @@ import { EchoeConfigService } from '../../services/echoe-config.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
-import type { UpdateEchoeGlobalSettingsDto, CreateDeckConfigPresetDto } from '@echoe/dto';
+import type { UpdateEchoeGlobalSettingsDto, CreateDeckConfigPresetDto, UserInfoDto } from '@echoe/dto';
 
 @Service()
 @JsonController('/api/v1/config')
@@ -18,8 +18,12 @@ export class EchoeConfigController {
    * Get global echoe settings
    */
   @Get('/')
-  async getSettings() {
+  async getSettings(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const settings = await this.echoeConfigService.getSettings();
       return ResponseUtil.success(settings);
     } catch (error) {
@@ -33,8 +37,12 @@ export class EchoeConfigController {
    * Update global echoe settings
    */
   @Put('/')
-  async updateSettings(@Body() dto: UpdateEchoeGlobalSettingsDto) {
+  async updateSettings(@Body() dto: UpdateEchoeGlobalSettingsDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const settings = await this.echoeConfigService.updateSettings(dto);
       return ResponseUtil.success(settings);
     } catch (error) {
@@ -48,8 +56,12 @@ export class EchoeConfigController {
    * Get all deck config presets
    */
   @Get('/presets')
-  async getPresets() {
+  async getPresets(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const presets = await this.echoeConfigService.getPresets();
       return ResponseUtil.success(presets);
     } catch (error) {
@@ -63,8 +75,12 @@ export class EchoeConfigController {
    * Save a new deck config preset
    */
   @Post('/presets')
-  async savePreset(@Body() dto: CreateDeckConfigPresetDto) {
+  async savePreset(@Body() dto: CreateDeckConfigPresetDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const preset = await this.echoeConfigService.savePreset(dto);
       return ResponseUtil.success(preset);
     } catch (error) {
@@ -78,8 +94,12 @@ export class EchoeConfigController {
    * Delete a deck config preset
    */
   @Delete('/presets/:id')
-  async deletePreset(@Param('id') id: string) {
+  async deletePreset(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       await this.echoeConfigService.deletePreset(id);
       return ResponseUtil.success({ deleted: true });
     } catch (error) {

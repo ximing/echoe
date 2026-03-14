@@ -1,4 +1,4 @@
-import { JsonController, Get, Post, Put, Delete, Body, Param, QueryParam } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Body, Param, QueryParam, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -19,6 +19,7 @@ import type {
   BulkCardOperationDto,
   EchoeNoteQueryParams,
   EchoeCardQueryParams,
+  UserInfoDto,
 } from '@echoe/dto';
 
 @Service()
@@ -37,9 +38,14 @@ export class EchoeNoteController {
     @QueryParam('q') q?: string,
     @QueryParam('status') status?: 'new' | 'learn' | 'review' | 'suspended' | 'buried',
     @QueryParam('page') page?: number,
-    @QueryParam('limit') limit?: number
+    @QueryParam('limit') limit?: number,
+    @CurrentUser() userDto?: UserInfoDto
   ) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const params: EchoeNoteQueryParams = {
         deckId,
         tags,
@@ -62,8 +68,12 @@ export class EchoeNoteController {
    * Get a single note by ID
    */
   @Get('/notes/:id')
-  async getNoteById(@Param('id') id: number) {
+  async getNoteById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const note = await this.echoeNoteService.getNoteById(id);
       if (!note) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -80,8 +90,12 @@ export class EchoeNoteController {
    * Create a new note
    */
   @Post('/notes')
-  async createNote(@Body() dto: CreateEchoeNoteDto) {
+  async createNote(@Body() dto: CreateEchoeNoteDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.notetypeId || !dto.deckId || !dto.fields) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -102,8 +116,12 @@ export class EchoeNoteController {
    * Update a note
    */
   @Put('/notes/:id')
-  async updateNote(@Param('id') id: number, @Body() dto: UpdateEchoeNoteDto) {
+  async updateNote(@Param('id') id: number, @Body() dto: UpdateEchoeNoteDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const note = await this.echoeNoteService.updateNote(id, dto);
       if (!note) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -120,8 +138,12 @@ export class EchoeNoteController {
    * Delete a note
    */
   @Delete('/notes/:id')
-  async deleteNote(@Param('id') id: number) {
+  async deleteNote(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result = await this.echoeNoteService.deleteNote(id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -138,8 +160,12 @@ export class EchoeNoteController {
    * Get a card by ID with full note data
    */
   @Get('/cards/:id')
-  async getCardById(@Param('id') id: number) {
+  async getCardById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const card = await this.echoeNoteService.getCardById(id);
       if (!card) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -164,9 +190,14 @@ export class EchoeNoteController {
     @QueryParam('sort') sort?: 'added' | 'due' | 'mod',
     @QueryParam('order') order?: 'asc' | 'desc',
     @QueryParam('page') page?: number,
-    @QueryParam('limit') limit?: number
+    @QueryParam('limit') limit?: number,
+    @CurrentUser() userDto?: UserInfoDto
   ) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const params: EchoeCardQueryParams = {
         deckId,
         q,
@@ -191,8 +222,12 @@ export class EchoeNoteController {
    * Perform bulk card operations
    */
   @Post('/cards/bulk')
-  async bulkCardOperation(@Body() dto: BulkCardOperationDto) {
+  async bulkCardOperation(@Body() dto: BulkCardOperationDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.cardIds || dto.cardIds.length === 0 || !dto.action) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -213,8 +248,12 @@ export class EchoeNoteController {
    * Get all note types
    */
   @Get('/notetypes')
-  async getAllNoteTypes() {
+  async getAllNoteTypes(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const noteTypes = await this.echoeNoteService.getAllNoteTypes();
       return ResponseUtil.success(noteTypes);
     } catch (error) {
@@ -228,8 +267,12 @@ export class EchoeNoteController {
    * Get a note type by ID
    */
   @Get('/notetypes/:id')
-  async getNoteTypeById(@Param('id') id: number) {
+  async getNoteTypeById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const noteType = await this.echoeNoteService.getNoteTypeById(id);
       if (!noteType) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -246,8 +289,12 @@ export class EchoeNoteController {
    * Create a new note type
    */
   @Post('/notetypes')
-  async createNoteType(@Body() dto: CreateEchoeNoteTypeDto) {
+  async createNoteType(@Body() dto: CreateEchoeNoteTypeDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.name) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -265,8 +312,12 @@ export class EchoeNoteController {
    * Update a note type
    */
   @Put('/notetypes/:id')
-  async updateNoteType(@Param('id') id: number, @Body() dto: UpdateEchoeNoteTypeDto) {
+  async updateNoteType(@Param('id') id: number, @Body() dto: UpdateEchoeNoteTypeDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const noteType = await this.echoeNoteService.updateNoteType(id, dto);
       if (!noteType) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
@@ -283,8 +334,12 @@ export class EchoeNoteController {
    * Delete a note type
    */
   @Delete('/notetypes/:id')
-  async deleteNoteType(@Param('id') id: number) {
+  async deleteNoteType(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result = await this.echoeNoteService.deleteNoteType(id);
       if (!result.success) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, result.message);

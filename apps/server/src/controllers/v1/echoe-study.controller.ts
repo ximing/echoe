@@ -30,9 +30,14 @@ export class EchoeStudyController {
     @QueryParam('deckId') deckId?: number,
     @QueryParam('limit') limit?: number,
     @QueryParam('reviewAhead') reviewAhead?: number,
-    @QueryParam('preview') preview?: boolean
+    @QueryParam('preview') preview?: boolean,
+    @CurrentUser() userDto?: UserInfoDto
   ) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const params: StudyQueueParams = {
         deckId,
         limit,
@@ -109,8 +114,12 @@ export class EchoeStudyController {
    * Bury cards
    */
   @Post('/bury')
-  async buryCards(@Body() dto: BuryCardsDto) {
+  async buryCards(@Body() dto: BuryCardsDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.cardIds || dto.cardIds.length === 0) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -128,8 +137,12 @@ export class EchoeStudyController {
    * Forget cards (reset to new)
    */
   @Post('/forget')
-  async forgetCards(@Body() dto: ForgetCardsDto) {
+  async forgetCards(@Body() dto: ForgetCardsDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.cardIds || dto.cardIds.length === 0) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -147,8 +160,12 @@ export class EchoeStudyController {
    * Get study counts for a deck
    */
   @Get('/counts')
-  async getCounts(@QueryParam('deckId') deckId?: number) {
+  async getCounts(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const counts = await this.echoeStudyService.getCounts(deckId);
       return ResponseUtil.success(counts);
     } catch (error) {
@@ -162,8 +179,12 @@ export class EchoeStudyController {
    * Get scheduling options for a card (preview of all rating outcomes)
    */
   @Get('/options')
-  async getOptions(@QueryParam('cardId') cardId: number) {
+  async getOptions(@QueryParam('cardId') cardId: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (cardId == null || !Number.isFinite(cardId) || cardId <= 0) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
       }
