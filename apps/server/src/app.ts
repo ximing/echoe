@@ -21,6 +21,7 @@ import { EchoeSeedService } from './services/echoe-seed.service.js';
 import { EchoeStudyService } from './services/echoe-study.service.js';
 import { initIOC } from './ioc.js';
 import { authHandler } from './middlewares/auth-handler.js';
+import { ensureUserWorkspace } from './middlewares/ensure-user-workspace.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { logger } from './utils/logger.js';
 
@@ -121,6 +122,7 @@ export async function createApp() {
   app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(authHandler);
+  app.use(ensureUserWorkspace);
 
   // Serve static files from public directory (web build artifacts)
   const publicPath = join(__dirname, '../public');

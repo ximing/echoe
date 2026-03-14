@@ -302,6 +302,7 @@ export class EchoeSeedService {
   /**
    * Seeds the database with default Echoe data if not already seeded.
    * This is idempotent - safe to call multiple times.
+   * @deprecated Use ensureUserWorkspace(uid) for per-user initialization
    */
   async seedIfNeeded(): Promise<void> {
     const db = getDatabase();
@@ -363,6 +364,246 @@ export class EchoeSeedService {
     logger.info('Echoe seed completed successfully');
 
     await this.repairLegacyDueToMilliseconds();
+  }
+
+  /**
+   * Ensures a user has their own Echoe workspace initialized.
+   * This is idempotent - safe to call multiple times for the same user.
+   * Initializes user-scoped defaults for col, deck, deck_config, notetype, and template.
+   *
+   * @param uid - User ID to initialize workspace for
+   */
+  async ensureUserWorkspace(uid: string): Promise<void> {
+    const db = getDatabase();
+
+    // Check if user workspace already exists (check for user's collection)
+    const existingCol = await db
+      .select()
+      .from(echoeCol)
+      .where(eq(echoeCol.uid, uid))
+      .limit(1);
+
+    if (existingCol.length > 0) {
+      logger.debug(`User workspace already exists for uid=${uid}, skipping initialization`);
+      return;
+    }
+
+    logger.info(`Initializing Echoe workspace for user uid=${uid}`);
+
+    const now = Math.floor(Date.now() / 1000);
+    const nowMs = Date.now();
+
+    // Generate unique IDs for user's resources using timestamp-based approach
+    const deckConfigId = nowMs;
+    const deckId = nowMs + 1;
+    const noteTypeBasicId = nowMs + 2;
+    const noteTypeBasicReversedId = nowMs + 3;
+    const noteTypeBasicOptionalReversedId = nowMs + 4;
+    const noteTypeBasicTypeInAnswerId = nowMs + 5;
+    const noteTypeClozeId = nowMs + 6;
+
+    // 1. Create default deck config
+    const deckConfigData = {
+      id: deckConfigId,
+      uid,
+      name: 'Default',
+      replayq: 1,
+      timer: 0,
+      maxTaken: 60,
+      autoplay: 1,
+      mod: now,
+      usn: -1,
+      newConfig: JSON.stringify({
+        bury: true,
+        newBrand: 'again',
+        newGood: 'good',
+        newHard: 'hard',
+        newInterval: 1,
+        newSteps: [1, 10],
+        order: 1,
+        perDay: 20,
+        delays: [1, 10],
+      }),
+      revConfig: JSON.stringify({
+        bury: true,
+        ease: 2.5,
+        ease4: 1.3,
+        fuzz: 0.05,
+        hardMaxInterval: 36500,
+        hardInterval: 1.2,
+        maxInterval: 36500,
+        minSpace: 1,
+        mult: 1,
+        perDay: 200,
+        fsrs: {
+          requestRetention: 0.9,
+          maxInterval: 36500,
+          enableFuzz: true,
+          enableShortTerm: false,
+          learningSteps: [1, 10],
+          relearningSteps: [10],
+        },
+      }),
+      lapseConfig: JSON.stringify({
+        bury: true,
+        delays: [10],
+        leechAction: 0,
+        leechFails: 8,
+        minInt: 1,
+        mult: 1,
+        resched: true,
+      }),
+    };
+    await db.insert(echoeDeckConfig).values(deckConfigData);
+    logger.debug(`Created default deck config for uid=${uid}`);
+
+    // 2. Create default deck
+    const deckData = {
+      id: deckId,
+      uid,
+      name: 'Default',
+      conf: deckConfigId,
+      extendNew: 20,
+      extendRev: 200,
+      usn: -1,
+      lim: 0,
+      collapsed: 0,
+      dyn: 0,
+      mod: now,
+      desc: '',
+      mid: 0,
+    };
+    await db.insert(echoeDecks).values(deckData);
+    logger.debug(`Created default deck for uid=${uid}`);
+
+    // 3. Create note types with templates
+    const noteTypesData = [
+      // Basic
+      {
+        id: noteTypeBasicId,
+        uid,
+        name: 'Basic',
+        mod: now,
+        usn: -1,
+        sortf: 0,
+        did: 0,
+        tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0)]),
+        flds: BASIC_FIELDS,
+        css: DEFAULT_CSS,
+        type: 0,
+        latexPre: '',
+        latexPost: '',
+        req: JSON.stringify([[0, 'any', []]]),
+      },
+      // Basic (Reversed)
+      {
+        id: noteTypeBasicReversedId,
+        uid,
+        name: 'Basic (Reversed)',
+        mod: now,
+        usn: -1,
+        sortf: 0,
+        did: 0,
+        tmpls: JSON.stringify([
+          createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0),
+          createBasicTemplate('Card 2', '{{Back}}', '{{FrontSide}}<hr id="answer">{{Front}}', 1),
+        ]),
+        flds: BASIC_FIELDS,
+        css: DEFAULT_CSS,
+        type: 0,
+        latexPre: '',
+        latexPost: '',
+        req: JSON.stringify([[0, 'any', []], [1, 'any', []]]),
+      },
+      // Basic (Optional Reversed)
+      {
+        id: noteTypeBasicOptionalReversedId,
+        uid,
+        name: 'Basic (Optional Reversed)',
+        mod: now,
+        usn: -1,
+        sortf: 0,
+        did: 0,
+        tmpls: JSON.stringify([
+          createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0),
+          createBasicTemplate('Card 2', '{{#Add Reverse}}{{Back}}{{/Add Reverse}}', '{{FrontSide}}<hr id="answer">{{Front}}', 1),
+        ]),
+        flds: JSON.stringify([
+          { name: 'Front', ord: 0, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', plainText: false },
+          { name: 'Back', ord: 1, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', plainText: false },
+          { name: 'Add Reverse', ord: 2, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', plainText: false },
+        ]),
+        css: DEFAULT_CSS,
+        type: 0,
+        latexPre: '',
+        latexPost: '',
+        req: JSON.stringify([[0, 'any', []], [1, 'any', []]]),
+      },
+      // Basic (Type in the answer)
+      {
+        id: noteTypeBasicTypeInAnswerId,
+        uid,
+        name: 'Basic (Type in the answer)',
+        mod: now,
+        usn: -1,
+        sortf: 0,
+        did: 0,
+        tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{Front}}<br>{{type:Back}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0)]),
+        flds: BASIC_FIELDS,
+        css: DEFAULT_CSS,
+        type: 0,
+        latexPre: '',
+        latexPost: '',
+        req: JSON.stringify([[0, 'any', []]]),
+      },
+      // Cloze
+      {
+        id: noteTypeClozeId,
+        uid,
+        name: 'Cloze',
+        mod: now,
+        usn: -1,
+        sortf: 0,
+        did: 0,
+        tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{cloze:Text}}', '{{cloze:Text}}<br>{{Extra}}', 0)]),
+        flds: CLOZE_FIELDS,
+        css: DEFAULT_CSS,
+        type: 1, // type 1 = cloze
+        latexPre: '',
+        latexPost: '',
+        req: JSON.stringify([[0, 'any', []]]),
+      },
+    ];
+
+    for (const noteType of noteTypesData) {
+      await db.insert(echoeNotetypes).values(noteType);
+      logger.debug(`Created note type: ${noteType.name} for uid=${uid}`);
+    }
+
+    // 4. Create collection
+    const colData: typeof echoeCol.$inferInsert = {
+      id: nowMs + 7,
+      uid,
+      crt: now,
+      mod: now,
+      scm: now,
+      ver: 11,
+      dty: 0,
+      usn: -1,
+      ls: 0,
+      conf: JSON.stringify({
+        ...createDefaultColConfig(),
+        curDeck: deckId, // Point to user's default deck
+      }),
+      models: JSON.stringify({}),
+      decks: JSON.stringify({}),
+      dconf: JSON.stringify({}),
+      tags: JSON.stringify({}),
+    };
+    await db.insert(echoeCol).values(colData);
+    logger.debug(`Created collection for uid=${uid}`);
+
+    logger.info(`Echoe workspace initialization completed for uid=${uid}`);
   }
 
   /**

@@ -5,6 +5,7 @@ import { Service } from 'typedi';
 import { config } from '../../config/config.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 import { UserService } from '../../services/user.service.js';
+import { EchoeSeedService } from '../../services/echoe-seed.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil as ResponseUtility } from '../../utils/response.js';
 
@@ -14,7 +15,10 @@ import type { Response } from 'express';
 @Service()
 @JsonController('/api/v1/auth')
 export class AuthV1Controller {
-  constructor(private userService: UserService) {}
+  constructor(
+    private userService: UserService,
+    private echoeSeedService: EchoeSeedService
+  ) {}
 
   @Post('/register')
   async register(@Body() userData: RegisterDto) {
@@ -47,6 +51,16 @@ export class AuthV1Controller {
         phone: userData.phone,
         status: 1,
       });
+
+      // Initialize user's Echoe workspace
+      try {
+        await this.echoeSeedService.ensureUserWorkspace(user.uid);
+        logger.info(`Initialized Echoe workspace for new user uid=${user.uid}`);
+      } catch (error) {
+        logger.error(`Failed to initialize Echoe workspace for uid=${user.uid}:`, error);
+        // Don't fail registration if workspace initialization fails
+        // User can still use the system, workspace will be initialized on first Echoe access
+      }
 
       return ResponseUtility.success({
         user: {
