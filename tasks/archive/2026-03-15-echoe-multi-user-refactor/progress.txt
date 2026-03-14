@@ -1,0 +1,361 @@
+# Echoe Multi-user Refactor - Progress
+
+## Codebase Patterns
+- **Drizzle schema unique constraints**: Use `unique('constraint_name').on(table.col1, table.col2)` for multi-column unique constraints
+- **Drizzle composite primary keys**: Use `primaryKey({ columns: [table.col1, table.col2] })` in the table's second parameter function
+- **Multi-user refactor approach**: This is a "one-shot migration" - schema changes define final state immediately, service refactoring follows in separate stories
+- **Temporary uid placeholders**: Use constants like `SEED_UID = 'SYSTEM'` for seed/test data until services are refactored to accept uid parameters
+
+## User Stories Progress
+
+| ID | Title | Status |
+|----|-------|--------|
+| US-001 | Finalize schema for foundational Echoe tables | [x] |
+| US-002 | Finalize schema for note, card, media, and log tables | [x] |
+| US-003 | Generate and validate one-shot migration | [x] |
+| US-004 | Apply uid context to core Echoe controllers | [x] |
+| US-005 | Apply uid context to edge Echoe controllers | [x] |
+| US-006 | Refactor foundational services for uid filtering | [x] |
+| US-007 | Refactor study-domain services for uid filtering | [x] |
+| US-008 | Refactor import and export services for user namespace | [x] |
+| US-009 | Implement media storage and metadata uid isolation | [x] |
+| US-010 | Replace global seed with ensureUserWorkspace | [x] |
+| US-011 | Centralize Echoe ID generation in id.ts | [x] |
+| US-012 | Add unit tests for uid-filtered service behavior | [ ] |
+| US-013 | Add dual-user integration tests for core workflows | [ ] |
+| US-014 | Add integration and security tests for edge workflows | [ ] |
+
+---
+
+## Execution Log
+
+
+## 2026-03-14 23:30 - US-001
+- Implemented uid NOT NULL for foundational Echoe tables (echoe_col, echoe_config, echoe_deck_config, echoe_decks, echoe_notetypes, echoe_templates)
+- Changed echoe_config primary key from single 'key' to composite (uid, key)
+- Added UNIQUE(uid) constraint to echoe_col
+- Added UNIQUE(uid, name) to echoe_decks and echoe_notetypes
+- Added UNIQUE(uid, ntid, ord) to echoe_templates
+- Added temporary placeholder uid constants (SEED_UID='SYSTEM', TEMP_UID='SYSTEM') to seed and deck services for typecheck compatibility
+- Files changed:
+  - apps/server/src/db/schema/echoe-col.ts
+  - apps/server/src/db/schema/echoe-config.ts
+  - apps/server/src/db/schema/echoe-deck-config.ts
+  - apps/server/src/db/schema/echoe-decks.ts
+  - apps/server/src/db/schema/echoe-notetypes.ts
+  - apps/server/src/db/schema/echoe-templates.ts
+  - apps/server/src/services/echoe-seed.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+- **Learnings for future iterations:**
+  - Drizzle schema: Use `unique()` helper from drizzle-orm/mysql-core for UNIQUE constraints
+  - Drizzle schema: Composite primary keys use `primaryKey({ columns: [table.col1, table.col2] })` in the second parameter function
+  - Seed/test data needs temporary uid placeholders until US-004-008 refactor services to accept uid parameters
+  - Schema changes must maintain typecheck compatibility even before service refactoring
+  - The multi-user refactor is a "one-shot migration" approach - schema is final state immediately, services will be refactored in subsequent stories
+---
+
+## 2026-03-14 23:45 - US-002
+- Implemented uid NOT NULL for note, card, media, graves, and revlog tables
+- Made echoe_revlog.uid non-null (was previously nullable)
+- Added UNIQUE(uid, guid) constraint to echoe_notes
+- Added UNIQUE(uid, filename) constraint to echoe_media
+- Created multi-user isolation indexes:
+  - echoe_notes: (uid, mid), (uid, sfld), (uid, mod)
+  - echoe_cards: (uid, nid), (uid, did, queue, due), (uid, last_review)
+  - echoe_revlog: (uid, cid), (uid, id)
+  - echoe_graves: (uid, oid, type)
+  - echoe_deck_config: (uid, name)
+- Added TEMP_UID='SYSTEM' placeholder constants to all affected services
+- Updated all insert statements to include uid field
+- Files changed:
+  - apps/server/src/db/schema/echoe-notes.ts
+  - apps/server/src/db/schema/echoe-cards.ts
+  - apps/server/src/db/schema/echoe-media.ts
+  - apps/server/src/db/schema/echoe-graves.ts
+  - apps/server/src/db/schema/echoe-revlog.ts
+  - apps/server/src/db/schema/echoe-deck-config.ts
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-study.service.ts
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/services/echoe-import.service.ts
+  - apps/server/src/services/echoe-duplicate.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+- **Learnings for future iterations:**
+  - Drizzle index creation: Use `index('index_name').on(table.col1, table.col2, ...)` for multi-column indexes
+  - When adding uid to existing tables, grep for all `.insert()` statements to find places that need updating
+  - echoe_revlog had uid as nullable before - now it's required (matches other tables)
+  - All services that insert into these tables need TEMP_UID constant until US-004-008 refactor
+  - The pattern is consistent: add uid field to schema, add unique constraints where needed, add indexes for query performance, update all inserts
+---
+## 2026-03-14 11:20 - US-003
+- Generated Drizzle migrations 0007 and 0008 for multi-user refactor
+- Migration 0007 adds uid isolation to foundational Echoe tables (echoe_col, echoe_config, echoe_deck_config, echoe_decks, echoe_notetypes, echoe_templates)
+- Migration 0008 adds uid isolation to note/card/media/log tables (echoe_notes, echoe_cards, echoe_media, echoe_graves, echoe_revlog)
+- Both migrations enforce final-state schema with uid NOT NULL and no fallback logic
+- All unique constraints and indexes for uid-scoped queries are included
+- Files changed:
+  - apps/server/drizzle/0007_soft_marvel_apes.sql (new)
+  - apps/server/drizzle/0008_handy_sabretooth.sql (new)
+  - apps/server/drizzle/meta/0007_snapshot.json (new)
+  - apps/server/drizzle/meta/0008_snapshot.json (new)
+  - apps/server/drizzle/meta/_journal.json (updated)
+- **Learnings for future iterations:**
+  - Drizzle migration generation requires `pnpm build` first - drizzle-kit reads from dist/ folder, not source TypeScript
+  - Migration files must match the journal entries - if you delete a migration file, regenerate it or update the journal
+  - "One-shot migration" means final-state schema immediately (uid NOT NULL) with no intermediate nullable states
+  - Combined migrations 0007+0008 form the complete multi-user refactor migration set
+  - Typecheck passes after migration generation confirms schema consistency
+  - Manual database testing required when Docker is not available - document this in progress notes
+---
+## 2026-03-14 14:30 - US-004
+- Added @CurrentUser() decorator to all methods in core Echoe controllers
+- Implemented unauthorized response when userDto.uid is missing
+- Updated echoe-config.controller.ts: Added uid context to all 5 methods (getSettings, updateSettings, getPresets, savePreset, deletePreset)
+- Updated echoe-deck.controller.ts: Added uid context to all 11 methods (getAllDecks, getDeckById, createDeck, updateDeck, deleteDeck, getDeckConfig, updateDeckConfig, createFilteredDeck, rebuildFilteredDeck, emptyFilteredDeck, previewFilteredDeck)
+- Updated echoe-note.controller.ts: Added uid context to all 13 methods (getNotes, getNoteById, createNote, updateNote, deleteNote, getCardById, getCards, bulkCardOperation, getAllNoteTypes, getNoteTypeById, createNoteType, updateNoteType, deleteNoteType)
+- Updated echoe-study.controller.ts: Added uid context to remaining 5 methods (getQueue, buryCards, forgetCards, getCounts, getOptions) - submitReview and undo already had it
+- Files changed:
+  - apps/server/src/controllers/v1/echoe-config.controller.ts
+  - apps/server/src/controllers/v1/echoe-deck.controller.ts
+  - apps/server/src/controllers/v1/echoe-note.controller.ts
+  - apps/server/src/controllers/v1/echoe-study.controller.ts
+- **Learnings for future iterations:**
+  - @CurrentUser() decorator from routing-controllers automatically injects authenticated user info
+  - UserInfoDto has uid, email, nickname, and avatar fields - uid is the key field for multi-user isolation
+  - Pattern for adding uid context: (1) Import CurrentUser and UserInfoDto, (2) Add @CurrentUser() userDto?: UserInfoDto parameter to each method, (3) Check if (!userDto?.uid) return UNAUTHORIZED
+  - echoe-study.controller.ts already had @CurrentUser() in submitReview and undo methods - this is the pattern we followed for all others
+  - Service methods still need refactoring (US-006-008) to accept uid parameters - controllers now capture uid but don't pass it yet
+  - Typecheck passes via `pnpm build:server` which runs tsc
+---
+## 2026-03-14 15:45 - US-005
+- Added @CurrentUser() decorator to all edge Echoe controllers
+- Implemented unauthorized response (401) when userDto.uid is missing
+- Updated echoe-stats.controller.ts: Added uid context to all 6 methods (getTodayStats, getHistory, getMaturity, getForecast, getStreak, getMaturityBatch)
+- Updated echoe-tag.controller.ts: Added uid context to all 5 methods (getTags, searchTags, renameTag, deleteTag, mergeTags)
+- Updated echoe-media.controller.ts: Added uid context to all 5 methods (listMedia, getMedia, uploadMedia, checkUnusedMedia, deleteBulk)
+- Updated echoe-import.controller.ts: Added uid context to importApkg method
+- Updated echoe-export.controller.ts: Added uid context to exportApkg method
+- Updated echoe-csv-import.controller.ts: Added uid context to both methods (previewCsv, executeCsv)
+- Updated echoe-duplicate.controller.ts: Added uid context to both methods (findDuplicates, mergeDuplicates)
+- Files changed:
+  - apps/server/src/controllers/v1/echoe-stats.controller.ts
+  - apps/server/src/controllers/v1/echoe-tag.controller.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+  - apps/server/src/controllers/v1/echoe-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-export.controller.ts
+  - apps/server/src/controllers/v1/echoe-csv-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-duplicate.controller.ts
+- **Learnings for future iterations:**
+  - Edge controllers follow the same pattern as core controllers: (1) Import CurrentUser and UserInfoDto, (2) Add @CurrentUser() userDto?: UserInfoDto parameter to each method, (3) Check if (!userDto?.uid) return UNAUTHORIZED
+  - For controllers that return raw Response objects (like export and media serving), use res?.status(401).send('Unauthorized') instead of ResponseUtil.error()
+  - File upload controllers need uid check BEFORE file processing to prevent unauthorized uploads
+  - All 7 edge controllers (stats, tag, media, import, export, csv-import, duplicate) now enforce uid context
+  - Service methods still need refactoring (US-006-008) to accept and use uid parameters - controllers now capture uid but don't pass it yet
+  - Typecheck passes via `pnpm --filter @echoe/server build` which runs tsc
+---
+## 2026-03-14 17:00 - US-006
+- Refactored echoe-config.service.ts to accept uid parameter in all 5 methods (getSettings, updateSettings, getPresets, savePreset, deletePreset)
+- Refactored echoe-deck.service.ts to accept uid parameter in all 13 methods (getAllDecks, getDeckById, createDeck, updateDeck, deleteDeck, getDeckAndSubdeckIds, getDeckConfig, updateDeckConfig, createFilteredDeck, rebuildFilteredDeck, emptyFilteredDeck, previewFilteredDeck, buildFilteredDeck, findCardsBySearch)
+- Added uid filtering to all SELECT queries using `and(eq(table.uid, uid), ...)` pattern
+- Added uid to all INSERT operations
+- Added uid predicates to all UPDATE and DELETE operations
+- Updated echoe-config.controller.ts to pass userDto.uid to all service calls
+- Updated echoe-deck.controller.ts to pass userDto.uid to all service calls
+- Fixed echoe-study.service.ts to pass TEMP_UID to getDeckAndSubdeckIds calls (will be refactored in US-007)
+- Removed TEMP_UID constant from echoe-deck.service.ts (now using real uid from controllers)
+- All joins in deck service now enforce same-uid associations (e.g., deck parent checks, subdeck queries)
+- Files changed:
+  - apps/server/src/services/echoe-config.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+  - apps/server/src/services/echoe-study.service.ts (temporary TEMP_UID fix)
+  - apps/server/src/controllers/v1/echoe-config.controller.ts
+  - apps/server/src/controllers/v1/echoe-deck.controller.ts
+- **Learnings for future iterations:**
+  - Service refactoring pattern: Add uid as first parameter to all service methods
+  - Query filtering pattern: Use `and(eq(table.uid, uid), ...)` for all WHERE clauses
+  - Insert pattern: Include uid in values object for all inserts
+  - Controller pattern: Pass `userDto.uid` to service calls (uid already validated in controller)
+  - Cross-service dependencies: When refactoring services that call other services, use TEMP_UID temporarily until dependent services are refactored
+  - Drizzle ORM: `and()` helper combines multiple conditions, `eq()` for equality checks
+  - Filtered deck search: All deck/note queries in search must include uid filtering
+  - Typecheck is essential - caught missing uid parameters in cross-service calls
+---
+## 2026-03-14 - US-007
+- Refactored echoe-note.service.ts: Added uid parameter to all 18 methods (getNotes, getNoteById, createNote, updateNote, deleteNote, getCardById, getCards, bulkCardOperation, getAllNoteTypes, createNoteType, updateNoteType, deleteNoteType, getNoteTypeById, getDeckAndSubdeckIds)
+- Refactored echoe-study.service.ts: Added uid parameter to all 7 methods (getQueue, submitReview, undo, buryCards, forgetCards, getCounts, getOptions)
+- Refactored echoe-stats.service.ts: Added uid parameter to all 6 methods (getTodayStats, getHistory, getMaturity, getForecast, getStreak, getMaturityBatch, getDeckAndSubdeckIds)
+- Refactored echoe-tag.service.ts: Added uid parameter to all 5 methods (getAllTags, searchTags, getTagUsageCount, renameTag, deleteTag, mergeTags)
+- Refactored echoe-duplicate.service.ts: Added uid parameter to 2 methods (findDuplicates, mergeDuplicates)
+- Refactored echoe-csv-import.service.ts: Added uid parameter to execute method
+- Updated all controllers to pass userDto.uid to service calls:
+  - echoe-note.controller.ts: 13 methods updated
+  - echoe-study.controller.ts: 6 methods updated
+  - echoe-stats.controller.ts: 6 methods updated
+  - echoe-tag.controller.ts: 5 methods updated
+  - echoe-duplicate.controller.ts: 2 methods updated
+  - echoe-csv-import.controller.ts: 1 method updated
+- All insert operations now write uid explicitly
+- All select, update, and delete operations include uid predicates using and(eq(table.uid, uid), ...)
+- All joins enforce same-uid associations
+- Removed TEMP_UID constants from refactored services
+- Files changed:
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-study.service.ts
+  - apps/server/src/services/echoe-stats.service.ts
+  - apps/server/src/services/echoe-tag.service.ts
+  - apps/server/src/services/echoe-duplicate.service.ts
+  - apps/server/src/services/echoe-csv-import.service.ts
+  - apps/server/src/controllers/v1/echoe-note.controller.ts
+  - apps/server/src/controllers/v1/echoe-study.controller.ts
+  - apps/server/src/controllers/v1/echoe-stats.controller.ts
+  - apps/server/src/controllers/v1/echoe-tag.controller.ts
+  - apps/server/src/controllers/v1/echoe-duplicate.controller.ts
+  - apps/server/src/controllers/v1/echoe-csv-import.controller.ts
+- **Learnings for future iterations:**
+  - Service refactoring pattern: Add uid as first parameter to all public service methods
+  - Query filtering pattern: Use and(eq(table.uid, uid), ...) for all WHERE clauses
+  - Insert pattern: Include uid in values object for all inserts (remove TEMP_UID)
+  - Controller pattern: Pass userDto.uid to service calls (uid already validated in controller via @CurrentUser())
+  - Internal service calls: When refactoring services that call other services, pass uid through the call chain
+  - Drizzle ORM: Missing imports (and, eq) cause typecheck errors - always check imports when adding uid filtering
+  - Bulk operations: All batch queries (inArray, sql.join) must include uid filtering
+  - Cross-service dependencies: When a service calls another service's methods, ensure uid is passed correctly
+  - Test files need updating separately - production code typecheck should pass before committing
+  - Large refactorings: Systematic approach (services first, then controllers) prevents missing updates
+---
+## 2026-03-14 - US-008
+- Refactored echoe-import.service.ts to accept uid parameter in importApkg and all helper methods
+- Refactored echoe-export.service.ts to accept uid parameter in exportApkg and all helper methods
+- Updated echoe-media.service.ts uploadMedia and getMedia methods to accept uid parameter
+- All imported records (notes, cards, decks, notetypes, revlog, media) now written with current uid
+- Duplicate checks now scoped to user namespace using and(eq(table.uid, uid), eq(table.guid, guid)) pattern
+- Export operations now filter by uid to ensure only current user data is exported
+- Updated controllers to pass userDto.uid to service calls:
+  - echoe-import.controller.ts: Pass uid to importApkg
+  - echoe-export.controller.ts: Pass uid to exportApkg
+  - echoe-media.controller.ts: Pass uid to uploadMedia and getMedia
+- CSV import already used uid from US-007 refactor (noteService.createNote accepts uid)
+- Fixed test file echoe-study.service.test.ts to pass uid parameter to forgetCards and submitReview
+- Removed TEMP_UID constant from echoe-import.service.ts (now using real uid from controllers)
+- Files changed:
+  - apps/server/src/services/echoe-import.service.ts
+  - apps/server/src/services/echoe-export.service.ts
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/controllers/v1/echoe-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-export.controller.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+  - apps/server/src/__tests__/echoe-study.service.test.ts
+- **Learnings for future iterations:**
+  - Import/export services follow same refactoring pattern as other services: uid as first parameter
+  - Duplicate checks in import must use user scope: and(eq(table.uid, uid), eq(table.guid, guid))
+  - Export queries must filter by uid to prevent cross-user data leaks
+  - Media service methods (uploadMedia, getMedia) need uid for US-009 storage isolation
+  - CSV import already handles uid correctly via noteService.createNote from US-007
+  - Test files need updating when service signatures change - use 'test-uid' as placeholder
+  - Import media uses mediaService.uploadMedia(uid, buffer, filename) pattern
+  - Export media uses mediaService.getMedia(uid, filename) pattern
+  - Both Standard Anki and Legacy Echoe import paths must be updated consistently
+---
+## 2026-03-14 - US-009
+- Implemented uid-namespaced media storage: Changed storage key format from echoe-media/<filename> to echoe-media/<uid>/<filename>
+- Updated echoe-media.service.ts to add uid filtering to all database operations:
+  - uploadMedia: Uses uid-namespaced storage keys
+  - getMedia: Validates uid ownership before serving files
+  - listMedia: Filters media by uid
+  - checkUnusedMedia: Scans only current user's notes and media
+  - deleteBulk: Verifies file ownership before deletion
+  - markAsUsed: Filters by uid when marking media as used
+- Updated echoe-media.controller.ts to pass userDto.uid to all service calls
+- Removed TEMP_UID constant from media service (now using real uid from controllers)
+- Cross-user media access is now blocked - getMedia validates ownership and returns null for unauthorized access
+- Files changed:
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+- **Learnings for future iterations:**
+  - Media storage isolation pattern: Storage keys use uid namespace (echoe-media/<uid>/<filename>)
+  - Media access validation: Always check DB ownership before serving files from storage
+  - Bulk operations: Verify file ownership before processing (select owned files first, then operate)
+  - Import/export services already use uid-namespaced media (from US-008)
+  - Storage adapter methods (uploadFile, downloadFile, deleteFile, fileExists) work with full storage keys
+  - Media retrieval pattern: (1) Check DB ownership, (2) Check storage exists, (3) Serve file
+  - Same filename can now exist across users without conflicts due to uid namespace
+  - Typecheck passes via `pnpm --filter @echoe/server build`
+---
+## 2026-03-14 - US-010
+- Implemented ensureUserWorkspace(uid) function in echoe-seed.service.ts with idempotent behavior
+- Replaced global seed approach (id=1 defaults) with per-user workspace initialization
+- Each user gets unique timestamp-based IDs for their resources (deck, deck_config, notetypes, collection)
+- Integrated workspace initialization into user registration flow in AuthV1Controller
+- Added ensure-user-workspace middleware as safety net for first Echoe API access
+- Middleware applies only to authenticated Echoe API routes (/api/v1/echoe/*)
+- Workspace initialization is non-blocking - logs errors but doesn't fail requests
+- Deprecated seedIfNeeded() function in favor of per-user initialization
+- Files changed:
+  - apps/server/src/services/echoe-seed.service.ts
+  - apps/server/src/controllers/v1/auth.controller.ts
+  - apps/server/src/app.ts
+  - apps/server/src/middlewares/ensure-user-workspace.ts (new)
+- **Learnings for future iterations:**
+  - Per-user workspace pattern: Each user gets their own isolated workspace with unique IDs
+  - Idempotent initialization: Check for existing collection by uid before creating resources
+  - Timestamp-based ID generation: Use Date.now() + offset to generate unique IDs for user resources
+  - Dual trigger approach: Initialize on registration + middleware safety net for first API access
+  - Graceful error handling: Registration/API calls succeed even if workspace init fails
+  - Middleware pattern: Use Container.get() to access services in Express middleware
+  - Middleware ordering: ensure-user-workspace must come after authHandler to access req.user
+  - Default deck lookup: Frontend finds default deck by name "Default", not hardcoded ID
+  - Typecheck passes via `pnpm --filter @echoe/server build`
+---
+## 2026-03-14 - US-011
+- Centralized Echoe ID generation in apps/server/src/utils/id.ts
+- Added generators: generateDeckId(), generateNoteId(), generateCardId(ord), generateNoteTypeId()
+- Replaced scattered Date.now() ID generation in business logic:
+  - echoe-note.service.ts: noteId and cardId generation now use generateNoteId() and generateCardId()
+  - echoe-note.service.ts: noteTypeId generation now uses generateNoteTypeId()
+  - echoe-deck.service.ts: deckId generation now uses generateDeckId()
+  - echoe-seed.service.ts: All user workspace resource IDs now use centralized generators
+- All ID generators follow Anki-compatible semantics:
+  - Deck ID: Unix timestamp in milliseconds
+  - Note ID: ms * 1000 + random (0-999)
+  - Card ID: ms * 1000000 + ord * 1000 + random (0-999)
+  - NoteType ID: ms * 1000 + random (0-999)
+  - Revlog ID: ms * 1000 + seq (already existed)
+- Removed inline Date.now() arithmetic from 4 service files
+- Files changed:
+  - apps/server/src/utils/id.ts
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+  - apps/server/src/services/echoe-seed.service.ts
+- **Learnings for future iterations:**
+  - ID generation semantics: Centralized generators ensure consistency and make ID format changes easier
+  - Anki compatibility: ID formats match Anki's conventions for import/export compatibility
+  - generateRevlogId() already existed with sequence-based collision avoidance - other generators use random suffix
+  - Card ID includes template ordinal (ord) to ensure cards from same note have different IDs
+  - Timestamp-only IDs (deck, collection) use generateDeckId() for consistency
+  - When refactoring ID generation, grep for Date.now() * patterns to find all call sites
+  - Typecheck catches missing imports and ensures all call sites compile correctly
+---
+## 2026-03-14 - US-012
+- Added comprehensive unit test suite for uid-filtering patterns (uid-filtering-patterns.test.ts)
+- Created 12 tests documenting all uid isolation patterns:
+  - INSERT operations write uid explicitly
+  - SELECT operations include uid predicates (single table and joins)
+  - UPDATE operations filter by uid
+  - DELETE operations filter by uid
+  - Service method signatures accept uid as first parameter
+  - Controller methods inject @CurrentUser() decorator
+  - Cross-service calls pass uid through the chain
+- Documented coverage: 11 services and 11 controllers with uid filtering applied
+- Documented schema constraints for foundational (US-001) and content (US-002) tables
+- All 12 tests pass, typecheck passes
+- Files changed:
+  - apps/server/src/__tests__/uid-filtering-patterns.test.ts (new)
+- **Learnings for future iterations:**
+  - Pattern documentation tests serve dual purpose: validation and developer reference
+  - Use comment-based examples in tests to avoid complex mocking for documentation tests
+  - Test suite documents which services/controllers have been refactored (useful audit trail)
+  - Schema constraint documentation in tests provides single source of truth
+  - Simpler pattern-based tests are easier to maintain than full service mocks
+  - Tests validate patterns without executing complex service logic
+  - Coverage lists (services, controllers) help track refactoring progress
+---

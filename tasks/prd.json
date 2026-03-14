@@ -1,204 +1,186 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/echoe-multi-user-refactor",
-  "description": "Echoe 多用户重构（上线前一次性迁移版）- 将单用户全局共享模型升级为按 uid 强隔离的逻辑多租户模型。",
+  "branchName": "ralph/echoe-id-refactor-big-bang",
+  "description": "Echoe ID 重构（Big Bang）：将业务关联 ID 从数值迁移为基于 generateTypeId 的 nanoid 字符串，并统一使用业务 ID 字段做关联。",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Finalize schema for foundational Echoe tables",
-      "description": "As a backend developer, I want foundational Echoe tables to include uid isolation constraints so tenant boundaries are enforced at the data model level.",
+      "title": "Add Echoe OBJECT_TYPE constants",
+      "description": "As a backend developer, I want dedicated Echoe object types so every domain entity can generate prefixed string IDs consistently.",
       "acceptanceCriteria": [
-        "Add uid NOT NULL to echoe_col, echoe_config, echoe_deck_config, echoe_decks, echoe_notetypes, and echoe_templates",
-        "Set echoe_config key uniqueness to user scope via PRIMARY KEY (uid, key) or equivalent UNIQUE(uid, key)",
-        "Add UNIQUE(uid) to echoe_col",
-        "Add UNIQUE(uid, name) to echoe_decks and echoe_notetypes",
-        "Add UNIQUE(uid, ntid, ord) to echoe_templates",
+        "Add OBJECT_TYPE entries: ECHOE_CARD, ECHOE_NOTE, ECHOE_DECK, ECHOE_NOTETYPE, ECHOE_TEMPLATE, ECHOE_REVLOG, ECHOE_COL, ECHOE_DECK_CONFIG, ECHOE_GRAVE, ECHOE_MEDIA",
+        "All new constants are exported from apps/server/src/models/constant/type.ts and referenced without ts-ignore",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Finalize schema for note, card, media, and log tables",
-      "description": "As a backend developer, I want content and log tables to enforce uid-scoped uniqueness and indexes so all high-traffic Echoe data is isolated and queryable.",
+      "title": "Extend generateTypeId for Echoe prefixes",
+      "description": "As a backend developer, I want generateTypeId to cover all Echoe entities so string ID generation is centralized.",
       "acceptanceCriteria": [
-        "Add uid NOT NULL to echoe_notes, echoe_cards, echoe_media, echoe_graves, and echoe_revlog",
-        "Make echoe_revlog.uid non-null in final schema",
-        "Add UNIQUE(uid, guid) to echoe_notes",
-        "Add UNIQUE(uid, filename) to echoe_media",
-        "Create first-wave indexes for echoe_notes (uid, mid), (uid, sfld), (uid, mod)",
-        "Create first-wave indexes for echoe_cards (uid, nid), (uid, did, queue, due), (uid, last_review)",
-        "Create first-wave indexes for echoe_revlog (uid, cid), (uid, id), echoe_graves (uid, oid, type), and echoe_deck_config (uid, name)",
+        "Add generateTypeId switch cases for all Echoe OBJECT_TYPE values in apps/server/src/utils/id.ts",
+        "Prefix mapping matches PRD: ec/en/ed/ent/et/erl/ecol/edc/eg/em",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Generate and validate one-shot migration",
-      "description": "As a release engineer, I want one destructive Drizzle migration for final-state schema so rollout is deterministic and avoids manual database edits.",
+      "title": "Refactor notes and cards schema to business IDs",
+      "description": "As a backend developer, I want notes and cards tables to use string business IDs so core note-card relationships no longer depend on numeric IDs.",
       "acceptanceCriteria": [
-        "Generate migration with pnpm --filter @echoe/server migrate:generate from final schema",
-        "Migration SQL contains final-state structure only with no compatibility columns or uid IS NULL fallback logic",
-        "Migration runs successfully with pnpm --filter @echoe/server migrate on a cleaned Echoe dataset",
-        "Post-migration schema matches declared table constraints and indexes",
+        "In echoe_notes, keep auto-increment primary id and add unique note_id varchar(191)",
+        "In echoe_cards, keep auto-increment primary id and add unique card_id varchar(191)",
+        "Convert relation fields mid/nid/did/odid from numeric to varchar(191) where required by PRD",
+        "Update related indexes in echoe_notes.ts and echoe-cards.ts",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Apply uid context to core Echoe controllers",
-      "description": "As an API developer, I want core Echoe controllers to require authenticated uid context so requests always execute in the current user namespace.",
+      "title": "Refactor decks/notetypes/templates schema",
+      "description": "As a backend developer, I want deck, notetype, and template schemas to use business IDs so downstream relationships are string-based.",
       "acceptanceCriteria": [
-        "Update echoe-config.controller.ts, echoe-deck.controller.ts, echoe-note.controller.ts, and echoe-study.controller.ts to inject @CurrentUser() userDto",
-        "Return unauthorized response when userDto.uid is missing",
-        "Pass uid explicitly from controller methods to service calls",
+        "In echoe_decks add deck_id and convert conf/mid to varchar(191)",
+        "In echoe_notetypes add note_type_id and convert did to varchar(191)",
+        "In echoe_templates add template_id and convert ntid/did to varchar(191)",
+        "Keep numeric auto-increment primary key id for each table",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Apply uid context to edge Echoe controllers",
-      "description": "As an API developer, I want edge Echoe controllers to enforce uid context so non-core workflows cannot leak data across users.",
+      "title": "Refactor revlog/col/deck-config schema",
+      "description": "As a backend developer, I want revlog, collection, and deck config schemas to use business IDs so scheduling and config references are consistent.",
       "acceptanceCriteria": [
-        "Update echoe-stats.controller.ts, echoe-tag.controller.ts, echoe-media.controller.ts, echoe-import.controller.ts, echoe-export.controller.ts, echoe-csv-import.controller.ts, and echoe-duplicate.controller.ts to inject @CurrentUser() userDto",
-        "Return unauthorized response when userDto.uid is missing",
-        "Pass uid explicitly from controller methods to service calls",
+        "In echoe_revlog add revlog_id and convert cid to varchar(191)",
+        "In echoe_col add col_id and keep uid unique behavior unchanged",
+        "In echoe_deck_config add deck_config_id and keep existing config payload fields intact",
+        "Keep numeric auto-increment primary key id where applicable",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Refactor foundational services for uid filtering",
-      "description": "As a backend developer, I want foundational Echoe services to write and query by uid so base metadata is tenant-safe.",
+      "title": "Refactor graves/media schema and index alignment",
+      "description": "As a backend developer, I want graves and media tables aligned with business IDs so deletion tracking and media metadata follow the same ID model.",
       "acceptanceCriteria": [
-        "Refactor echoe-config.service.ts and echoe-deck.service.ts signatures to include uid: string",
-        "Ensure insert operations write uid explicitly",
-        "Ensure select, update, and delete operations include uid predicates",
-        "Ensure joins in these services enforce same-uid associations",
-        "Tests pass",
+        "In echoe_graves add grave_id and convert oid to varchar(191)",
+        "In echoe_media add media_id with unique constraint",
+        "Keep echoe_config as composite key (uid, key) without adding config_id",
+        "Update affected indexes and unique constraints to match string ID columns",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Refactor study-domain services for uid filtering",
-      "description": "As a backend developer, I want note and study domain services to enforce uid boundaries so learning data cannot be cross-accessed.",
+      "title": "Finalize schema exports and build input",
+      "description": "As a release engineer, I want schema exports and compiled output ready so migration generation reads the correct final model.",
       "acceptanceCriteria": [
-        "Refactor echoe-note.service.ts, echoe-study.service.ts, echoe-stats.service.ts, echoe-tag.service.ts, and echoe-duplicate.service.ts signatures to include uid: string",
-        "Ensure insert operations write uid explicitly",
-        "Ensure select, update, and delete operations include uid predicates",
-        "Ensure joins in these services enforce same-uid associations",
-        "Tests pass",
+        "Update apps/server/src/db/schema/index.ts exports for all changed tables",
+        "Run pnpm --filter @echoe/server build successfully before migration generation",
+        "Compiled schema in dist matches source-level final schema changes",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Refactor import and export services for user namespace",
-      "description": "As a backend developer, I want import/export pipelines to operate in uid namespace so package and CSV operations remain tenant-isolated.",
+      "title": "Generate migration for ID refactor",
+      "description": "As a release engineer, I want a deterministic migration script so Big Bang ID schema changes can be applied in one controlled step.",
       "acceptanceCriteria": [
-        "Refactor echoe-import.service.ts, echoe-export.service.ts, and echoe-csv-import.service.ts signatures to include uid: string",
-        "Ensure all imported records are written with current uid",
-        "Apply duplicate checks in user scope such as (uid, guid)",
-        "Ensure export only reads current uid data",
-        "Update CSV import flow to use noteService.createNote(uid, dto)",
-        "Tests pass",
+        "Run pnpm --filter @echoe/server migrate:generate after server build",
+        "Generated SQL includes business ID columns, string foreign key columns, and expected indexes",
+        "Migration artifacts are updated consistently in apps/server/drizzle and drizzle/meta",
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Implement media storage and metadata uid isolation",
-      "description": "As a user, I want media files and metadata namespaced by uid so same filenames can coexist without cross-user access.",
+      "title": "Run migration and verify constraints",
+      "description": "As a release engineer, I want to execute migration and validate schema so runtime code can rely on new ID constraints safely.",
       "acceptanceCriteria": [
-        "Change object storage key format from echoe-media/<filename> to echoe-media/<uid>/<filename>",
-        "Ensure echoe-media DB reads, updates, and deletes are filtered by uid",
-        "Keep upload and retrieval behavior consistent for same-user access",
-        "Reject or hide cross-user media access attempts",
-        "Tests pass",
+        "Run pnpm --filter @echoe/server migrate successfully on test/dev database",
+        "Verify each target table has expected *_id unique column and string relation columns",
+        "Verify key indexes for uid + business relation fields exist after migration",
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-010",
-      "title": "Replace global seed with ensureUserWorkspace",
-      "description": "As a new user, I want my own default Echoe workspace initialized automatically so I can use Echoe without relying on global seed data.",
+      "title": "Convert core DTO entity ID types to string",
+      "description": "As a shared package maintainer, I want core DTO entities to use string IDs so backend and frontend contracts are consistent.",
       "acceptanceCriteria": [
-        "Add ensureUserWorkspace(uid) with idempotent behavior",
-        "Initialize user-scoped defaults for col, deck, deck_config, notetype, and template",
-        "Trigger initialization on registration success or first Echoe entry",
-        "Remove reliance on global fixed resources such as id=1 defaults",
-        "Tests pass",
+        "Update entity DTOs in packages/dto/src/echoe.ts (Deck/DeckConfig/NoteType/Template/Note/Card/CardListItem/StudyQueueItem/Media) from number IDs to string IDs",
+        "Update related relation fields nid/did/mid/cid/ntid/conf/oid to string where they represent business IDs",
+        "No ID field in these core entity DTOs remains typed as number unless it is non-business numeric data",
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-011",
-      "title": "Centralize Echoe ID generation in id.ts",
-      "description": "As a maintainer, I want Echoe domain IDs generated from a single utility so ID semantics are consistent and Date.now() usage is removed from business logic.",
+      "title": "Convert DTO command and query payload IDs",
+      "description": "As a shared package maintainer, I want DTO input/query payloads to use string IDs so APIs accept business IDs end-to-end.",
       "acceptanceCriteria": [
-        "Add or extend generators in apps/server/src/utils/id.ts for deck, notetype, template, note, card, and revlog",
-        "Replace scattered Date.now() ID generation in Echoe business code with centralized helpers",
-        "Ensure all updated call sites compile with explicit ID source",
-        "Tests pass",
+        "Update Create/Update/Bulk/Review/Csv/Duplicate payload DTOs with ID fields from number to string",
+        "Update query DTOs that include deckId/noteId/cardId/notetypeId to string",
+        "Preserve numeric typing for non-ID numeric fields (time, counts, intervals, rating values)",
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-012",
-      "title": "Add unit tests for uid-filtered service behavior",
-      "description": "As a QA-focused developer, I want unit coverage proving service queries include uid filters so accidental omissions are caught early.",
+      "title": "Build DTO package after ID contract changes",
+      "description": "As a shared package maintainer, I want DTO package build output refreshed so downstream apps consume the new string ID contracts.",
       "acceptanceCriteria": [
-        "Add or update unit tests to assert uid predicates in key service query paths",
-        "Cover insert paths to assert uid is written",
-        "Cover update/delete paths to assert uid-scoped mutations",
-        "Tests pass",
+        "Run pnpm --filter @echoe/dto build with success",
+        "Generated dist declaration files reflect string ID definitions",
+        "No stale number-based ID declaration remains in DTO dist output",
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-013",
-      "title": "Add dual-user integration tests for core workflows",
-      "description": "As a QA-focused developer, I want A/B user integration tests for core Echoe flows so cross-user visibility and mutation regressions are blocked.",
+      "title": "Refactor note service to string business IDs",
+      "description": "As a backend developer, I want note-domain service logic to use string business IDs so note and card operations stop converting IDs to numbers.",
       "acceptanceCriteria": [
-        "Add integration tests covering note, card, deck, study, stats, and tag workflows with two users",
-        "Assert user B cannot read, update, or delete user A resources",
-        "Assert cross-user lookups return unauthorized or empty results per endpoint contract",
+        "Update apps/server/src/services/echoe-note.service.ts to query and mutate by business ID columns",
+        "Remove Number()/parseInt() usage for note/card/deck/notetype ID conversions in this service",
+        "Ensure grave writes and mapping DTO outputs use string business IDs",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -208,18 +190,177 @@
     },
     {
       "id": "US-014",
-      "title": "Add integration and security tests for edge workflows",
-      "description": "As a QA-focused developer, I want edge-path isolation tests so import/export/media workflows are release-gated against tenant boundary leaks.",
+      "title": "Refactor deck service to string business IDs",
+      "description": "As a backend developer, I want deck-domain service logic to use string business IDs so deck CRUD and filtered-deck behavior remain consistent.",
       "acceptanceCriteria": [
-        "Add integration tests for import, export, and media flows using two users",
-        "Verify exports only contain current uid data",
-        "Verify same filename uploads across users do not conflict",
-        "Add malicious cross-user ID access tests for protected Echoe APIs",
-        "Mark dual-user isolation suite as release gate",
+        "Update apps/server/src/services/echoe-deck.service.ts to use deck_id and deck_config_id for business relations",
+        "Remove numeric ID conversions in deck service logic and response mapping",
+        "Ensure deck hierarchy and filtered-deck query paths still work with string IDs",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Refactor study and stats services to string IDs",
+      "description": "As a backend developer, I want study and stats services to use string business IDs so scheduling and statistics remain correct after migration.",
+      "acceptanceCriteria": [
+        "Update apps/server/src/services/echoe-study.service.ts and echoe-stats.service.ts for string card/note/deck/revlog IDs",
+        "Keep due/interval/time computations numeric while ID fields remain string",
+        "Remove ID-related Number()/parseInt() conversions from both services",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Refactor import/export services for string IDs",
+      "description": "As a backend developer, I want import and export services to map business IDs correctly so import/export pipelines stay functional.",
+      "acceptanceCriteria": [
+        "Update apps/server/src/services/echoe-import.service.ts and echoe-export.service.ts for string business IDs",
+        "When importing, generate new business IDs via generateTypeId for created entities",
+        "Ensure export payload generation reads string business IDs without numeric casts",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Refactor remaining Echoe services to string IDs",
+      "description": "As a backend developer, I want remaining Echoe services to align with string IDs so no isolated service still relies on numeric business IDs.",
+      "acceptanceCriteria": [
+        "Update echoe-csv-import.service.ts, echoe-duplicate.service.ts, echoe-media.service.ts, echoe-config.service.ts, and echoe-tag.service.ts for string ID usage",
+        "Replace ID-related numeric casts in service internals and DTO mappings",
+        "Ensure service signatures and call sites remain consistent after type changes",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Remove legacy numeric Echoe ID generator usage",
+      "description": "As a maintainer, I want legacy numeric ID generators removed so new code cannot regress to numeric business IDs.",
+      "acceptanceCriteria": [
+        "Delete generateDeckId/generateNoteId/generateCardId/generateNoteTypeId/generateRevlogId from apps/server/src/utils/id.ts",
+        "Replace all remaining call sites with generateTypeId-based business ID creation",
+        "Search for Date.now()-based Echoe ID generation no longer returns active business-ID code paths",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Refactor core Echoe controllers for string ID params",
+      "description": "As an API developer, I want core Echoe controllers to accept string IDs so controller-service contracts match the new DTO and schema model.",
+      "acceptanceCriteria": [
+        "Update echoe-note.controller.ts, echoe-deck.controller.ts, echoe-study.controller.ts, and echoe-config.controller.ts ID params from number to string",
+        "Remove parseInt/Number conversion logic for route and query ID params in these controllers",
+        "Ensure controller method signatures align with updated service method signatures",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Refactor edge Echoe controllers for string ID params",
+      "description": "As an API developer, I want edge Echoe controllers to accept string IDs so all endpoints consistently use business IDs.",
+      "acceptanceCriteria": [
+        "Update echoe-stats.controller.ts, echoe-tag.controller.ts, echoe-media.controller.ts, echoe-import.controller.ts, echoe-export.controller.ts, echoe-csv-import.controller.ts, and echoe-duplicate.controller.ts for string ID params",
+        "Remove parseInt/Number conversion logic for IDs in these controllers",
+        "All controller call sites compile against updated services and DTOs",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Update web API client signatures to string IDs",
+      "description": "As a frontend developer, I want web API wrappers to use string IDs so requests match backend contracts without ID casting.",
+      "acceptanceCriteria": [
+        "Update apps/web/src/api/echoe.ts method signatures from number IDs to string IDs",
+        "Remove .toString() conversions that were only needed for numeric IDs",
+        "Ensure request params/body fields still use expected server key names",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Update web services ID state types",
+      "description": "As a frontend developer, I want web service layer state to use string IDs so UI state and API contracts are consistent.",
+      "acceptanceCriteria": [
+        "Update echoe-deck.service.ts, echoe-note.service.ts, echoe-study.service.ts, echoe-stats.service.ts, echoe-csv-import.service.ts, and related services to string ID types",
+        "Replace Set<number> and number-based ID fields with Set<string> and string fields",
+        "Ensure service method signatures and internal caches compile with updated DTO types",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Update cards pages for string ID routing and actions",
+      "description": "As a frontend developer, I want cards page logic to stop numeric ID parsing so UI actions work with string business IDs.",
+      "acceptanceCriteria": [
+        "Update apps/web/src/pages/cards/** to remove parseInt/Number usage for deckId/noteId/cardId",
+        "Update route param handling and event handlers to pass string IDs directly",
+        "Selection and expansion state uses string IDs consistently",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Add and update tests for string-ID migration behavior",
+      "description": "As a QA-focused developer, I want automated tests covering string-ID flows so regressions are detected before merge.",
+      "acceptanceCriteria": [
+        "Add or update backend unit/integration tests for note/deck/study/import/export paths using string business IDs",
+        "Add or update tests that cover ID generation and relation integrity for migrated schema contracts",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Run mandatory migration quality gates",
+      "description": "As a release engineer, I want mandatory quality gate commands to pass so the Big Bang migration is safe to merge.",
+      "acceptanceCriteria": [
+        "Run pnpm --filter @echoe/server test with exit code 0",
+        "Run pnpm --filter @echoe/dto test with exit code 0",
+        "Run pnpm lint with exit code 0",
+        "Run pnpm --filter @echoe/server typecheck, pnpm --filter @echoe/web typecheck, and pnpm --filter @echoe/dto typecheck with exit code 0",
+        "Typecheck passes"
+      ],
+      "priority": 25,
       "passes": false,
       "notes": ""
     }
