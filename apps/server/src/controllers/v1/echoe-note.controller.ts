@@ -33,7 +33,7 @@ export class EchoeNoteController {
    */
   @Get('/notes')
   async getNotes(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('tags') tags?: string,
     @QueryParam('q') q?: string,
     @QueryParam('status') status?: 'new' | 'learn' | 'review' | 'suspended' | 'buried',
@@ -68,7 +68,7 @@ export class EchoeNoteController {
    * Get a single note by ID
    */
   @Get('/notes/:id')
-  async getNoteById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getNoteById(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -116,7 +116,7 @@ export class EchoeNoteController {
    * Update a note
    */
   @Put('/notes/:id')
-  async updateNote(@Param('id') id: number, @Body() dto: UpdateEchoeNoteDto, @CurrentUser() userDto?: UserInfoDto) {
+  async updateNote(@Param('id') id: string, @Body() dto: UpdateEchoeNoteDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -138,7 +138,7 @@ export class EchoeNoteController {
    * Delete a note
    */
   @Delete('/notes/:id')
-  async deleteNote(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async deleteNote(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -160,7 +160,7 @@ export class EchoeNoteController {
    * Get a card by ID with full note data
    */
   @Get('/cards/:id')
-  async getCardById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getCardById(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -183,7 +183,7 @@ export class EchoeNoteController {
    */
   @Get('/cards')
   async getCards(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('q') q?: string,
     @QueryParam('status') status?: 'new' | 'learn' | 'review' | 'suspended' | 'buried' | 'leech',
     @QueryParam('tag') tag?: string,
@@ -270,7 +270,7 @@ export class EchoeNoteController {
    * Get a note type by ID
    */
   @Get('/notetypes/:id')
-  async getNoteTypeById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getNoteTypeById(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -315,7 +315,7 @@ export class EchoeNoteController {
    * Update a note type
    */
   @Put('/notetypes/:id')
-  async updateNoteType(@Param('id') id: number, @Body() dto: UpdateEchoeNoteTypeDto, @CurrentUser() userDto?: UserInfoDto) {
+  async updateNoteType(@Param('id') id: string, @Body() dto: UpdateEchoeNoteTypeDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -337,7 +337,7 @@ export class EchoeNoteController {
    * Delete a note type
    */
   @Delete('/notetypes/:id')
-  async deleteNoteType(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async deleteNoteType(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);

@@ -27,7 +27,7 @@ export class EchoeStudyController {
    */
   @Get('/queue')
   async getQueue(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('limit') limit?: number,
     @QueryParam('reviewAhead') reviewAhead?: number,
     @QueryParam('preview') preview?: boolean,
@@ -68,8 +68,8 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      if (!Number.isFinite(dto.cardId) || dto.cardId <= 0) {
-        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId must be a positive number');
+      if (!dto.cardId || dto.cardId.trim() === '') {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
       }
 
       if (!Number.isInteger(dto.rating) || dto.rating < 1 || dto.rating > 4) {
@@ -96,7 +96,7 @@ export class EchoeStudyController {
    * Undo the last review
    */
   @Post('/undo')
-  async undo(@QueryParam('reviewId') reviewId?: number, @CurrentUser() userDto?: UserInfoDto) {
+  async undo(@QueryParam('reviewId') reviewId?: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -164,7 +164,7 @@ export class EchoeStudyController {
    * Get study counts for a deck
    */
   @Get('/counts')
-  async getCounts(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getCounts(@QueryParam('deckId') deckId?: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -183,13 +183,13 @@ export class EchoeStudyController {
    * Get scheduling options for a card (preview of all rating outcomes)
    */
   @Get('/options')
-  async getOptions(@QueryParam('cardId') cardId: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getOptions(@QueryParam('cardId') cardId: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      if (cardId == null || !Number.isFinite(cardId) || cardId <= 0) {
+      if (!cardId || cardId.trim() === '') {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
       }
 

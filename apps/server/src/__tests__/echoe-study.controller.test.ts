@@ -13,8 +13,8 @@ describe('EchoeStudyController submitReview validation', () => {
   let controller: EchoeStudyController;
   let submitReviewMock: jest.Mock;
 
-  const createDto = (overrides: Partial<{ cardId: number; rating: number; timeTaken: number }> = {}) => ({
-    cardId: 1001,
+  const createDto = (overrides: Partial<{ cardId: string; rating: number; timeTaken: number }> = {}) => ({
+    cardId: 'ec_test_card_001',
     rating: 3,
     timeTaken: 1500,
     ...overrides,
@@ -77,10 +77,10 @@ describe('EchoeStudyController undo ownership check', () => {
   });
 
   it('should call undo with uid and reviewId when user is authenticated', async () => {
-    const response = await controller.undo(42, mockUser);
+    const response = await controller.undo('erl_test_review_42', mockUser);
 
     expect(response.code).toBe(ErrorCode.SUCCESS);
-    expect(undoMock).toHaveBeenCalledWith(mockUser.uid, 42);
+    expect(undoMock).toHaveBeenCalledWith(mockUser.uid, 'erl_test_review_42');
   });
 
   it('should propagate permission denied error from service', async () => {
@@ -89,7 +89,7 @@ describe('EchoeStudyController undo ownership check', () => {
       message: 'Permission denied: this review does not belong to you',
     });
 
-    const response = await controller.undo(99, mockUser);
+    const response = await controller.undo('erl_test_review_99', mockUser);
 
     expect(response.code).toBe(ErrorCode.PARAMS_ERROR);
     expect(response.msg).toBe('Permission denied: this review does not belong to you');
