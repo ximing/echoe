@@ -174,11 +174,15 @@ export const submitReview = (data: ReviewSubmissionDto) => {
 };
 
 /**
- * Undo last review
+ * Undo a specific review by reviewId
  */
-export const undoReview = () => {
+export const undoReview = (reviewId?: number) => {
   return request.post<unknown, { code: number; data: { success: boolean; card?: StudyQueueItemDto } }>(
-    '/api/v1/study/undo'
+    '/api/v1/study/undo',
+    undefined,
+    {
+      params: reviewId !== undefined ? { reviewId } : undefined,
+    }
   );
 };
 

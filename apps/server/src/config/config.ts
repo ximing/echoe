@@ -101,6 +101,7 @@ export interface Config {
   attachment: AttachmentConfig;
   scheduler?: {
     dbOptimizationCron: string; // Cron expression for database optimization (default: '0 2 * * *' - daily at 2 AM)
+    studyUnburyCron: string; // Cron expression for study unbury at day boundary (default: '5 0 * * *' - daily at 00:05)
   };
   openai: {
     apiKey: string;
@@ -208,6 +209,7 @@ export const config: Config = {
   },
   scheduler: {
     dbOptimizationCron: process.env.DB_OPTIMIZATION_CRON || '0 2 * * *', // 默认每天凌晨 2 点
+    studyUnburyCron: process.env.STUDY_UNBURY_CRON || '5 0 * * *', // 默认每天 00:05 执行埋卡恢复
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',

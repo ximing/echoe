@@ -258,22 +258,23 @@ export class EchoeStudyService extends Service {
 
     const timeTaken = Date.now() - this.cardStartTime;
 
-    // Save current state for undo
-    this.undoStack.push({
-      cardId: card.cardId,
-      previousState: { ...card },
-    });
-    // Keep only last 10 entries
-    if (this.undoStack.length > 10) {
-      this.undoStack.shift();
-    }
-
     try {
       const res = await apiSubmitReview({
         cardId: card.cardId,
         rating,
         timeTaken,
       });
+
+      // Save current state for undo with exact reviewId to avoid cross-tab mismatch.
+      this.undoStack.push({
+        cardId: card.cardId,
+        previousState: { ...card },
+        reviewId: res?.data?.reviewId,
+      });
+      // Keep only last 10 entries
+      if (this.undoStack.length > 10) {
+        this.undoStack.shift();
+      }
 
       // Check for leech detection
       if (res?.data?.isLeech) {
@@ -329,8 +330,13 @@ export class EchoeStudyService extends Service {
     const entry = this.undoStack.pop();
     if (!entry) return false;
 
+    if (entry.reviewId == null) {
+      this.error = 'Cannot undo this review reliably. Please refresh and retry.';
+      return false;
+    }
+
     try {
-      await apiUndoReview();
+      await apiUndoReview(entry.reviewId);
 
       // Move back to previous card
       this.currentIndex = Math.max(0, this.currentIndex - 1);
@@ -343,6 +349,8 @@ export class EchoeStudyService extends Service {
 
       return true;
     } catch (err) {
+      // Restore stack entry so user can retry if network/server transiently fails.
+      this.undoStack.push(entry);
       this.error = 'Failed to undo';
       return false;
     }

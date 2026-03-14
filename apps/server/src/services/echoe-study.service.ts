@@ -1,7 +1,7 @@
 import { Service } from 'typedi';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, isNull, or } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
-import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes } from '../db/schema/index.js';
+import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes, users } from '../db/schema/index.js';
 import type { Card } from 'ts-fsrs';
 import { z } from 'zod';
 
@@ -31,6 +31,7 @@ import type {
  * For new cards we pass through native FSRS Card initialization.
  */
 type FSRSCardInput = FSRSInput | Card;
+type StudyReviewResultDto = ReviewResultDto & { reviewId?: number };
 
 type FsrsTimingContext = {
   elapsedDays: number;
@@ -173,7 +174,7 @@ export class EchoeStudyService {
   /**
    * Submit a review for a card
    */
-  async submitReview(dto: ReviewSubmissionDto, uid?: string): Promise<ReviewResultDto> {
+  async submitReview(dto: ReviewSubmissionDto, uid?: string): Promise<StudyReviewResultDto> {
     const db = getDatabase();
     const now = new Date();
 
@@ -288,14 +289,14 @@ export class EchoeStudyService {
       .where(eq(echoeCards.id, dto.cardId));
 
     const revlogType = this.resolveRevlogType(card, deck);
+    const reviewId = generateRevlogId();
 
     // Log the review using pre-review card state
     await db.insert(echoeRevlog).values({
-      id: generateRevlogId(),
+      id: reviewId,
       cid: dto.cardId,
       uid: uid ?? null,
-      nid: card.nid,
-      lid: 0,
+      usn: -1,
       ease: dto.rating,
       ivl: schedulingResult.interval,
       lastIvl: card.ivl,
@@ -417,6 +418,7 @@ export class EchoeStudyService {
       nextFactor: schedulingResult.stability,
       graduated,
       isLeech,
+      reviewId,
     };
   }
 
@@ -602,18 +604,71 @@ export class EchoeStudyService {
   }
 
   /**
-   * Unbury cards at day boundary
-   * Resets all buried cards (queue=-2 or queue=-3) to their previous queue value
+   * Unbury buried cards for all active users at day boundary.
    */
-  async unburyAtDayBoundary(): Promise<number> {
+  async unburyAtDayBoundaryForAllUsers(): Promise<{ userCount: number; unburiedCount: number }> {
+    const db = getDatabase();
+
+    const activeUsers = await db
+      .select({ uid: users.uid })
+      .from(users)
+      .where(eq(users.deletedAt, 0));
+
+    let unburiedCount = 0;
+
+    for (const user of activeUsers) {
+      if (!user.uid) {
+        continue;
+      }
+      unburiedCount += await this.unburyAtDayBoundary(user.uid);
+    }
+
+    return {
+      userCount: activeUsers.length,
+      unburiedCount,
+    };
+  }
+
+  /**
+   * Unbury cards at day boundary for a specific user.
+   * Only cards that have revlog ownership for the given uid are unburied.
+   */
+  async unburyAtDayBoundary(uid: string): Promise<number> {
     const db = getDatabase();
     const now = Math.floor(Date.now() / 1000);
 
-    // Get all buried cards
+    if (!uid) {
+      logger.warn('Skip unburyAtDayBoundary: missing uid', {
+        event: 'study_unbury_missing_uid',
+      });
+      return 0;
+    }
+
+    // Find buried cards belonging to this user.
+    //
+    // Ownership is determined via two complementary paths:
+    //   1. Cards with at least one revlog row whose uid matches → clearly owned by this user.
+    //   2. Cards with NO revlog at all (e.g. brand-new cards that were sibling-buried before
+    //      ever being reviewed) → they have no owner signal in revlog, so we include them to
+    //      prevent permanent entombment.  A LEFT JOIN with revlog.cid IS NULL captures this.
+    //
+    // Using INNER JOIN would miss path-2 cards entirely, leaving them buried forever.
     const buriedCards = await db
-      .select()
+      .selectDistinct({
+        id: echoeCards.id,
+        type: echoeCards.type,
+      })
       .from(echoeCards)
-      .where(sql`${echoeCards.queue} IN (-2, -3)`);
+      .leftJoin(echoeRevlog, eq(echoeRevlog.cid, echoeCards.id))
+      .where(
+        and(
+          sql`${echoeCards.queue} IN (-2, -3)`,
+          or(
+            eq(echoeRevlog.uid, uid),      // path 1: has a revlog owned by this user
+            isNull(echoeRevlog.cid)        // path 2: has no revlog at all (never reviewed)
+          )
+        )
+      );
 
     let unburiedCount = 0;
 
@@ -643,7 +698,7 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(eq(echoeCards.id, card.id));
+        .where(eq(echoeCards.id, Number(card.id)));
 
       unburiedCount++;
     }
@@ -675,10 +730,10 @@ export class EchoeStudyService {
       .where(and(...newConditions))
       .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
-    // Learning cards (queue=1 or queue=3)
+    // Learning cards due now (queue=1 or queue=3 and due <= now)
     const learnConditions = deckFilter
-      ? [deckFilter, sql`${echoeCards.queue} IN (1, 3)`]
-      : [sql`${echoeCards.queue} IN (1, 3)`];
+      ? [deckFilter, sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`]
+      : [sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`];
     const learnCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)

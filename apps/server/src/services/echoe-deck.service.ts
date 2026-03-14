@@ -963,7 +963,7 @@ export class EchoeDeckService {
         } else {
           return []; // No notes with this tag
         }
-      } else if (term === 'is:new' || term === 'is:learning') {
+      } else if (term === 'is:new') {
         // New cards
         conditions.push(eq(echoeCards.queue, 0));
       } else if (term === 'is:learn' || term === 'is:learning') {

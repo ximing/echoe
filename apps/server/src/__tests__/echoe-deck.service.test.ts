@@ -34,7 +34,6 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
     difficultCount: 0,
     averageRetrievability: 0,
     lastStudiedAt: null,
-    children: [],
     ...overrides,
     children: overrides.children ?? [],
   });

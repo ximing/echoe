@@ -464,6 +464,171 @@ describe('EchoeStudyService - forgetCards', () => {
   });
 });
 
+describe('EchoeStudyService - unburyAtDayBoundary ownership guard', () => {
+  let service: EchoeStudyService;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should skip unbury when uid is missing', async () => {
+    const selectDistinctMock = jest.fn();
+
+    mockedGetDatabase.mockReturnValue({
+      selectDistinct: selectDistinctMock,
+    } as any);
+
+    const count = await service.unburyAtDayBoundary('');
+
+    expect(count).toBe(0);
+    expect(selectDistinctMock).not.toHaveBeenCalled();
+  });
+
+  it('should use leftJoin and unbury cards owned by uid', async () => {
+    const whereSelectMock = jest.fn().mockResolvedValue([
+      { id: 1001, type: 0 },
+      { id: 1002, type: 3 },
+    ]);
+    const leftJoinMock = jest.fn().mockReturnValue({ where: whereSelectMock });
+    const fromMock = jest.fn().mockReturnValue({ leftJoin: leftJoinMock });
+    const selectDistinctMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    const whereUpdateMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereUpdateMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    mockedGetDatabase.mockReturnValue({
+      selectDistinct: selectDistinctMock,
+      update: updateMock,
+    } as any);
+
+    const count = await service.unburyAtDayBoundary('user-a');
+
+    expect(count).toBe(2);
+    expect(selectDistinctMock).toHaveBeenCalledTimes(1);
+    expect(fromMock).toHaveBeenCalledTimes(1);
+    // Must use leftJoin (not innerJoin) so cards with no revlog are also unburied
+    expect(leftJoinMock).toHaveBeenCalledTimes(1);
+    expect(whereSelectMock).toHaveBeenCalledTimes(1);
+
+    expect(setMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        queue: 0,
+        usn: -1,
+      })
+    );
+    expect(setMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        queue: 3,
+        usn: -1,
+      })
+    );
+    expect(whereUpdateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should unbury new cards with no revlog (sibling-buried before first review)', async () => {
+    // Simulate a card that was sibling-buried (queue=-3) but has never been reviewed
+    // (no revlog entry). With the old INNER JOIN it would never be found; with the
+    // new LEFT JOIN + IS NULL condition it must be included.
+    const whereSelectMock = jest.fn().mockResolvedValue([
+      { id: 2001, type: 0 }, // new card, no revlog
+    ]);
+    const leftJoinMock = jest.fn().mockReturnValue({ where: whereSelectMock });
+    const fromMock = jest.fn().mockReturnValue({ leftJoin: leftJoinMock });
+    const selectDistinctMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    const whereUpdateMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereUpdateMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    mockedGetDatabase.mockReturnValue({
+      selectDistinct: selectDistinctMock,
+      update: updateMock,
+    } as any);
+
+    const count = await service.unburyAtDayBoundary('user-b');
+
+    // The card must be unburied despite having no revlog
+    expect(count).toBe(1);
+    expect(leftJoinMock).toHaveBeenCalledTimes(1);
+    // New card (type=0) should be restored to queue=0
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queue: 0,
+        usn: -1,
+      })
+    );
+    expect(whereUpdateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('EchoeStudyService - unburyAtDayBoundaryForAllUsers', () => {
+  let service: EchoeStudyService;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should aggregate unbury counts across active users', async () => {
+    const whereMock = jest.fn().mockResolvedValue([{ uid: 'user-a' }, { uid: 'user-b' }]);
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+    } as any);
+
+    const unburySpy = jest
+      .spyOn(service, 'unburyAtDayBoundary')
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3);
+
+    const result = await service.unburyAtDayBoundaryForAllUsers();
+
+    expect(result).toEqual({ userCount: 2, unburiedCount: 5 });
+    expect(selectMock).toHaveBeenCalledTimes(1);
+    expect(fromMock).toHaveBeenCalledTimes(1);
+    expect(whereMock).toHaveBeenCalledTimes(1);
+    expect(unburySpy).toHaveBeenNthCalledWith(1, 'user-a');
+    expect(unburySpy).toHaveBeenNthCalledWith(2, 'user-b');
+  });
+
+  it('should return zero counts when no active users exist', async () => {
+    const whereMock = jest.fn().mockResolvedValue([]);
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+    } as any);
+
+    const unburySpy = jest.spyOn(service, 'unburyAtDayBoundary').mockResolvedValue(1);
+
+    const result = await service.unburyAtDayBoundaryForAllUsers();
+
+    expect(result).toEqual({ userCount: 0, unburiedCount: 0 });
+    expect(unburySpy).not.toHaveBeenCalled();
+  });
+});
+
 describe('EchoeStudyService - submitReview learning_steps persistence', () => {
   let service: EchoeStudyService;
   let scheduleCardMock: jest.Mock;

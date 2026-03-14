@@ -587,6 +587,8 @@ export interface ReviewResultDto {
   graduated: boolean;
   /** Whether card was detected as a leech */
   isLeech?: boolean;
+  /** Revlog ID created for this review; used for precise undo */
+  reviewId?: number;
 }
 
 export interface StudyCountsDto {

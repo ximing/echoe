@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import cron from 'node-cron';
 import dayjs from 'dayjs';
 import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
@@ -17,6 +18,7 @@ import { controllers } from './controllers/index.js';
 import { initializeDatabase, checkConnectionHealth, closeDatabase } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { EchoeSeedService } from './services/echoe-seed.service.js';
+import { EchoeStudyService } from './services/echoe-study.service.js';
 import { initIOC } from './ioc.js';
 import { authHandler } from './middlewares/auth-handler.js';
 import { errorHandler } from './middlewares/error-handler.js';
@@ -56,6 +58,44 @@ export async function createApp() {
     logger.error('Failed to seed Echoe default data:', error);
     throw error;
   }
+
+  const echoeStudyService = Container.get(EchoeStudyService);
+  const studyUnburyCron = config.scheduler?.studyUnburyCron || '5 0 * * *';
+
+  const runStudyUnburyJob = async (trigger: 'startup' | 'schedule') => {
+    try {
+      const { userCount, unburiedCount } = await echoeStudyService.unburyAtDayBoundaryForAllUsers();
+      logger.info('Study unbury job completed', {
+        event: 'study_unbury_job_completed',
+        trigger,
+        userCount,
+        unburiedCount,
+      });
+    } catch (error) {
+      logger.error('Study unbury job failed', {
+        event: 'study_unbury_job_failed',
+        trigger,
+        error,
+      });
+    }
+  };
+
+  const studyUnburyTask = cron.schedule(
+    studyUnburyCron,
+    () => {
+      void runStudyUnburyJob('schedule');
+    },
+    { timezone: config.locale.timezone }
+  );
+
+  logger.info('Study unbury cron registered', {
+    event: 'study_unbury_cron_registered',
+    cron: studyUnburyCron,
+    timezone: config.locale.timezone,
+  });
+
+  // Catch-up run for deployments/restarts that cross day boundary.
+  await runStudyUnburyJob('startup');
 
   const app: any = express();
 
@@ -146,6 +186,9 @@ export async function createApp() {
     logger.info(`Received ${signal}, shutting down gracefully...`);
     server.close(async () => {
       try {
+        // Stop scheduled tasks before database shutdown.
+        studyUnburyTask.stop();
+
         // Close MySQL connection pool
         await closeDatabase();
         logger.info('All resources cleaned up');

@@ -252,6 +252,9 @@ export class EchoeNoteService {
           lapses: 0,
           left: 0,
           usn: 0,
+          stability: 0,
+          difficulty: 0,
+          lastReview: 0,
         });
       }
 
@@ -1216,6 +1219,9 @@ export class EchoeNoteService {
       lapses: card.lapses,
       left: card.left,
       usn: card.usn,
+      stability: card.stability ?? 0,
+      difficulty: card.difficulty ?? 0,
+      lastReview: card.lastReview ?? 0,
     };
   }
 

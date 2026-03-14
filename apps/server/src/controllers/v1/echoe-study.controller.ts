@@ -164,7 +164,7 @@ export class EchoeStudyController {
   @Get('/options')
   async getOptions(@QueryParam('cardId') cardId: number) {
     try {
-      if (!cardId) {
+      if (cardId == null || !Number.isFinite(cardId) || cardId <= 0) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
       }
 
