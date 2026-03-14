@@ -3,7 +3,6 @@ import { Service } from 'typedi';
 
 import { config } from '../../config/config.js';
 import { ErrorCode } from '../../constants/error-codes.js';
-import { GitHubReleaseService } from '../../services/github-release.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil as ResponseUtility } from '../../utils/response.js';
 
@@ -12,7 +11,7 @@ import type { UserInfoDto } from '@echoe/dto';
 @Service()
 @JsonController('/api/v1/system')
 export class SystemController {
-  constructor(private gitHubReleaseService: GitHubReleaseService) {}
+  constructor() {}
 
   @Get('/open/version')
   async getVersion(@CurrentUser() user: UserInfoDto) {
@@ -30,8 +29,7 @@ export class SystemController {
   @Get('/open/app-versions')
   async getAppVersions() {
     try {
-      const versions = await this.gitHubReleaseService.getAllVersions();
-      return ResponseUtility.success(versions);
+      return ResponseUtility.success({});
     } catch (error) {
       logger.error('Error fetching app versions:', error);
       return ResponseUtility.error(

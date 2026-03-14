@@ -404,8 +404,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dto
       '@rabjs/react':
-        specifier: ^9.0.0
-        version: 9.0.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^9.0.5
+        version: 9.0.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@tiptap/extension-image':
         specifier: ^3.20.1
         version: 3.20.1(@tiptap/core@3.20.1(@tiptap/pm@3.20.1))
@@ -2145,11 +2145,11 @@ packages:
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
 
-  '@rabjs/observer@9.0.0':
-    resolution: {integrity: sha512-eMuyAm+CwIY1WkGxUZNP0nXLK+qOpBGTN85fx4JxWQx902bZNuKh1DVSb7Bw1r/3iMifqF/iFmyZWahxIX+pfQ==}
+  '@rabjs/observer@9.0.5':
+    resolution: {integrity: sha512-fc0MSeiudb0BsMDaPgvTfpZDzsYvYokjUq8ByHc6J+vYvDXkAgXmTrFholX5lv+TekfsiqJsejyMv22lDTS9lg==}
 
-  '@rabjs/react@9.0.0':
-    resolution: {integrity: sha512-aQgi4Cd7iHBPH6juVAZKlX+wOBf2cXqMilmr8jJITxFN0fD6krwTegl338LVnu+6tVxRdx6X7n2EZmT/mg5pkQ==}
+  '@rabjs/react@9.0.5':
+    resolution: {integrity: sha512-yZ4uCi+8bRXTnsT/lhgxjbVJpMmhqbduRIITdCSvf2zgS4QAeAm13w+oZtcO7IVWt00HORAj1dcIUokuSKimww==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -2157,8 +2157,8 @@ packages:
       react-dom:
         optional: true
 
-  '@rabjs/service@9.0.0':
-    resolution: {integrity: sha512-KnrcB2ysuR+1FnztaXbNiY/zl0bk5THNzyEtABKcXpqfLKcUoIbpdzFBk42cnGk9zF7QUWu0xExqqAfKArqeZw==}
+  '@rabjs/service@9.0.5':
+    resolution: {integrity: sha512-OD0QnW/WF7B6Hm6raF64xscgbehT8YbkQZHtJ+s2y4tZM0F4KofEss7fcOYduUogkCj0q48e4ZoSkHy8G/QJxQ==}
 
   '@reduxjs/toolkit@2.11.2':
     resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
@@ -10618,23 +10618,23 @@ snapshots:
 
   '@pkgr/core@0.2.9': {}
 
-  '@rabjs/observer@9.0.0': {}
+  '@rabjs/observer@9.0.5': {}
 
-  '@rabjs/react@9.0.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@rabjs/react@9.0.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@rabjs/observer': 9.0.0
-      '@rabjs/service': 9.0.0
+      '@rabjs/observer': 9.0.5
+      '@rabjs/service': 9.0.5
       nanoid: 5.1.6
       react: 19.2.4
       use-sync-external-store: 1.6.0(react@19.2.4)
     optionalDependencies:
       react-dom: 19.2.4(react@19.2.4)
 
-  '@rabjs/service@9.0.0':
+  '@rabjs/service@9.0.5':
     dependencies:
       eventemitter3: 5.0.4
     optionalDependencies:
-      '@rabjs/observer': 9.0.0
+      '@rabjs/observer': 9.0.5
 
   '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.2.13)(react@19.2.4)(redux@5.0.1))(react@19.2.4)':
     dependencies:
