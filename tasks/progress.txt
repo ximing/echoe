@@ -19,7 +19,7 @@
 | US-007 | Refactor study-domain services for uid filtering | [x] |
 | US-008 | Refactor import and export services for user namespace | [x] |
 | US-009 | Implement media storage and metadata uid isolation | [x] |
-| US-010 | Replace global seed with ensureUserWorkspace | [ ] |
+| US-010 | Replace global seed with ensureUserWorkspace | [x] |
 | US-011 | Centralize Echoe ID generation in id.ts | [ ] |
 | US-012 | Add unit tests for uid-filtered service behavior | [ ] |
 | US-013 | Add dual-user integration tests for core workflows | [ ] |
@@ -279,5 +279,30 @@
   - Storage adapter methods (uploadFile, downloadFile, deleteFile, fileExists) work with full storage keys
   - Media retrieval pattern: (1) Check DB ownership, (2) Check storage exists, (3) Serve file
   - Same filename can now exist across users without conflicts due to uid namespace
+  - Typecheck passes via `pnpm --filter @echoe/server build`
+---
+## 2026-03-14 - US-010
+- Implemented ensureUserWorkspace(uid) function in echoe-seed.service.ts with idempotent behavior
+- Replaced global seed approach (id=1 defaults) with per-user workspace initialization
+- Each user gets unique timestamp-based IDs for their resources (deck, deck_config, notetypes, collection)
+- Integrated workspace initialization into user registration flow in AuthV1Controller
+- Added ensure-user-workspace middleware as safety net for first Echoe API access
+- Middleware applies only to authenticated Echoe API routes (/api/v1/echoe/*)
+- Workspace initialization is non-blocking - logs errors but doesn't fail requests
+- Deprecated seedIfNeeded() function in favor of per-user initialization
+- Files changed:
+  - apps/server/src/services/echoe-seed.service.ts
+  - apps/server/src/controllers/v1/auth.controller.ts
+  - apps/server/src/app.ts
+  - apps/server/src/middlewares/ensure-user-workspace.ts (new)
+- **Learnings for future iterations:**
+  - Per-user workspace pattern: Each user gets their own isolated workspace with unique IDs
+  - Idempotent initialization: Check for existing collection by uid before creating resources
+  - Timestamp-based ID generation: Use Date.now() + offset to generate unique IDs for user resources
+  - Dual trigger approach: Initialize on registration + middleware safety net for first API access
+  - Graceful error handling: Registration/API calls succeed even if workspace init fails
+  - Middleware pattern: Use Container.get() to access services in Express middleware
+  - Middleware ordering: ensure-user-workspace must come after authHandler to access req.user
+  - Default deck lookup: Frontend finds default deck by name "Default", not hardcoded ID
   - Typecheck passes via `pnpm --filter @echoe/server build`
 ---
