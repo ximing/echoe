@@ -16,9 +16,9 @@
 | US-004 | Apply uid context to core Echoe controllers | [x] |
 | US-005 | Apply uid context to edge Echoe controllers | [x] |
 | US-006 | Refactor foundational services for uid filtering | [x] |
-| US-007 | Refactor study-domain services for uid filtering | [ ] |
-| US-008 | Refactor import and export services for user namespace | [ ] |
-| US-009 | Implement media storage and metadata uid isolation | [ ] |
+| US-007 | Refactor study-domain services for uid filtering | [x] |
+| US-008 | Refactor import and export services for user namespace | [x] |
+| US-009 | Implement media storage and metadata uid isolation | [x] |
 | US-010 | Replace global seed with ensureUserWorkspace | [ ] |
 | US-011 | Centralize Echoe ID generation in id.ts | [ ] |
 | US-012 | Add unit tests for uid-filtered service behavior | [ ] |
@@ -222,4 +222,62 @@
   - Cross-service dependencies: When a service calls another service's methods, ensure uid is passed correctly
   - Test files need updating separately - production code typecheck should pass before committing
   - Large refactorings: Systematic approach (services first, then controllers) prevents missing updates
+---
+## 2026-03-14 - US-008
+- Refactored echoe-import.service.ts to accept uid parameter in importApkg and all helper methods
+- Refactored echoe-export.service.ts to accept uid parameter in exportApkg and all helper methods
+- Updated echoe-media.service.ts uploadMedia and getMedia methods to accept uid parameter
+- All imported records (notes, cards, decks, notetypes, revlog, media) now written with current uid
+- Duplicate checks now scoped to user namespace using and(eq(table.uid, uid), eq(table.guid, guid)) pattern
+- Export operations now filter by uid to ensure only current user data is exported
+- Updated controllers to pass userDto.uid to service calls:
+  - echoe-import.controller.ts: Pass uid to importApkg
+  - echoe-export.controller.ts: Pass uid to exportApkg
+  - echoe-media.controller.ts: Pass uid to uploadMedia and getMedia
+- CSV import already used uid from US-007 refactor (noteService.createNote accepts uid)
+- Fixed test file echoe-study.service.test.ts to pass uid parameter to forgetCards and submitReview
+- Removed TEMP_UID constant from echoe-import.service.ts (now using real uid from controllers)
+- Files changed:
+  - apps/server/src/services/echoe-import.service.ts
+  - apps/server/src/services/echoe-export.service.ts
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/controllers/v1/echoe-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-export.controller.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+  - apps/server/src/__tests__/echoe-study.service.test.ts
+- **Learnings for future iterations:**
+  - Import/export services follow same refactoring pattern as other services: uid as first parameter
+  - Duplicate checks in import must use user scope: and(eq(table.uid, uid), eq(table.guid, guid))
+  - Export queries must filter by uid to prevent cross-user data leaks
+  - Media service methods (uploadMedia, getMedia) need uid for US-009 storage isolation
+  - CSV import already handles uid correctly via noteService.createNote from US-007
+  - Test files need updating when service signatures change - use 'test-uid' as placeholder
+  - Import media uses mediaService.uploadMedia(uid, buffer, filename) pattern
+  - Export media uses mediaService.getMedia(uid, filename) pattern
+  - Both Standard Anki and Legacy Echoe import paths must be updated consistently
+---
+## 2026-03-14 - US-009
+- Implemented uid-namespaced media storage: Changed storage key format from echoe-media/<filename> to echoe-media/<uid>/<filename>
+- Updated echoe-media.service.ts to add uid filtering to all database operations:
+  - uploadMedia: Uses uid-namespaced storage keys
+  - getMedia: Validates uid ownership before serving files
+  - listMedia: Filters media by uid
+  - checkUnusedMedia: Scans only current user's notes and media
+  - deleteBulk: Verifies file ownership before deletion
+  - markAsUsed: Filters by uid when marking media as used
+- Updated echoe-media.controller.ts to pass userDto.uid to all service calls
+- Removed TEMP_UID constant from media service (now using real uid from controllers)
+- Cross-user media access is now blocked - getMedia validates ownership and returns null for unauthorized access
+- Files changed:
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+- **Learnings for future iterations:**
+  - Media storage isolation pattern: Storage keys use uid namespace (echoe-media/<uid>/<filename>)
+  - Media access validation: Always check DB ownership before serving files from storage
+  - Bulk operations: Verify file ownership before processing (select owned files first, then operate)
+  - Import/export services already use uid-namespaced media (from US-008)
+  - Storage adapter methods (uploadFile, downloadFile, deleteFile, fileExists) work with full storage keys
+  - Media retrieval pattern: (1) Check DB ownership, (2) Check storage exists, (3) Serve file
+  - Same filename can now exist across users without conflicts due to uid namespace
+  - Typecheck passes via `pnpm --filter @echoe/server build`
 ---
