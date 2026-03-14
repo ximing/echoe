@@ -859,15 +859,15 @@ export class EchoeDeckService {
     const sampleCards: EchoeCardListItemDto[] = await Promise.all(
       cards.map(async (card) => {
         // Get note info
-        const note = await db.select().from(echoeNotes).where(eq(echoeNotes.id, card.nid)).limit(1);
+        const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid))).limit(1);
         const noteData = note[0];
 
         // Get deck name
-        const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, card.did)).limit(1);
+        const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.id, card.did), eq(echoeDecks.uid, uid))).limit(1);
 
         // Get note type name
         const noteType = noteData?.mid
-          ? await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.id, noteData.mid)).limit(1)
+          ? await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.id, noteData.mid), eq(echoeNotetypes.uid, uid))).limit(1)
           : [];
 
         // Parse fields from fieldsJson (primary source)
