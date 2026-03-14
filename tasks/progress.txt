@@ -20,7 +20,7 @@
 | US-008 | Refactor import and export services for user namespace | [x] |
 | US-009 | Implement media storage and metadata uid isolation | [x] |
 | US-010 | Replace global seed with ensureUserWorkspace | [x] |
-| US-011 | Centralize Echoe ID generation in id.ts | [ ] |
+| US-011 | Centralize Echoe ID generation in id.ts | [x] |
 | US-012 | Add unit tests for uid-filtered service behavior | [ ] |
 | US-013 | Add dual-user integration tests for core workflows | [ ] |
 | US-014 | Add integration and security tests for edge workflows | [ ] |
@@ -305,4 +305,33 @@
   - Middleware ordering: ensure-user-workspace must come after authHandler to access req.user
   - Default deck lookup: Frontend finds default deck by name "Default", not hardcoded ID
   - Typecheck passes via `pnpm --filter @echoe/server build`
+---
+## 2026-03-14 - US-011
+- Centralized Echoe ID generation in apps/server/src/utils/id.ts
+- Added generators: generateDeckId(), generateNoteId(), generateCardId(ord), generateNoteTypeId()
+- Replaced scattered Date.now() ID generation in business logic:
+  - echoe-note.service.ts: noteId and cardId generation now use generateNoteId() and generateCardId()
+  - echoe-note.service.ts: noteTypeId generation now uses generateNoteTypeId()
+  - echoe-deck.service.ts: deckId generation now uses generateDeckId()
+  - echoe-seed.service.ts: All user workspace resource IDs now use centralized generators
+- All ID generators follow Anki-compatible semantics:
+  - Deck ID: Unix timestamp in milliseconds
+  - Note ID: ms * 1000 + random (0-999)
+  - Card ID: ms * 1000000 + ord * 1000 + random (0-999)
+  - NoteType ID: ms * 1000 + random (0-999)
+  - Revlog ID: ms * 1000 + seq (already existed)
+- Removed inline Date.now() arithmetic from 4 service files
+- Files changed:
+  - apps/server/src/utils/id.ts
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+  - apps/server/src/services/echoe-seed.service.ts
+- **Learnings for future iterations:**
+  - ID generation semantics: Centralized generators ensure consistency and make ID format changes easier
+  - Anki compatibility: ID formats match Anki's conventions for import/export compatibility
+  - generateRevlogId() already existed with sequence-based collision avoidance - other generators use random suffix
+  - Card ID includes template ordinal (ord) to ensure cards from same note have different IDs
+  - Timestamp-only IDs (deck, collection) use generateDeckId() for consistency
+  - When refactoring ID generation, grep for Date.now() * patterns to find all call sites
+  - Typecheck catches missing imports and ensures all call sites compile correctly
 ---
