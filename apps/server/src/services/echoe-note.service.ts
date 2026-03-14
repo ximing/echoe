@@ -1,4 +1,3 @@
-// @ts-nocheck - Temporary: Schema changed to string IDs, service refactor in US-013+
 import { Service } from 'typedi';
 import { eq, and, inArray, like, sql, or, desc, asc } from 'drizzle-orm';
 
@@ -16,7 +15,8 @@ import { safeJsonParse, parseNoteFields, parseTags } from '../utils/echoe-note.u
 import { EchoeStudyService } from './echoe-study.service.js';
 import { EchoeDeckService } from './echoe-deck.service.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
-import { generateNoteId, generateCardId, generateNoteTypeId } from '../utils/id.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 import type { RichTextFields } from '../types/note-fields.js';
 import type { EchoeCards } from '../db/schema/echoe-cards.js';
 import type { EchoeNotes } from '../db/schema/echoe-notes.js';
@@ -66,9 +66,9 @@ export class EchoeNoteService {
         .from(echoeCards)
         .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
-      const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
+      const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
       if (noteIds.length > 0) {
-        conditions.push(inArray(echoeNotes.id, noteIds));
+        conditions.push(inArray(echoeNotes.noteId, noteIds));
       } else {
         // No cards found, return empty
         return { notes: [], total: 0 };
@@ -113,9 +113,9 @@ export class EchoeNoteService {
 
       if (cardConditions) {
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), cardConditions));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
         if (noteIds.length > 0) {
-          conditions.push(inArray(echoeNotes.id, noteIds));
+          conditions.push(inArray(echoeNotes.noteId, noteIds));
         } else {
           return { notes: [], total: 0 };
         }
@@ -152,10 +152,10 @@ export class EchoeNoteService {
   /**
    * Get a single note by ID
    */
-  async getNoteById(uid: string, id: number): Promise<EchoeNoteWithCardsDto | null> {
+  async getNoteById(uid: string, id: string): Promise<EchoeNoteWithCardsDto | null> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
 
     if (note.length === 0) {
       return null;
@@ -176,7 +176,7 @@ export class EchoeNoteService {
   async createNote(uid: string, dto: CreateEchoeNoteDto): Promise<EchoeNoteWithCardsDto> {
     // Get note type to determine templates (outside transaction - read only)
     const db = getDatabase();
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, dto.notetypeId))).limit(1);
+    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId))).limit(1);
 
     if (notetype.length === 0) {
       throw new Error(`Note type ${dto.notetypeId} not found`);
@@ -202,13 +202,13 @@ export class EchoeNoteService {
     const tagsJson = JSON.stringify(tags);
 
     const now = Math.floor(Date.now() / 1000);
-    const noteId = generateNoteId();
+    const noteId = generateTypeId(OBJECT_TYPE.ECHOE_NOTE);
 
     // Wrap note and card creation in a transaction
     return withTransaction(async (tx) => {
       // MySQL insert does not support returning(); fetch the inserted note explicitly.
       await tx.insert(echoeNotes).values({
-        id: noteId,
+        noteId,
         uid,
         guid,
         mid: dto.notetypeId,
@@ -229,9 +229,9 @@ export class EchoeNoteService {
       const createdCards: EchoeCardDto[] = [];
 
       for (const template of templates) {
-        const cardId = generateCardId(template.ord);
+        const cardId = generateTypeId(OBJECT_TYPE.ECHOE_CARD);
         await tx.insert(echoeCards).values({
-          id: cardId,
+          cardId,
           uid,
           nid: noteId,
           did: dto.deckId,
@@ -270,7 +270,7 @@ export class EchoeNoteService {
         });
       }
 
-      const insertedNote = await tx.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, noteId))).limit(1);
+      const insertedNote = await tx.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, noteId))).limit(1);
 
       if (insertedNote.length === 0) {
         throw new Error(`Failed to load inserted note ${noteId}`);
@@ -286,10 +286,10 @@ export class EchoeNoteService {
   /**
    * Update a note
    */
-  async updateNote(uid: string, id: number, dto: UpdateEchoeNoteDto): Promise<EchoeNoteDto | null> {
+  async updateNote(uid: string, id: string, dto: UpdateEchoeNoteDto): Promise<EchoeNoteDto | null> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
 
     if (note.length === 0) {
       return null;
@@ -303,7 +303,7 @@ export class EchoeNoteService {
       const notetype = await db
         .select()
         .from(echoeNotetypes)
-        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, note[0].mid)))
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid)))
         .limit(1);
 
       if (notetype.length === 0) {
@@ -335,19 +335,19 @@ export class EchoeNoteService {
       updates.tags = JSON.stringify(dto.tags);
     }
 
-    await db.update(echoeNotes).set(updates).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id)));
+    await db.update(echoeNotes).set(updates).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id)));
 
-    const updated = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id))).limit(1);
+    const updated = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
     return this.mapNoteToDto(updated[0]);
   }
 
   /**
    * Delete a note
    */
-  async deleteNote(uid: string, id: number): Promise<boolean> {
+  async deleteNote(uid: string, id: string): Promise<boolean> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
 
     if (note.length === 0) {
       return false;
@@ -362,7 +362,7 @@ export class EchoeNoteService {
     return withTransaction(async (tx) => {
       // Add cards to graves
       for (const card of cards) {
-        await tx.insert(echoeGraves).values({ uid, usn: 0, oid: Number(card.id), type: 2 });
+        await tx.insert(echoeGraves).values({ uid, usn: 0, oid: card.cardId, type: 2 });
       }
 
       // Add note to graves
@@ -372,7 +372,7 @@ export class EchoeNoteService {
       await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
 
       // Delete note
-      await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id)));
+      await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id)));
 
       return true;
     });
@@ -381,16 +381,16 @@ export class EchoeNoteService {
   /**
    * Get card by ID with full note data
    */
-  async getCardById(uid: string, id: number): Promise<EchoeCardWithNoteDto | null> {
+  async getCardById(uid: string, id: string): Promise<EchoeCardWithNoteDto | null> {
     const db = getDatabase();
 
-    const card = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, id))).limit(1);
+    const card = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, id))).limit(1);
 
     if (card.length === 0) {
       return null;
     }
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, card[0].nid))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, card[0].nid))).limit(1);
 
     if (note.length === 0) {
       return null;
@@ -439,11 +439,11 @@ export class EchoeNoteService {
         case 'leech':
           // Get notes with leech tag
           const leechNotes = await db
-            .select({ id: echoeNotes.id })
+            .select({ noteId: echoeNotes.noteId })
             .from(echoeNotes)
             .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE '%"leech"%'`));
 
-          const leechNoteIds = leechNotes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
+          const leechNoteIds = leechNotes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
           if (leechNoteIds.length > 0) {
             cardConditions.push(inArray(echoeCards.nid, leechNoteIds));
           } else {
@@ -475,7 +475,7 @@ export class EchoeNoteService {
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
-      .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.id))
+      .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.noteId))
       .where(whereClause);
 
     const total = countResult[0]?.count || 0;
@@ -506,9 +506,9 @@ export class EchoeNoteService {
         notetype: echoeNotetypes,
       })
       .from(echoeCards)
-      .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.id))
-      .leftJoin(echoeDecks, and(eq(echoeCards.did, echoeDecks.id), eq(echoeDecks.uid, uid)))
-      .leftJoin(echoeNotetypes, and(eq(echoeNotes.mid, echoeNotetypes.id), eq(echoeNotetypes.uid, uid)))
+      .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.noteId))
+      .leftJoin(echoeDecks, and(eq(echoeCards.did, echoeDecks.deckId), eq(echoeDecks.uid, uid)))
+      .leftJoin(echoeNotetypes, and(eq(echoeNotes.mid, echoeNotetypes.noteTypeId), eq(echoeNotetypes.uid, uid)))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(limit)
@@ -539,9 +539,9 @@ export class EchoeNoteService {
         }
 
         return {
-          id: Number(card.id),
-          nid: Number(card.nid),
-          did: Number(card.did),
+          id: card.cardId,
+          nid: card.nid,
+          did: card.did,
           deckName: deck?.name || 'Unknown',
           ord: card.ord,
           type: card.type,
@@ -554,10 +554,10 @@ export class EchoeNoteService {
           front,
           fields: noteFields,
           tags: note ? parseTags(note.tags) : [],
-          mid: Number(note?.mid || 0),
+          mid: note?.mid || '',
           notetypeName: notetype?.name || 'Unknown',
           notetypeType: notetype?.type || 0,
-          addedAt: Number(card.id) < 100000000000 ? Number(card.id) : Math.floor(Number(card.id) / 1000),
+          addedAt: Number(card.id),
           mod: note?.mod || card.mod,
         };
       })
@@ -569,16 +569,16 @@ export class EchoeNoteService {
   /**
    * Restore card queues by their FSRS type for unsuspend/unbury actions.
    */
-  private async restoreQueueByCardType(uid: string, cards: Array<Pick<EchoeCards, 'id' | 'type'>>, now: number, action: 'unsuspend' | 'unbury'): Promise<void> {
+  private async restoreQueueByCardType(uid: string, cards: Array<Pick<EchoeCards, 'cardId' | 'type'>>, now: number, action: 'unsuspend' | 'unbury'): Promise<void> {
     const db = getDatabase();
 
-    const knownTypeCardIds = new Map<number, number[]>();
-    const unknownTypeCards: Array<Pick<EchoeCards, 'id' | 'type'>> = [];
+    const knownTypeCardIds = new Map<number, string[]>();
+    const unknownTypeCards: Array<Pick<EchoeCards, 'cardId' | 'type'>> = [];
 
     for (const card of cards) {
       if ([0, 1, 2, 3].includes(card.type)) {
         const ids = knownTypeCardIds.get(card.type) || [];
-        ids.push(card.id);
+        ids.push(card.cardId);
         knownTypeCardIds.set(card.type, ids);
       } else {
         unknownTypeCards.push(card);
@@ -590,20 +590,20 @@ export class EchoeNoteService {
         db
           .update(echoeCards)
           .set({ queue: type, mod: now, usn: 0 })
-          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, ids)))
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, ids)))
       )
     );
 
     if (unknownTypeCards.length > 0) {
       logger.warn(`Fallback queue restore for unknown card type in ${action}`, {
         uid,
-        cardTypes: unknownTypeCards.map((card: Pick<EchoeCards, 'id' | 'type'>) => ({ id: card.id, type: card.type })),
+        cardTypes: unknownTypeCards.map((card: Pick<EchoeCards, 'cardId' | 'type'>) => ({ id: card.cardId, type: card.type })),
         fallbackQueue: 0,
       });
       await db
         .update(echoeCards)
         .set({ queue: 0, mod: now, usn: 0 })
-        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, unknownTypeCards.map((card: Pick<EchoeCards, 'id'>) => card.id))));
+        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, unknownTypeCards.map((card: Pick<EchoeCards, 'cardId'>) => card.cardId))));
     }
   }
 
@@ -622,14 +622,14 @@ export class EchoeNoteService {
         await db
           .update(echoeCards)
           .set({ queue: -1, mod: now, usn: 0 })
-          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
         affected = cardIds.length;
         break;
       }
 
       case 'unsuspend': {
         // Get all cards at once and restore queue based on card type.
-        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
+        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
         await this.restoreQueueByCardType(uid, cards, now, 'unsuspend');
         affected = cards.length;
         break;
@@ -639,14 +639,14 @@ export class EchoeNoteService {
         await db
           .update(echoeCards)
           .set({ queue: -2, mod: now, usn: 0 })
-          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
         affected = cardIds.length;
         break;
       }
 
       case 'unbury': {
         // Get all cards at once and restore queue based on card type.
-        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
+        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
         await this.restoreQueueByCardType(uid, cards, now, 'unbury');
         affected = cards.length;
         break;
@@ -664,9 +664,9 @@ export class EchoeNoteService {
         }
         // Security: verify the target deck belongs to the current user to prevent cross-tenant card movement.
         const targetDeck = await db
-          .select({ id: echoeDecks.id })
+          .select({ deckId: echoeDecks.deckId })
           .from(echoeDecks)
-          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, payload.deckId)))
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, payload.deckId)))
           .limit(1);
         if (targetDeck.length === 0) {
           logger.warn('bulkCardOperation move: target deckId does not belong to uid', {
@@ -678,7 +678,7 @@ export class EchoeNoteService {
         await db
           .update(echoeCards)
           .set({ did: payload.deckId, mod: now, usn: 0 })
-          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
         affected = cardIds.length;
         break;
       }
@@ -688,15 +688,15 @@ export class EchoeNoteService {
           throw new Error('tag is required for addTag action');
         }
         // Get unique note IDs from cards (batch query)
-        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
+        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
           break;
         }
 
         // Batch query all notes at once
-        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
+        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
 
         // Process notes and collect updates
         for (const note of notes) {
@@ -706,7 +706,7 @@ export class EchoeNoteService {
             await db
               .update(echoeNotes)
               .set({ tags: JSON.stringify(tags), mod: now, usn: 0 })
-              .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, Number(note.id))));
+              .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, note.noteId)));
           }
         }
         affected = noteIds.length;
@@ -718,15 +718,15 @@ export class EchoeNoteService {
           throw new Error('tag is required for removeTag action');
         }
         // Get unique note IDs from cards (batch query)
-        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid)))) as number[];
+        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
           break;
         }
 
         // Batch query all notes at once
-        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
+        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
 
         // Process notes and collect updates
         for (const note of notes) {
@@ -735,7 +735,7 @@ export class EchoeNoteService {
           await db
             .update(echoeNotes)
             .set({ tags: JSON.stringify(filteredTags), mod: now, usn: 0 })
-            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, Number(note.id))));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, note.noteId)));
         }
         affected = noteIds.length;
         break;
@@ -759,7 +759,7 @@ export class EchoeNoteService {
     }
 
     // Batch query all templates in one call
-    const noteTypeIds = notetypes.map((nt: Pick<EchoeNotetypes, 'id'>) => Number(nt.id));
+    const noteTypeIds = notetypes.map((nt: Pick<EchoeNotetypes, 'noteTypeId'>) => nt.noteTypeId);
     const allTemplates = await db
       .select()
       .from(echoeTemplates)
@@ -773,11 +773,11 @@ export class EchoeNoteService {
       .groupBy(echoeNotes.mid);
 
     // Create a map for quick lookup
-    const templatesMap = new Map<number, typeof allTemplates>();
-    const countMap = new Map<number, number>();
+    const templatesMap = new Map<string, typeof allTemplates>();
+    const countMap = new Map<string, number>();
 
     for (const template of allTemplates) {
-      const ntid = Number(template.ntid);
+      const ntid = template.ntid;
       if (!templatesMap.has(ntid)) {
         templatesMap.set(ntid, []);
       }
@@ -785,14 +785,14 @@ export class EchoeNoteService {
     }
 
     for (const nc of noteCounts) {
-      countMap.set(Number(nc.mid), Number(nc.count));
+      countMap.set(nc.mid, Number(nc.count));
     }
 
     // Build result
     const result: EchoeNoteTypeDto[] = [];
 
     for (const nt of notetypes) {
-      const ntid = Number(nt.id);
+      const ntid = nt.noteTypeId;
       const templates = templatesMap.get(ntid) || [];
 
       result.push({
@@ -800,16 +800,16 @@ export class EchoeNoteService {
         name: nt.name,
         mod: nt.mod,
         sortf: nt.sortf,
-        did: Number(nt.did),
+        did: nt.did,
         tmpls: templates.map((t: EchoeTemplates) => ({
-          id: Number(t.id),
+          id: t.templateId,
           name: t.name,
           ord: t.ord,
           qfmt: t.qfmt,
           afmt: t.afmt,
           bqfmt: t.bqfmt,
           bafmt: t.bafmt,
-          did: Number(t.did),
+          did: t.did,
         })),
         flds: JSON.parse(nt.flds),
         css: nt.css,
@@ -832,7 +832,7 @@ export class EchoeNoteService {
     const db = getDatabase();
 
     const now = Math.floor(Date.now() / 1000);
-    const noteTypeId = generateNoteTypeId();
+    const noteTypeId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
 
     let fields = dto.flds;
     let templates = dto.tmpls;
@@ -843,7 +843,7 @@ export class EchoeNoteService {
 
     // If cloning from an existing note type
     if (dto.cloneFrom) {
-      const sourceNotetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, dto.cloneFrom))).limit(1);
+      const sourceNotetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.cloneFrom))).limit(1);
       if (sourceNotetype.length > 0) {
         const source = sourceNotetype[0];
         fields = fields || JSON.parse(source.flds as string).map((f: any) => ({ name: f.name }));
@@ -895,13 +895,13 @@ export class EchoeNoteService {
     latexPost = latexPost || '\\end{document}';
 
     const newNotetype = await db.insert(echoeNotetypes).values({
-      id: noteTypeId,
+      noteTypeId,
       uid,
       name: dto.name,
       mod: now,
       usn: 0,
       sortf: 0,
-      did: 0,
+      did: '',
       tmpls: tmplsJson,
       flds: fldsJson,
       css,
@@ -915,9 +915,9 @@ export class EchoeNoteService {
     const createdTemplates: any[] = [];
     for (let i = 0; i < templates.length; i++) {
       const template = templates[i];
-      const templateId = noteTypeId * 1000000 + i * 1000 + Math.floor(Math.random() * 1000);
+      const templateId = generateTypeId(OBJECT_TYPE.ECHOE_TEMPLATE);
       await db.insert(echoeTemplates).values({
-        id: templateId,
+        templateId,
         uid,
         ntid: noteTypeId,
         name: template.name,
@@ -926,7 +926,7 @@ export class EchoeNoteService {
         afmt: template.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
         bqfmt: '',
         bafmt: '',
-        did: 0,
+        did: '',
         mod: now,
         usn: 0,
       });
@@ -938,7 +938,7 @@ export class EchoeNoteService {
         afmt: template.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
         bqfmt: '',
         bafmt: '',
-        did: 0,
+        did: '',
       });
     }
 
@@ -947,7 +947,7 @@ export class EchoeNoteService {
       name: dto.name,
       mod: now,
       sortf: 0,
-      did: 0,
+      did: '',
       tmpls: createdTemplates,
       flds: JSON.parse(fldsJson),
       css,
@@ -961,10 +961,10 @@ export class EchoeNoteService {
   /**
    * Update a note type
    */
-  async updateNoteType(uid: string, id: number, dto: UpdateEchoeNoteTypeDto): Promise<EchoeNoteTypeDto | null> {
+  async updateNoteType(uid: string, id: string, dto: UpdateEchoeNoteTypeDto): Promise<EchoeNoteTypeDto | null> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id))).limit(1);
+    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
 
     if (notetype.length === 0) {
       return null;
@@ -989,7 +989,7 @@ export class EchoeNoteService {
       updates.latexPost = dto.latexPost;
     }
 
-    await db.update(echoeNotetypes).set(updates).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+    await db.update(echoeNotetypes).set(updates).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
 
     // Add new fields if provided
     if (dto.flds) {
@@ -1011,7 +1011,7 @@ export class EchoeNoteService {
           hidden: false,
         });
       }
-      await db.update(echoeNotetypes).set({ flds: JSON.stringify(newFields) }).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+      await db.update(echoeNotetypes).set({ flds: JSON.stringify(newFields) }).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
     }
 
     // Add new templates if provided
@@ -1021,9 +1021,9 @@ export class EchoeNoteService {
 
       for (let i = 0; i < dto.tmpls.length; i++) {
         const t = dto.tmpls[i];
-        const templateId = id * 1000000 + (newOrd + i) * 1000 + Math.floor(Math.random() * 1000);
+        const templateId = generateTypeId(OBJECT_TYPE.ECHOE_TEMPLATE);
         await db.insert(echoeTemplates).values({
-          id: templateId,
+          templateId,
           uid,
           ntid: id,
           name: t.name,
@@ -1032,7 +1032,7 @@ export class EchoeNoteService {
           afmt: t.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
           bqfmt: '',
           bafmt: '',
-          did: 0,
+          did: '',
           mod: now,
           usn: 0,
         });
@@ -1059,7 +1059,7 @@ export class EchoeNoteService {
         await db
           .update(echoeNotetypes)
           .set({ flds: JSON.stringify(updatedFlds) })
-          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
 
         logger.info('Renamed fields in notetype flds', {
           uid,
@@ -1069,7 +1069,7 @@ export class EchoeNoteService {
 
         // 2. Migrate fieldsJson in all notes belonging to this notetype
         const affectedNotes = await db
-          .select({ id: echoeNotes.id, fieldsJson: echoeNotes.fieldsJson })
+          .select({ noteId: echoeNotes.noteId, fieldsJson: echoeNotes.fieldsJson })
           .from(echoeNotes)
           .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id)));
 
@@ -1084,7 +1084,7 @@ export class EchoeNoteService {
             await db
               .update(echoeNotes)
               .set({ fieldsJson: newFields, mod: now })
-              .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
+              .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, note.noteId)));
           }
 
           logger.info('Migrated fieldsJson for renamed fields', {
@@ -1104,10 +1104,10 @@ export class EchoeNoteService {
   /**
    * Delete a note type (rejects if notes exist)
    */
-  async deleteNoteType(uid: string, id: number): Promise<{ success: boolean; message?: string }> {
+  async deleteNoteType(uid: string, id: string): Promise<{ success: boolean; message?: string }> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id))).limit(1);
+    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
 
     if (notetype.length === 0) {
       return { success: false, message: 'Note type not found' };
@@ -1125,7 +1125,7 @@ export class EchoeNoteService {
     await db.delete(echoeTemplates).where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.ntid, id)));
 
     // Delete note type
-    await db.delete(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+    await db.delete(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
 
     return { success: true };
   }
@@ -1133,10 +1133,10 @@ export class EchoeNoteService {
   /**
    * Get note type by ID
    */
-  async getNoteTypeById(uid: string, id: number): Promise<EchoeNoteTypeDto | null> {
+  async getNoteTypeById(uid: string, id: string): Promise<EchoeNoteTypeDto | null> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id))).limit(1);
+    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
 
     if (notetype.length === 0) {
       return null;
@@ -1152,20 +1152,20 @@ export class EchoeNoteService {
     const noteCount = Number(noteCountResult[0]?.count || 0);
 
     return {
-      id: Number(notetype[0].id),
+      id: notetype[0].noteTypeId,
       name: notetype[0].name,
       mod: notetype[0].mod,
       sortf: notetype[0].sortf,
-      did: Number(notetype[0].did),
+      did: notetype[0].did,
       tmpls: templates.map((t: EchoeTemplates) => ({
-        id: Number(t.id),
+        id: t.templateId,
         name: t.name,
         ord: t.ord,
         qfmt: t.qfmt,
         afmt: t.afmt,
         bqfmt: t.bqfmt,
         bafmt: t.bafmt,
-        did: Number(t.did),
+        did: t.did,
       })),
       flds: JSON.parse(notetype[0].flds),
       css: notetype[0].css,
@@ -1188,9 +1188,9 @@ export class EchoeNoteService {
         : {};
 
     return {
-      id: Number(note.id),
+      id: note.noteId,
       guid: note.guid,
-      mid: Number(note.mid),
+      mid: note.mid,
       mod: note.mod,
       tags: safeJsonParse<string[]>(note.tags, []),
       fields,
@@ -1207,9 +1207,9 @@ export class EchoeNoteService {
    */
   private mapCardToDto(card: any): EchoeCardDto {
     return {
-      id: Number(card.id),
-      nid: Number(card.nid),
-      did: Number(card.did),
+      id: card.cardId,
+      nid: card.nid,
+      did: card.did,
       ord: card.ord,
       mod: card.mod,
       type: card.type,
