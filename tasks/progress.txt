@@ -20,10 +20,10 @@
 | US-007 | Finalize schema exports and build input | [x] |
 | US-008 | Generate migration for ID refactor | [x] |
 | US-009 | Run migration and verify constraints | [x] |
-| US-010 | Convert core DTO entity ID types to string | [ ] |
-| US-011 | Convert DTO command and query payload IDs | [ ] |
-| US-012 | Build DTO package after ID contract changes | [ ] |
-| US-013 | Refactor note service to string business IDs | [ ] |
+| US-010 | Convert core DTO entity ID types to string | [x] |
+| US-011 | Convert DTO command and query payload IDs | [x] |
+| US-012 | Build DTO package after ID contract changes | [x] |
+| US-013 | Refactor note service to string business IDs | [x] |
 | US-014 | Refactor deck service to string business IDs | [ ] |
 | US-015 | Refactor study and stats services to string IDs | [ ] |
 | US-016 | Refactor import/export services for string IDs | [ ] |
@@ -172,4 +172,19 @@
   - Rollup generates both CommonJS (index.js) and ESM (index.mjs) outputs
   - Type declarations are bundled into single dist/index.d.ts file
   - Build must succeed before downstream apps can consume new contracts
+---
+## 2026-03-15 - US-013
+- Refactored echoe-note.service.ts to use string business IDs throughout
+- Files changed: apps/server/src/services/echoe-note.service.ts
+- **Learnings for future iterations:**
+  - Service refactor pattern: Replace ID generators (generateNoteId → generateTypeId(OBJECT_TYPE.ECHOE_NOTE))
+  - Query by business ID columns (noteId, cardId, deckId, noteTypeId) instead of numeric id
+  - Remove Number()/parseInt() conversions for all business ID fields
+  - Update method signatures from `id: number` to `id: string` for all business ID parameters
+  - Join conditions must use business ID columns (eq(echoeCards.nid, echoeNotes.noteId))
+  - DTO mappings return business IDs directly without Number() conversions
+  - Grave writes use business ID fields (card.cardId, note.noteId)
+  - All 25 existing tests pass - string IDs work correctly with existing test data
+  - Removed @ts-nocheck comment - service is now fully type-safe
+  - Type errors in other services (deck, study, etc.) are expected and will be resolved in US-014+
 ---

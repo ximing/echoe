@@ -66,7 +66,7 @@ export class EchoeNoteService {
         .from(echoeCards)
         .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
-      const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+      const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
       if (noteIds.length > 0) {
         conditions.push(inArray(echoeNotes.noteId, noteIds));
       } else {
@@ -113,7 +113,7 @@ export class EchoeNoteService {
 
       if (cardConditions) {
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), cardConditions));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+        const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.noteId, noteIds));
         } else {
@@ -689,7 +689,7 @@ export class EchoeNoteService {
         }
         // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+        const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
           break;
@@ -719,7 +719,7 @@ export class EchoeNoteService {
         }
         // Get unique note IDs from cards (batch query)
         const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
-        const noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+        const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
           break;
