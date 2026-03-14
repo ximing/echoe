@@ -266,3 +266,16 @@
   - All 176 tests pass - seed service refactoring did not break existing functionality
   - No Date.now()-based Echoe ID generation remains in active code paths
 ---
+## 2026-03-15 - US-019
+- Refactored echoe-note.controller.ts, echoe-deck.controller.ts, and echoe-study.controller.ts to use string business IDs
+- Files changed: apps/server/src/controllers/v1/echoe-note.controller.ts, echoe-deck.controller.ts, echoe-study.controller.ts, apps/server/src/__tests__/echoe-study.controller.test.ts
+- **Learnings for future iterations:**
+  - Controller refactor pattern: Change @Param('id') id: number to id: string for all business ID route parameters
+  - Query param refactor: Change @QueryParam('deckId') deckId?: number to deckId?: string for all business ID query params
+  - Remove Number.isFinite() validations for ID parameters - replace with string validation (e.g., !cardId || cardId.trim() === '')
+  - echoe-config.controller.ts already used string IDs - no changes needed
+  - Controller tests must be updated to use string IDs in test data (e.g., cardId: 'ec_test_card_001' instead of cardId: 1001)
+  - Core controller typecheck passes - no type errors in the 4 core controllers
+  - Remaining typecheck errors are in test files (US-024) and edge controllers (US-020)
+  - All 176 tests pass - controller refactoring did not break existing functionality
+---
