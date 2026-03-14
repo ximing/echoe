@@ -188,3 +188,19 @@
   - Removed @ts-nocheck comment - service is now fully type-safe
   - Type errors in other services (deck, study, etc.) are expected and will be resolved in US-014+
 ---
+## 2026-03-15 - US-014
+- Refactored echoe-deck.service.ts to use string business IDs throughout
+- Files changed: apps/server/src/services/echoe-deck.service.ts, apps/server/src/services/echoe-note.service.ts
+- **Learnings for future iterations:**
+  - Deck service refactor pattern: Replace generateDeckId() with generateTypeId(OBJECT_TYPE.ECHOE_DECK)
+  - Query by business ID columns (deckId, deckConfigId, conf, mid) instead of numeric id
+  - Maps must use string keys instead of number keys (Map<string, T> not Map<number, T>)
+  - Method signatures: Change id: number to id: string for all business ID parameters
+  - Join conditions: Use business ID columns (eq(echoeRevlog.cid, echoeCards.cardId))
+  - DTO mappings: Return business IDs directly (deck.deckId, config.deckConfigId)
+  - Filtered deck operations: odid comparisons now check for empty string ('') not 0
+  - Deck hierarchy and filtered-deck search all work correctly with string IDs
+  - Type annotation fix: When mapping arrays, add explicit type: const noteIds: string[] = Array.from(...)
+  - All 6 deck service tests pass - string IDs work correctly with existing test infrastructure
+  - Type errors in controllers, study service, and other tests are expected and will be resolved in US-015+
+---
