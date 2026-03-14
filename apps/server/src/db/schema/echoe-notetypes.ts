@@ -15,13 +15,14 @@ import {
 export const echoeNotetypes = mysqlTable(
   'echoe_notetypes',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Note type ID
+    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    noteTypeId: varchar('note_type_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Note type name
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
     sortf: int('sortf').notNull().default(0), // Field index used for sorting
-    did: bigint('did', { mode: 'number' }).notNull().default(0), // Default deck ID
+    did: varchar('did', { length: 191 }).notNull().default(''), // Default deck ID - now business ID string
     tmpls: text('tmpls').notNull().$type<string>(), // JSON array of templates
     flds: text('flds').notNull().$type<string>(), // JSON array of field definitions
     css: text('css').notNull().$type<string>(), // Card CSS
@@ -31,8 +32,10 @@ export const echoeNotetypes = mysqlTable(
     req: text('req').notNull().$type<string>(), // JSON array of which fields are required
   },
   (table) => ({
+    noteTypeIdIdx: index('note_type_id_idx').on(table.noteTypeId),
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
+    uidNoteTypeIdIdx: index('uid_note_type_id_idx').on(table.uid, table.noteTypeId),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
   })
 );

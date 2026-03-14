@@ -17,23 +17,26 @@ import {
 export const echoeTemplates = mysqlTable(
   'echoe_templates',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Template ID
+    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    templateId: varchar('template_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
-    ntid: bigint('ntid', { mode: 'number' }).notNull(), // Note type ID
+    ntid: varchar('ntid', { length: 191 }).notNull(), // Note type ID - now business ID string
     name: varchar('name', { length: 191 }).notNull(), // Template name
     ord: int('ord').notNull(), // Template ordinal (0-based)
     qfmt: text('qfmt').notNull().$type<string>(), // Question format (front side)
     afmt: text('afmt').notNull().$type<string>(), // Answer format (back side)
     bqfmt: text('bqfmt').notNull().$type<string>(), // Browser question format
     bafmt: text('bafmt').notNull().$type<string>(), // Browser answer format
-    did: bigint('did', { mode: 'number' }).notNull().default(0), // Override deck ID
+    did: varchar('did', { length: 191 }).notNull().default(''), // Override deck ID - now business ID string
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
   },
   (table) => ({
+    templateIdIdx: index('template_id_idx').on(table.templateId),
     ntidIdx: index('ntid_idx').on(table.ntid),
     ordIdx: index('ord_idx').on(table.ord),
     usnIdx: index('usn_idx').on(table.usn),
+    uidTemplateIdIdx: index('uid_template_id_idx').on(table.uid, table.templateId),
     uidNtidOrdUnique: unique('uid_ntid_ord_unique').on(table.uid, table.ntid, table.ord),
   })
 );
