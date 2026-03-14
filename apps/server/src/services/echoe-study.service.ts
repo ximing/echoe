@@ -286,7 +286,7 @@ export class EchoeStudyService {
         difficulty: schedulingResult.difficulty,
         lastReview: now.getTime(),
       })
-      .where(eq(echoeCards.id, dto.cardId));
+      .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
 
     const revlogType = this.resolveRevlogType(card, deck);
     const reviewId = generateRevlogId();
@@ -337,7 +337,7 @@ export class EchoeStudyService {
           mod: Math.floor(now.getTime() / 1000),
           usn: -1,
         })
-        .where(eq(echoeCards.id, dto.cardId));
+        .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
 
       // Add 'leech' tag to the note if not already present
       const currentTags = this.parseTags(note.tags);
@@ -363,6 +363,7 @@ export class EchoeStudyService {
         .select()
         .from(echoeCards)
         .where(and(
+          eq(echoeCards.uid, uid),
           eq(echoeCards.nid, card.nid),
           sql`${echoeCards.id} != ${dto.cardId}`,
           sql`${echoeCards.queue} >= 0` // Only bury cards that are not already suspended/buried
@@ -377,7 +378,10 @@ export class EchoeStudyService {
             mod: Math.floor(now.getTime() / 1000),
             usn: -1,
           })
-          .where(sql`${echoeCards.id} IN (${sql.join(siblingIds.map((id: number) => sql`${id}`), sql`, `)})`);
+          .where(and(
+            eq(echoeCards.uid, uid),
+            sql`${echoeCards.id} IN (${sql.join(siblingIds.map((id: number) => sql`${id}`), sql`, `)})`
+          ));
       }
     }
 

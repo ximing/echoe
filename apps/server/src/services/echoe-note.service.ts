@@ -1160,7 +1160,7 @@ export class EchoeNoteService {
     try {
       return JSON.parse(json) as T;
     } catch (error) {
-      console.error('Failed to parse JSON:', error);
+      logger.error('Failed to parse JSON', { error });
       return fallback;
     }
   }

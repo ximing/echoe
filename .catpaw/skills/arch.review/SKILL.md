@@ -1,9 +1,9 @@
 ---
 name: arch-review
-description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只要用户提到“架构评审、FSRS 流程校验、重复代码治理、权限/跨租户安全检查、将问题转为 GitHub issue”，就应立即启用。若发现可执行问题，必须使用 `gh` CLI 按严格模板创建 issue。
+description: 面向 Echoe 架构、FSRS 与通用功能正确性审查技能。只要用户提到“架构评审、FSRS 流程校验、功能实现是否正常、重复代码治理、权限/跨租户安全检查、将问题转为 GitHub issue”，就应立即启用。若发现可执行且已确认的问题，必须使用 `gh` CLI 按严格模板创建 issue。
 ---
 
-# Echoe 架构与 FSRS 审查技能
+# Echoe 架构、FSRS 与功能正确性审查技能
 
 使用本技能对代码变更做高置信、可落地的审查，并输出可执行结论。
 
@@ -11,6 +11,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 
 - **架构一致性**：确认实现符合仓库既有约束与分层边界。
 - **FSRS 正确性**：确认学习流程、状态流转与持久化字段更新完整一致。
+- **通用功能正确性**：除 FSRS 外，检查系统中其他功能实现是否正常。
 - **可维护性**：识别重复逻辑与长期演进风险，降低后续分叉成本。
 - **安全边界**：识别权限校验缺失、跨租户访问、越权写入等风险。
 
@@ -18,6 +19,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 
 - **证据优先**：所有结论必须有代码路径或条件分支证据，禁止臆测。
 - **高置信优先**：宁可少报，也不要低质量、模糊问题。
+- **拿不准先确认**：对证据不足或业务语义不明确的问题，先与用户确认，再决定是否创建 issue。
 - **变更驱动**：先从改动文件入手，再按依赖链最小化扩展范围。
 - **规则对齐**：服务端日志必须符合 `@echoe/logger` 规范，不得接受 `console.*`。
 - **输出严格**：
@@ -32,6 +34,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 
 - 架构一致性检查
 - FSRS 流程/链路合规检查
+- 非 FSRS 功能实现是否正常检查
 - 重复代码/冗余逻辑检查
 - 权限、跨租户、越权相关安全检查
 - 将审查结论转成 GitHub issue
@@ -44,9 +47,10 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
    - `apps/server/src/services/fsrs.service.ts`
    - `apps/server/src/services/echoe-note.service.ts`
    - 调用上述服务的 controllers 与 DTO
-3. 涉及持久化行为时，必须交叉检查 schema 与测试。
+3. 对变更涉及的非 FSRS 功能，核对关键输入/输出、边界条件与异常分支。
+4. 涉及持久化行为时，必须交叉检查 schema 与测试。
 
-## 四个强制审查维度
+## 五个强制审查维度
 
 ### 1) 架构一致性
 
@@ -77,9 +81,17 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 - forget/reset 在所有入口路径行为一致
 - unbury/unsuspend 对不同卡片状态的恢复行为正确
 - revlog 与 card 更新保持前后语义一致
-- 功能实现上是否符合FSRS算法要求
+- 功能实现上是否符合 FSRS 算法要求
 
-### 3) 冗余代码
+### 3) 通用功能正确性（非 FSRS）
+
+检查系统中其他业务功能是否实现正常：
+
+- 关键输入/输出是否符合接口与业务预期
+- 正常路径、边界条件、异常路径行为是否一致且可解释
+- API/Service/DTO/持久化映射是否一致，避免“看似成功但数据错误”
+
+### 4) 冗余代码
 
 识别可维护性风险：
 
@@ -87,7 +99,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 - 多处重复的状态映射逻辑
 - 可漂移的复制粘贴分支
 
-### 4) 安全与权限检查
+### 5) 安全与权限检查
 
 重点排查：
 
@@ -101,6 +113,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 - `P1`：显著行为不一致，影响用户结果
 - `P2`：可维护性风险或局部行为缺口
 - `P3`：次要改进项
+- `P4`：低风险优化建议或观察项，不影响当前主要功能正确性
 
 ## 输出契约
 
@@ -125,11 +138,12 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 
 当存在至少一个可执行 finding 时，必须创建 GitHub issue。
 
-并遵循以下拆分规则（强制）：
+并遵循以下规则（强制）：
 
 - 一个 finding 创建一个独立 issue（1:1）
 - 若存在多个问题，必须创建多个 issue
 - 不同根因或不同修复路径的问题不得合并
+- 对证据不足或预期不明确的 finding，先与用户确认，再创建 issue
 
 ### Preflight
 
@@ -145,7 +159,7 @@ description: 面向 Echoe 代码变更的架构与 FSRS 质量审查技能。只
 
 使用：
 
-`[arch-review][<P0|P1|P2|P3>][<category>] <short summary>`
+`[arch-review][<P0|P1|P2|P3|P4>][<category>] <short summary>`
 
 category 示例：
 
@@ -195,8 +209,9 @@ Concrete implementation direction, not vague advice.
 - `bug`
 - `arch-review`
 - `security` / `fsrs` / `tech-debt`（三选一）
+- `P0` / `P1` / `P2` / `P3` / `P4`（必须且仅一个，需与 finding severity 一致）
 
-若标签不存在，不得阻塞 issue 创建。
+若优先级标签不存在，先尝试创建对应标签；若因权限等原因失败，不得阻塞 issue 创建，但需在最终输出中说明缺失的标签。
 
 ### 创建 issue 后的最终输出格式
 
@@ -213,4 +228,5 @@ Concrete implementation direction, not vague advice.
 
 - 每个 `P0/P1` finding 必须包含代码证据。
 - 禁止无证据的猜测性结论。
+- 对拿不准的问题，先与用户确认，确认后再建 issue。
 - 优先输出少量高置信问题，而非大量低质量问题。
