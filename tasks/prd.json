@@ -1,223 +1,227 @@
 {
-  "project": "Echoe Flashcards",
-  "branchName": "ralph/fsrs-full-chain",
-  "description": "Flashcards 列表与学习流程 FSRS 全链路改造 - 重构卡片集列表页面并统一到 FSRS 主口径",
+  "project": "Echoe",
+  "branchName": "ralph/echoe-multi-user-refactor",
+  "description": "Echoe 多用户重构（上线前一次性迁移版）- 将单用户全局共享模型升级为按 uid 强隔离的逻辑多租户模型。",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add FSRS fields to echoe_cards table",
-      "description": "As a developer, I need to add stability, difficulty, and last_review fields to the database so FSRS state can persist.",
+      "title": "Finalize schema for foundational Echoe tables",
+      "description": "As a backend developer, I want foundational Echoe tables to include uid isolation constraints so tenant boundaries are enforced at the data model level.",
       "acceptanceCriteria": [
-        "Add stability (DOUBLE) column to echoe_cards table",
-        "Add difficulty (DOUBLE) column to echoe_cards table",
-        "Add last_review (BIGINT) column to echoe_cards table",
-        "Add composite index on (did, queue, due)",
-        "Add index on (did, last_review)",
-        "Add index on (did, stability)",
-        "Generate and run migration successfully",
+        "Add uid NOT NULL to echoe_col, echoe_config, echoe_deck_config, echoe_decks, echoe_notetypes, and echoe_templates",
+        "Set echoe_config key uniqueness to user scope via PRIMARY KEY (uid, key) or equivalent UNIQUE(uid, key)",
+        "Add UNIQUE(uid) to echoe_col",
+        "Add UNIQUE(uid, name) to echoe_decks and echoe_notetypes",
+        "Add UNIQUE(uid, ntid, ord) to echoe_templates",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Fix elapsed_days calculation in FSRS scheduling",
-      "description": "As a developer, I need to fix the elapsed_days calculation in echoe-study.service.ts to use (now - last_review) instead of ivl.",
+      "title": "Finalize schema for note, card, media, and log tables",
+      "description": "As a backend developer, I want content and log tables to enforce uid-scoped uniqueness and indexes so all high-traffic Echoe data is isolated and queryable.",
       "acceptanceCriteria": [
-        "In echoe-study.service.ts, change elapsed_days from card.ivl to (now - last_review) / dayMs",
-        "Handle case when last_review is null (treat as new card)",
-        "Typecheck passes",
-        "Tests pass"
+        "Add uid NOT NULL to echoe_notes, echoe_cards, echoe_media, echoe_graves, and echoe_revlog",
+        "Make echoe_revlog.uid non-null in final schema",
+        "Add UNIQUE(uid, guid) to echoe_notes",
+        "Add UNIQUE(uid, filename) to echoe_media",
+        "Create first-wave indexes for echoe_notes (uid, mid), (uid, sfld), (uid, mod)",
+        "Create first-wave indexes for echoe_cards (uid, nid), (uid, did, queue, due), (uid, last_review)",
+        "Create first-wave indexes for echoe_revlog (uid, cid), (uid, id), echoe_graves (uid, oid, type), and echoe_deck_config (uid, name)",
+        "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Persist FSRS state (stability/difficulty/last_review) on review",
-      "description": "As a developer, I need to ensure stability, difficulty, and last_review are properly stored when a card is reviewed.",
+      "title": "Generate and validate one-shot migration",
+      "description": "As a release engineer, I want one destructive Drizzle migration for final-state schema so rollout is deterministic and avoids manual database edits.",
       "acceptanceCriteria": [
-        "Store stability from FSRS output to card.stability field",
-        "Store difficulty from FSRS output to card.difficulty field",
-        "Store last_review as current timestamp when review submitted",
-        "Typecheck passes",
-        "Tests pass"
+        "Generate migration with pnpm --filter @echoe/server migrate:generate from final schema",
+        "Migration SQL contains final-state structure only with no compatibility columns or uid IS NULL fallback logic",
+        "Migration runs successfully with pnpm --filter @echoe/server migrate on a cleaned Echoe dataset",
+        "Post-migration schema matches declared table constraints and indexes",
+        "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Add rating preview API endpoint",
-      "description": "As a user, I want to see the estimated interval before answering so I know when the card will reappear.",
+      "title": "Apply uid context to core Echoe controllers",
+      "description": "As an API developer, I want core Echoe controllers to require authenticated uid context so requests always execute in the current user namespace.",
       "acceptanceCriteria": [
-        "Create GET /api/v1/study/options?cardId=... endpoint",
-        "Return four options: Again/Hard/Good/Easy with next interval and due time",
-        "Use FSRS getSchedulingOptions to compute real values",
+        "Update echoe-config.controller.ts, echoe-deck.controller.ts, echoe-note.controller.ts, and echoe-study.controller.ts to inject @CurrentUser() userDto",
+        "Return unauthorized response when userDto.uid is missing",
+        "Pass uid explicitly from controller methods to service calls",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Update EchoeDeckWithCountsDto with FSRS metrics",
-      "description": "As a developer, I need to add FSRS metrics to the deck list DTO so the frontend can display maturity and difficulty counts.",
+      "title": "Apply uid context to edge Echoe controllers",
+      "description": "As an API developer, I want edge Echoe controllers to enforce uid context so non-core workflows cannot leak data across users.",
       "acceptanceCriteria": [
-        "Add totalCount field to EchoeDeckWithCountsDto",
-        "Add matureCount (stability >= 21) field",
-        "Add difficultCount (retrievability < 0.9) field",
-        "Add averageRetrievability field",
-        "Add lastStudiedAt field",
+        "Update echoe-stats.controller.ts, echoe-tag.controller.ts, echoe-media.controller.ts, echoe-import.controller.ts, echoe-export.controller.ts, echoe-csv-import.controller.ts, and echoe-duplicate.controller.ts to inject @CurrentUser() userDto",
+        "Return unauthorized response when userDto.uid is missing",
+        "Pass uid explicitly from controller methods to service calls",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Implement deck recursive aggregation for stats",
-      "description": "As a user, I want parent decks to show aggregated stats from all child decks.",
+      "title": "Refactor foundational services for uid filtering",
+      "description": "As a backend developer, I want foundational Echoe services to write and query by uid so base metadata is tenant-safe.",
       "acceptanceCriteria": [
-        "Deck stats query supports recursive aggregation of child decks",
-        "Parent deck matureCount = sum of all child deck matureCounts",
-        "Parent deck difficultCount = sum of all child deck difficultCounts",
-        "Parent deck averageRetrievability = weighted mean of children",
+        "Refactor echoe-config.service.ts and echoe-deck.service.ts signatures to include uid: string",
+        "Ensure insert operations write uid explicitly",
+        "Ensure select, update, and delete operations include uid predicates",
+        "Ensure joins in these services enforce same-uid associations",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Fix Undo to restore complete card state",
-      "description": "As a user, I want Undo to restore the exact state before review, including all FSRS fields.",
+      "title": "Refactor study-domain services for uid filtering",
+      "description": "As a backend developer, I want note and study domain services to enforce uid boundaries so learning data cannot be cross-accessed.",
       "acceptanceCriteria": [
-        "Undo restores: due, ivl, factor, reps, lapses, left, type, queue, stability, difficulty, last_review",
-        "Store pre-review snapshot in revlog extension column or separate table",
-        "Remove logic that tries to infer due from lastIvl",
+        "Refactor echoe-note.service.ts, echoe-study.service.ts, echoe-stats.service.ts, echoe-tag.service.ts, and echoe-duplicate.service.ts signatures to include uid: string",
+        "Ensure insert operations write uid explicitly",
+        "Ensure select, update, and delete operations include uid predicates",
+        "Ensure joins in these services enforce same-uid associations",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Add APKG import page and fix import entry point",
-      "description": "As a user, I want a dedicated APKG import page and the import button should go to the correct page.",
+      "title": "Refactor import and export services for user namespace",
+      "description": "As a backend developer, I want import/export pipelines to operate in uid namespace so package and CSV operations remain tenant-isolated.",
       "acceptanceCriteria": [
-        "Create APKG import page at /import/apkg",
-        "Fix Import .apkg button to navigate to /import/apkg (not CSV import)",
-        "Separate CSV import and APKG import into different entry points",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Refactor echoe-import.service.ts, echoe-export.service.ts, and echoe-csv-import.service.ts signatures to include uid: string",
+        "Ensure all imported records are written with current uid",
+        "Apply duplicate checks in user scope such as (uid, guid)",
+        "Ensure export only reads current uid data",
+        "Update CSV import flow to use noteService.createNote(uid, dto)",
+        "Tests pass",
+        "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "Implementation complete - APKG import page created, button navigation fixed"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Redesign Flashcards list page with grid layout",
-      "description": "As a user, I want to see flashcards in a responsive grid layout with learning metrics.",
+      "title": "Implement media storage and metadata uid isolation",
+      "description": "As a user, I want media files and metadata namespaced by uid so same filenames can coexist without cross-user access.",
       "acceptanceCriteria": [
-        "Implement grid layout: 1 column mobile, 2 columns tablet, 4 columns desktop",
-        "Show deck name, total cards, mastery progress bar",
-        "Show new/learn/review badges (color-coded)",
-        "Show last studied time",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Change object storage key format from echoe-media/<filename> to echoe-media/<uid>/<filename>",
+        "Ensure echoe-media DB reads, updates, and deletes are filtered by uid",
+        "Keep upload and retrieval behavior consistent for same-user access",
+        "Reject or hide cross-user media access attempts",
+        "Tests pass",
+        "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": "Grid layout implemented with responsive columns, mastery progress bar, color-coded badges, and last studied time"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-010",
-      "title": "Add search, sort, and collapsible hierarchy to deck list",
-      "description": "As a user, I want to search decks, sort by different criteria, and collapse/expand child decks.",
+      "title": "Replace global seed with ensureUserWorkspace",
+      "description": "As a new user, I want my own default Echoe workspace initialized automatically so I can use Echoe without relying on global seed data.",
       "acceptanceCriteria": [
-        "Add search input that filters deck names in real-time",
-        "Add sort dropdown: by due count, by name A-Z, by last studied",
-        "Show collapse/expand arrows for parent decks with children",
-        "Indent child decks with visual hierarchy (left border)",
-        "Persist collapse state in localStorage or backend",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Add ensureUserWorkspace(uid) with idempotent behavior",
+        "Initialize user-scoped defaults for col, deck, deck_config, notetype, and template",
+        "Trigger initialization on registration success or first Echoe entry",
+        "Remove reliance on global fixed resources such as id=1 defaults",
+        "Tests pass",
+        "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "Search, sort, and collapse/expand implemented. Child decks use left border for visual hierarchy."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-011",
-      "title": "Update frontend study page to use server rating preview",
-      "description": "As a user, I want the estimated intervals shown below rating buttons to come from the server (FSRS), not local calculation.",
+      "title": "Centralize Echoe ID generation in id.ts",
+      "description": "As a maintainer, I want Echoe domain IDs generated from a single utility so ID semantics are consistent and Date.now() usage is removed from business logic.",
       "acceptanceCriteria": [
-        "Fetch rating preview from GET /api/v1/study/options when loading study card",
-        "Display server-calculated intervals under each rating button",
-        "Remove local heuristic interval calculation",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Add or extend generators in apps/server/src/utils/id.ts for deck, notetype, template, note, card, and revlog",
+        "Replace scattered Date.now() ID generation in Echoe business code with centralized helpers",
+        "Ensure all updated call sites compile with explicit ID source",
+        "Tests pass",
+        "Typecheck passes"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "Rating preview API integrated. Server-calculated intervals displayed under rating buttons. Falls back to local heuristics if API unavailable."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-012",
-      "title": "Implement Standard Anki APKG import",
-      "description": "As an Anki user, I want to import official Anki APKG packages with full compatibility.",
+      "title": "Add unit tests for uid-filtered service behavior",
+      "description": "As a QA-focused developer, I want unit coverage proving service queries include uid filters so accidental omissions are caught early.",
       "acceptanceCriteria": [
-        "Auto-detect package type (Standard Anki vs Echoe Legacy)",
-        "Read col.json for models/decks/dconf (not custom tables)",
-        "Parse media manifest and map数字文件名 to real names",
-        "Import cards with proper FSRS field backfill",
-        "Show detailed import result report with errors",
+        "Add or update unit tests to assert uid predicates in key service query paths",
+        "Cover insert paths to assert uid is written",
+        "Cover update/delete paths to assert uid-scoped mutations",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": true,
-      "notes": "Standard Anki APKG import implemented with auto-detection, col.json parsing, media manifest mapping, and FSRS field backfill"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-013",
-      "title": "Implement Standard Anki APKG export",
-      "description": "As a user, I want to export packages that can be opened in Anki Desktop.",
+      "title": "Add dual-user integration tests for core workflows",
+      "description": "As a QA-focused developer, I want A/B user integration tests for core Echoe flows so cross-user visibility and mutation regressions are blocked.",
       "acceptanceCriteria": [
-        "Generate Standard Anki package structure with col.json",
-        "Include media manifest mapping",
-        "Support includeScheduling=false (export as new cards)",
-        "Support includeScheduling=true (export with scheduling and revlog)",
-        "Default to format=anki (not legacy)",
+        "Add integration tests covering note, card, deck, study, stats, and tag workflows with two users",
+        "Assert user B cannot read, update, or delete user A resources",
+        "Assert cross-user lookups return unauthorized or empty results per endpoint contract",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": true,
-      "notes": "Standard Anki APKG export implemented with col.json generation, media manifest mapping, format parameter support, and backward compatibility with legacy format"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-014",
-      "title": "Refactor stats service to use FSRS stability",
-      "description": "As a developer, I need to refactor the stats service to use stability instead of ivl for maturity calculations.",
+      "title": "Add integration and security tests for edge workflows",
+      "description": "As a QA-focused developer, I want edge-path isolation tests so import/export/media workflows are release-gated against tenant boundary leaks.",
       "acceptanceCriteria": [
-        "Update getMaturity to use stability >= 21 for mature classification",
-        "Update getMaturityBatch for batch operations",
-        "Add retrievability calculation: R(t,S) = (1 + t/(9S))^(-1)",
-        "Ensure stats, deck list, study queue use consistent due time semantics (ms timestamp)",
+        "Add integration tests for import, export, and media flows using two users",
+        "Verify exports only contain current uid data",
+        "Verify same filename uploads across users do not conflict",
+        "Add malicious cross-user ID access tests for protected Echoe APIs",
+        "Mark dual-user isolation suite as release gate",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": true,
-      "notes": "Updated getMaturity and getMaturityBatch to use stability instead of ivl. Added calculateRetrievability helper method with formula R(t,S) = (1 + t/(9S))^(-1). Maturity: new (lastReview=0 or stability=0), learning (0<stability<21), young (21<=stability<90), mature (stability>=21)."
+      "passes": false,
+      "notes": ""
     }
   ]
 }

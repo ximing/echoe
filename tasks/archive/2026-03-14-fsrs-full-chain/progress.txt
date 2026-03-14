@@ -1,0 +1,223 @@
+# Flashcards FSRS Full Chain - Progress
+
+## Codebase Patterns
+- Deck hierarchy uses '::' separator (e.g., "Parent::Child") to denote parent-child relationships
+- Use `buildDeckHierarchy()` in echoe-deck.service.ts to convert flat deck list to tree structure
+- FSRS stats are calculated per-deck in SQL queries, then aggregated in the service layer
+- For recursive aggregation: newCount/learnCount/reviewCount/totalCount/matureCount/difficultCount are summed; averageRetrievability is weighted by totalCount; lastStudiedAt is MAX
+
+## User Stories Progress
+
+| ID | Title | Status |
+|----|-------|--------|
+| US-001 | Add FSRS fields to echoe_cards table | [x] |
+| US-002 | Fix elapsed_days calculation in FSRS scheduling | [x] |
+| US-003 | Persist FSRS state on review | [x] |
+| US-004 | Add rating preview API endpoint | [x] |
+| US-005 | Update EchoeDeckWithCountsDto with FSRS metrics | [x] |
+| US-006 | Implement deck recursive aggregation for stats | [x] |
+| US-007 | Fix Undo to restore complete card state | [x] |
+| US-008 | Add APKG import page and fix import entry point | [x] |
+| US-009 | Redesign Flashcards list page with grid layout | [x] |
+| US-010 | Add search, sort, and collapsible hierarchy | [x] |
+| US-011 | Update frontend study page to use server rating preview | [x] |
+| US-012 | Implement Standard Anki APKG import | [x] |
+| US-013 | Implement Standard Anki APKG export | [x] |
+| US-014 | Refactor stats service to use FSRS stability | [ ] |
+
+---
+
+## Execution Log
+
+## 2026-03-12 11:38 - US-001
+- Added stability, difficulty, last_review columns to echoe_cards table in schema
+- Added three new indexes: did_queue_due_idx, did_last_review_idx, did_stability_idx
+- Generated migration 0004_huge_sentinel.sql and ran successfully
+- Server typecheck passes
+
+**Learnings for future iterations:**
+  - Always build server before generating migrations (drizzle-kit reads from dist/)
+  - Use double() for FSRS DOUBLE columns in Drizzle schema
+  - Migration runs automatically on server startup or can be run manually with pnpm migrate
+  - Server build passes even if web app has type errors (separate packages)
+---
+
+## 2026-03-12 12:20 - US-002
+- Fixed elapsed_days calculation in echoe-study.service.ts
+- Changed from `Math.max(card.ivl, 0)` to calculate based on `(now - last_review) / dayMs`
+- Added null check: if lastReview is 0 or null, treat as new card (elapsed_days = 0)
+- Server typecheck passes
+- All 58 tests pass
+
+**Learnings for future iterations:**
+  - elapsed_days should represent actual time since last review, not the interval
+  - For new cards (lastReview = 0), use elapsed_days = 0 to let FSRS calculate initial values
+  - The schema field is `lastReview` (camelCase) which maps to `last_review` in database
+---
+
+## 2026-03-12 13:45 - US-004
+- Added GET /api/v1/study/options?cardId=... endpoint
+- Added RatingOptionDto and StudyOptionsDto to DTO package
+- Added getOptions method to echoe-study.service.ts
+- Uses FSRS getSchedulingOptions to compute all 4 rating outcomes
+- Returns interval, due time, stability, and difficulty for each rating
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use card.stability if available, fallback to card.factor/1000 for backward compatibility
+  - The getSchedulingOptions method already exists in FSRSService - reuse it
+  - Rating values: 1=Again, 2=Hard, 3=Good, 4=Easy
+---
+
+## 2026-03-12 14:30 - US-005
+- Added FSRS metrics to EchoeDeckWithCountsDto in DTO package
+- Added fields: totalCount, matureCount (stability >= 21), difficultCount (retrievability < 0.9), averageRetrievability, lastStudiedAt
+- Updated getAllDecks() to query FSRS stats with SQL aggregations
+- Updated getDeckById() to include FSRS metrics
+- Updated createDeck() to return zero values for new FSRS fields
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Retrievability formula: R(t,S) = (1 + t/(9S))^(-1), where t = time since last review in days, S = stability
+  - Difficult cards are those with retrievability < 0.9 (i.e., time since review > stability * dayMs * 0.111...)
+  - Mature cards are defined as stability >= 21 days
+  - lastStudiedAt uses MAX(last_review) timestamp, returns null if never studied
+---
+
+## 2026-03-12 15:00 - US-006
+- Implemented recursive aggregation for deck stats in echoe-deck.service.ts
+- Added aggregateChildStats() method that post-order traverses the deck tree
+- Parent deck stats now include sums from all child decks:
+  - newCount, learnCount, reviewCount: sum of direct + children
+  - totalCount, matureCount, difficultCount: sum of direct + children
+  - averageRetrievability: weighted mean by totalCount
+  - lastStudiedAt: MAX of self and children
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use post-order traversal to aggregate child stats before parent (children first, then parent)
+  - averageRetrievability needs weighted average, not simple sum
+  - lastStudiedAt should use MAX to show most recent study time across all children
+---
+
+## 2026-03-12 13:00 - US-007
+- Added FSRS fields to revlog schema: stability, difficulty, last_review
+- Added pre-review snapshot fields to revlog: preDue, preIvl, preFactor, preReps, preLapses, preLeft, preType, preQueue, preStability, preDifficulty, preLastReview
+- Updated review submission to store full pre-review snapshot and post-review FSRS state
+- Fixed undo to restore all fields from pre-review snapshot (instead of inferring due from lastIvl)
+- Generated migration 0005_powerful_moon_knight.sql and ran successfully
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Store pre-review snapshot in revlog for undo instead of inferring from lastIvl
+  - The preDue is stored as a timestamp (ms), not interval days
+  - All card state fields (due, ivl, factor, reps, lapses, left, type, queue) plus FSRS fields (stability, difficulty, lastReview) should be restored from pre-review snapshot
+
+---
+
+## 2026-03-12 16:30 - US-008
+- Created APKG import page at /cards/import/apkg with full UI
+- Added importApkg API function to echoe.ts using ImportResultDto
+- Fixed Import .apkg button in cards index page to navigate to /cards/import/apkg
+- Added route in App.tsx for /cards/import/apkg
+- Server typecheck passes, web has pre-existing errors unrelated to this story
+
+**Learnings for future iterations:**
+  - Use ImportResultDto from @echoe/dto for import results (has notesAdded, cardsAdded, etc.)
+  - API response returns ImportResultDto directly in response.data (axios interceptor unwraps)
+  - Routes under /cards use Layout wrapper with ProtectedRoute
+---
+
+## 2026-03-12 17:00 - US-009
+- Redesigned Flashcards list page with responsive grid layout
+- Grid columns: 1 (mobile), 2 (sm), 3 (lg), 4 (xl)
+- Added mastery progress bar showing matureCount/totalCount percentage
+- Added color-coded badges: New (blue), Learning (yellow), Review (green), Done (gray)
+- Added last studied time with relative format ("5m ago", "2h ago", etc.)
+- Used custom DOM events for context menu handling on grid cards
+- Verified in browser - grid displays deck cards correctly
+
+**Learnings for future iterations:**
+  - Use Tailwind grid: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 for responsive columns
+  - EchoeDeckWithCountsDto has matureCount, difficultCount, averageRetrievability, lastStudiedAt from FSRS
+  - Mastery % = (matureCount / totalCount) * 100
+  - Context menu on grid items needs custom DOM events since grid cards don't have direct React handlers
+---
+
+## 2026-03-12 17:30 - US-010
+- Added search input with real-time filtering of deck names
+- Added sort dropdown: Due count (default), Name A-Z, Last studied
+- Added collapse/expand arrows for parent decks with children
+- Child decks already have left border for visual hierarchy from US-009
+- Collapse state managed by EchoeDeckService (toggleExpanded, isExpanded)
+- Verified in browser - search filters and sort work correctly
+
+**Learnings for future iterations:**
+  - Use getFilteredAndSortedDecks() helper to combine filtering and sorting
+  - sortBy options: 'due' (most due first), 'name' (alphabetical), 'lastStudied' (most recent first)
+  - toggleExpanded/isExpanded methods already exist in EchoeDeckService
+  - Child deck indentation uses pl-4 and border-l-2 for visual hierarchy
+
+---
+
+## 2026-03-12 18:00 - US-011
+- Added getStudyOptions API function in echoe.ts to call GET /api/v1/study/options?cardId=...
+- Added currentCardOptions property to EchoeStudyService to store rating previews
+- Added fetchStudyOptions() method to fetch options when showing answer
+- Updated getNextIntervalText() to use server-provided intervals when available, fall back to local heuristics
+- Added clearing of currentCardOptions when moving to next card
+- Rating buttons now display FSRS-calculated intervals from server instead of local estimation
+
+**Learnings for future iterations:**
+  - RatingOptionDto contains rating, label, interval, due, stability, difficulty
+  - getStudyOptions API returns StudyOptionsDto with cardId and options array
+  - Current card options are cleared when moving to next card (submit, bury, forget)
+  - Pre-existing web build errors unrelated to this change
+
+---
+
+## 2026-03-12 19:00 - US-012
+- Implemented Standard Anki APKG import with auto-detection
+- Added detectPackageType() method that checks for col.json (Standard Anki) vs custom tables (Echoe Legacy)
+- Added importStandardAnki() with col.json parsing for models and decks
+- Added parseMediaManifest() to map numeric filenames to real names
+- Added FSRS field backfill: stability from ivl, difficulty from factor, lastReview from mod time
+- Added importMediaFromStandardAnki() with media manifest mapping
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Standard Anki packages use col.json for metadata, legacy Echoe uses custom SQLite tables
+  - Media 2.0 manifest is a JSON file at "media" with numeric ID -> filename mapping
+  - FSRS fields are backfilled from card state: stability = ivl (or 1), difficulty = factor/1000 (or 2.5)
+  - Revlog entries include pre-review snapshot for undo: preStability from lastIvl, preLastReview calculated
+---
+
+## 2026-03-12 20:00 - US-013
+- Implemented Standard Anki APKG export with format parameter (anki/legacy, defaults to anki)
+- Added exportStandardAnki() method that generates col.json with models, decks, and dconf
+- Added media manifest mapping (numeric ID -> filename) for Standard Anki packages
+- Added createStandardAnkiSchema(), exportModelsForStandardAnki(), generateColJson() methods
+- Added getDeckConfigForStandardAnki() with default Anki scheduling settings
+- Added addMediaToZipStandardAnki() with media manifest
+- Updated controller to accept format query parameter
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Standard Anki packages use col.json for collection metadata, collection.db for SQLite database
+  - Media manifest is a JSON file at "media" with numeric ID -> filename mapping
+  - The export creates Standard Anki format by default, legacy format available via format=legacy query param
+  - col.json contains models (notetypes), decks, dconf (deck config), and conf (collection config)
+---
+
+## 2026-03-12 21:00 - US-014
+- Updated getMaturity to use stability instead of ivl for maturity classification
+- Updated getMaturityBatch to use stability instead of ivl
+- Added calculateRetrievability helper with formula R(t,S) = (1 + t/(9S))^(-1)
+- Maturity classification: new (lastReview=0 or stability=0), learning (0<stability<21), young (21<=stability<90), mature (stability>=21)
+- Server typecheck passes, all 58 tests pass
+
+**Learnings for future iterations:**
+  - Use stability for maturity: stability >= 21 days = mature, stability < 21 = learning/young
+  - Retrievability formula: R(t,S) = (1 + t/(9S))^(-1), where t = days since last review, S = stability
+  - New cards: lastReview = 0 OR stability = 0
+  - The calculateRetrievability method can be used by other services for difficulty calculations

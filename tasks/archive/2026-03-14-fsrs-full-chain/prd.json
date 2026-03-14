@@ -1,0 +1,223 @@
+{
+  "project": "Echoe Flashcards",
+  "branchName": "ralph/fsrs-full-chain",
+  "description": "Flashcards 列表与学习流程 FSRS 全链路改造 - 重构卡片集列表页面并统一到 FSRS 主口径",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add FSRS fields to echoe_cards table",
+      "description": "As a developer, I need to add stability, difficulty, and last_review fields to the database so FSRS state can persist.",
+      "acceptanceCriteria": [
+        "Add stability (DOUBLE) column to echoe_cards table",
+        "Add difficulty (DOUBLE) column to echoe_cards table",
+        "Add last_review (BIGINT) column to echoe_cards table",
+        "Add composite index on (did, queue, due)",
+        "Add index on (did, last_review)",
+        "Add index on (did, stability)",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Fix elapsed_days calculation in FSRS scheduling",
+      "description": "As a developer, I need to fix the elapsed_days calculation in echoe-study.service.ts to use (now - last_review) instead of ivl.",
+      "acceptanceCriteria": [
+        "In echoe-study.service.ts, change elapsed_days from card.ivl to (now - last_review) / dayMs",
+        "Handle case when last_review is null (treat as new card)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Persist FSRS state (stability/difficulty/last_review) on review",
+      "description": "As a developer, I need to ensure stability, difficulty, and last_review are properly stored when a card is reviewed.",
+      "acceptanceCriteria": [
+        "Store stability from FSRS output to card.stability field",
+        "Store difficulty from FSRS output to card.difficulty field",
+        "Store last_review as current timestamp when review submitted",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add rating preview API endpoint",
+      "description": "As a user, I want to see the estimated interval before answering so I know when the card will reappear.",
+      "acceptanceCriteria": [
+        "Create GET /api/v1/study/options?cardId=... endpoint",
+        "Return four options: Again/Hard/Good/Easy with next interval and due time",
+        "Use FSRS getSchedulingOptions to compute real values",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Update EchoeDeckWithCountsDto with FSRS metrics",
+      "description": "As a developer, I need to add FSRS metrics to the deck list DTO so the frontend can display maturity and difficulty counts.",
+      "acceptanceCriteria": [
+        "Add totalCount field to EchoeDeckWithCountsDto",
+        "Add matureCount (stability >= 21) field",
+        "Add difficultCount (retrievability < 0.9) field",
+        "Add averageRetrievability field",
+        "Add lastStudiedAt field",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement deck recursive aggregation for stats",
+      "description": "As a user, I want parent decks to show aggregated stats from all child decks.",
+      "acceptanceCriteria": [
+        "Deck stats query supports recursive aggregation of child decks",
+        "Parent deck matureCount = sum of all child deck matureCounts",
+        "Parent deck difficultCount = sum of all child deck difficultCounts",
+        "Parent deck averageRetrievability = weighted mean of children",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Fix Undo to restore complete card state",
+      "description": "As a user, I want Undo to restore the exact state before review, including all FSRS fields.",
+      "acceptanceCriteria": [
+        "Undo restores: due, ivl, factor, reps, lapses, left, type, queue, stability, difficulty, last_review",
+        "Store pre-review snapshot in revlog extension column or separate table",
+        "Remove logic that tries to infer due from lastIvl",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Add APKG import page and fix import entry point",
+      "description": "As a user, I want a dedicated APKG import page and the import button should go to the correct page.",
+      "acceptanceCriteria": [
+        "Create APKG import page at /import/apkg",
+        "Fix Import .apkg button to navigate to /import/apkg (not CSV import)",
+        "Separate CSV import and APKG import into different entry points",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Implementation complete - APKG import page created, button navigation fixed"
+    },
+    {
+      "id": "US-009",
+      "title": "Redesign Flashcards list page with grid layout",
+      "description": "As a user, I want to see flashcards in a responsive grid layout with learning metrics.",
+      "acceptanceCriteria": [
+        "Implement grid layout: 1 column mobile, 2 columns tablet, 4 columns desktop",
+        "Show deck name, total cards, mastery progress bar",
+        "Show new/learn/review badges (color-coded)",
+        "Show last studied time",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Grid layout implemented with responsive columns, mastery progress bar, color-coded badges, and last studied time"
+    },
+    {
+      "id": "US-010",
+      "title": "Add search, sort, and collapsible hierarchy to deck list",
+      "description": "As a user, I want to search decks, sort by different criteria, and collapse/expand child decks.",
+      "acceptanceCriteria": [
+        "Add search input that filters deck names in real-time",
+        "Add sort dropdown: by due count, by name A-Z, by last studied",
+        "Show collapse/expand arrows for parent decks with children",
+        "Indent child decks with visual hierarchy (left border)",
+        "Persist collapse state in localStorage or backend",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Search, sort, and collapse/expand implemented. Child decks use left border for visual hierarchy."
+    },
+    {
+      "id": "US-011",
+      "title": "Update frontend study page to use server rating preview",
+      "description": "As a user, I want the estimated intervals shown below rating buttons to come from the server (FSRS), not local calculation.",
+      "acceptanceCriteria": [
+        "Fetch rating preview from GET /api/v1/study/options when loading study card",
+        "Display server-calculated intervals under each rating button",
+        "Remove local heuristic interval calculation",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Rating preview API integrated. Server-calculated intervals displayed under rating buttons. Falls back to local heuristics if API unavailable."
+    },
+    {
+      "id": "US-012",
+      "title": "Implement Standard Anki APKG import",
+      "description": "As an Anki user, I want to import official Anki APKG packages with full compatibility.",
+      "acceptanceCriteria": [
+        "Auto-detect package type (Standard Anki vs Echoe Legacy)",
+        "Read col.json for models/decks/dconf (not custom tables)",
+        "Parse media manifest and map数字文件名 to real names",
+        "Import cards with proper FSRS field backfill",
+        "Show detailed import result report with errors",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Standard Anki APKG import implemented with auto-detection, col.json parsing, media manifest mapping, and FSRS field backfill"
+    },
+    {
+      "id": "US-013",
+      "title": "Implement Standard Anki APKG export",
+      "description": "As a user, I want to export packages that can be opened in Anki Desktop.",
+      "acceptanceCriteria": [
+        "Generate Standard Anki package structure with col.json",
+        "Include media manifest mapping",
+        "Support includeScheduling=false (export as new cards)",
+        "Support includeScheduling=true (export with scheduling and revlog)",
+        "Default to format=anki (not legacy)",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Standard Anki APKG export implemented with col.json generation, media manifest mapping, format parameter support, and backward compatibility with legacy format"
+    },
+    {
+      "id": "US-014",
+      "title": "Refactor stats service to use FSRS stability",
+      "description": "As a developer, I need to refactor the stats service to use stability instead of ivl for maturity calculations.",
+      "acceptanceCriteria": [
+        "Update getMaturity to use stability >= 21 for mature classification",
+        "Update getMaturityBatch for batch operations",
+        "Add retrievability calculation: R(t,S) = (1 + t/(9S))^(-1)",
+        "Ensure stats, deck list, study queue use consistent due time semantics (ms timestamp)",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Updated getMaturity and getMaturityBatch to use stability instead of ivl. Added calculateRetrievability helper method with formula R(t,S) = (1 + t/(9S))^(-1). Maturity: new (lastReview=0 or stability=0), learning (0<stability<21), young (21<=stability<90), mature (stability>=21)."
+    }
+  ]
+}
