@@ -10,6 +10,7 @@ import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { logger } from '../utils/logger.js';
 import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
+import { generateDeckId } from '../utils/id.js';
 import { DEFAULT_FSRS_DTO_CONFIG } from './fsrs-default-config.js';
 import { parseStepToMinutes } from '../utils/fsrs-steps.js';
 
@@ -326,7 +327,7 @@ export class EchoeDeckService {
     const db = getDatabase();
 
     // Generate deck ID (Unix timestamp in ms)
-    const id = Date.now();
+    const id = generateDeckId();
     const now = Math.floor(Date.now() / 1000);
 
     // If name contains '::', check if parent exists (not for filtered decks)
@@ -752,7 +753,7 @@ export class EchoeDeckService {
     const db = getDatabase();
 
     // Generate deck ID (Unix timestamp in ms)
-    const id = Date.now();
+    const id = generateDeckId();
     const now = Math.floor(Date.now() / 1000);
 
     const newDeck: NewEchoeDecks = {

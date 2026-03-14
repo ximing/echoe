@@ -12,6 +12,7 @@ import {
   echoeConfig,
 } from '../db/schema/index.js';
 import { logger } from '../utils/logger.js';
+import { generateDeckId, generateNoteTypeId } from '../utils/id.js';
 
 const DEFAULT_DECK_ID = 1;
 const DEFAULT_DECK_CONFIG_ID = 1;
@@ -391,16 +392,15 @@ export class EchoeSeedService {
     logger.info(`Initializing Echoe workspace for user uid=${uid}`);
 
     const now = Math.floor(Date.now() / 1000);
-    const nowMs = Date.now();
 
-    // Generate unique IDs for user's resources using timestamp-based approach
-    const deckConfigId = nowMs;
-    const deckId = nowMs + 1;
-    const noteTypeBasicId = nowMs + 2;
-    const noteTypeBasicReversedId = nowMs + 3;
-    const noteTypeBasicOptionalReversedId = nowMs + 4;
-    const noteTypeBasicTypeInAnswerId = nowMs + 5;
-    const noteTypeClozeId = nowMs + 6;
+    // Generate unique IDs for user's resources using centralized ID generators
+    const deckConfigId = generateDeckId();
+    const deckId = generateDeckId();
+    const noteTypeBasicId = generateNoteTypeId();
+    const noteTypeBasicReversedId = generateNoteTypeId();
+    const noteTypeBasicOptionalReversedId = generateNoteTypeId();
+    const noteTypeBasicTypeInAnswerId = generateNoteTypeId();
+    const noteTypeClozeId = generateNoteTypeId();
 
     // 1. Create default deck config
     const deckConfigData = {
@@ -582,7 +582,7 @@ export class EchoeSeedService {
 
     // 4. Create collection
     const colData: typeof echoeCol.$inferInsert = {
-      id: nowMs + 7,
+      id: generateDeckId(),
       uid,
       crt: now,
       mod: now,

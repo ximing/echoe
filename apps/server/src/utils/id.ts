@@ -98,3 +98,36 @@ export function generateRevlogId(): number {
   }
   return ms * 1000 + _revlogSeq;
 }
+
+/**
+ * 生成唯一的 Deck ID。
+ * 格式：Unix timestamp in milliseconds（与 Anki deck.id 语义对齐）。
+ */
+export function generateDeckId(): number {
+  return Date.now();
+}
+
+/**
+ * 生成唯一的 Note ID。
+ * 格式：ms * 1000 + random（与 Anki note.id 语义对齐）。
+ */
+export function generateNoteId(): number {
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}
+
+/**
+ * 生成唯一的 Card ID。
+ * 格式：ms * 1000000 + ord * 1000 + random（与 Anki card.id 语义对齐）。
+ * @param ord - Template ordinal (order) for this card type
+ */
+export function generateCardId(ord: number): number {
+  return Date.now() * 1000000 + ord * 1000 + Math.floor(Math.random() * 1000);
+}
+
+/**
+ * 生成唯一的 NoteType ID。
+ * 格式：ms * 1000 + random（与 Anki notetype.id 语义对齐）。
+ */
+export function generateNoteTypeId(): number {
+  return Date.now() * 1000 + Math.floor(Math.random() * 1000);
+}

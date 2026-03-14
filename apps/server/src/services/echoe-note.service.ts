@@ -12,6 +12,7 @@ import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
+import { generateNoteId, generateCardId, generateNoteTypeId } from '../utils/id.js';
 import type { RichTextFields } from '../types/note-fields.js';
 import type { EchoeCards } from '../db/schema/echoe-cards.js';
 import type { EchoeNotes } from '../db/schema/echoe-notes.js';
@@ -192,7 +193,7 @@ export class EchoeNoteService {
     const tagsJson = JSON.stringify(tags);
 
     const now = Math.floor(Date.now() / 1000);
-    const noteId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    const noteId = generateNoteId();
 
     // Wrap note and card creation in a transaction
     return withTransaction(async (tx) => {
@@ -219,7 +220,7 @@ export class EchoeNoteService {
       const createdCards: EchoeCardDto[] = [];
 
       for (const template of templates) {
-        const cardId = Date.now() * 1000000 + template.ord * 1000 + Math.floor(Math.random() * 1000);
+        const cardId = generateCardId(template.ord);
         await tx.insert(echoeCards).values({
           id: cardId,
           uid,
@@ -849,7 +850,7 @@ export class EchoeNoteService {
     const db = getDatabase();
 
     const now = Math.floor(Date.now() / 1000);
-    const noteTypeId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    const noteTypeId = generateNoteTypeId();
 
     let fields = dto.flds;
     let templates = dto.tmpls;
