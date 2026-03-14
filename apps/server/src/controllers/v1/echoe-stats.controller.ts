@@ -24,7 +24,7 @@ export class EchoeStatsController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const stats = await this.echoeStatsService.getTodayStats(deckId);
+      const stats = await this.echoeStatsService.getTodayStats(userDto.uid, deckId);
       return ResponseUtil.success(stats);
     } catch (error) {
       logger.error('Get today stats error:', error);
@@ -51,7 +51,7 @@ export class EchoeStatsController {
       if (isNaN(days) || days < 1 || days > 365) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'days must be between 1 and 365');
       }
-      const history = await this.echoeStatsService.getHistory(deckId, days);
+      const history = await this.echoeStatsService.getHistory(userDto.uid, deckId, days);
       return ResponseUtil.success(history);
     } catch (error) {
       logger.error('Get history error:', error);
@@ -70,7 +70,7 @@ export class EchoeStatsController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const maturity = await this.echoeStatsService.getMaturity(deckId);
+      const maturity = await this.echoeStatsService.getMaturity(userDto.uid, deckId);
       return ResponseUtil.success(maturity);
     } catch (error) {
       logger.error('Get maturity error:', error);
@@ -97,7 +97,7 @@ export class EchoeStatsController {
       if (isNaN(days) || days < 1 || days > 365) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'days must be between 1 and 365');
       }
-      const forecast = await this.echoeStatsService.getForecast(deckId, days);
+      const forecast = await this.echoeStatsService.getForecast(userDto.uid, deckId, days);
       return ResponseUtil.success(forecast);
     } catch (error) {
       logger.error('Get forecast error:', error);
@@ -116,7 +116,7 @@ export class EchoeStatsController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const streak = await this.echoeStatsService.getStreak();
+      const streak = await this.echoeStatsService.getStreak(userDto.uid);
       return ResponseUtil.success({ streak });
     } catch (error) {
       logger.error('Get streak error:', error);
@@ -135,7 +135,7 @@ export class EchoeStatsController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result = await this.echoeStatsService.getMaturityBatch();
+      const result = await this.echoeStatsService.getMaturityBatch(userDto.uid);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Get maturity batch error:', error);

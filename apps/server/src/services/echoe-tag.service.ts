@@ -4,7 +4,7 @@
  */
 
 import { Service } from 'typedi';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
@@ -17,11 +17,11 @@ export class EchoeTagService {
   /**
    * Get all tags with usage count, sorted by count descending
    */
-  async getAllTags(): Promise<EchoeTagDto[]> {
+  async getAllTags(uid: string): Promise<EchoeTagDto[]> {
     const db = getDatabase();
 
     // Get all notes with tags
-    const notes = await db.select({ tags: echoeNotes.tags }).from(echoeNotes);
+    const notes = await db.select({ tags: echoeNotes.tags }).from(echoeNotes).where(eq(echoeNotes.uid, uid));
 
     // Count tag usage
     const tagCounts = new Map<string, number>();
@@ -53,8 +53,8 @@ export class EchoeTagService {
   /**
    * Search tags by prefix (for autocomplete)
    */
-  async searchTags(query: string, limit = 10): Promise<string[]> {
-    const allTags = await this.getAllTags();
+  async searchTags(uid: string, query: string, limit = 10): Promise<string[]> {
+    const allTags = await this.getAllTags(uid);
     const normalizedQuery = query.toLowerCase().trim();
 
     return allTags
@@ -66,14 +66,14 @@ export class EchoeTagService {
   /**
    * Get usage count for a specific tag
    */
-  async getTagUsageCount(tagName: string): Promise<number> {
+  async getTagUsageCount(uid: string, tagName: string): Promise<number> {
     const normalizedTag = tagName.toLowerCase().trim();
 
     const db = getDatabase();
     const result = await db
       .select({ tags: echoeNotes.tags })
       .from(echoeNotes)
-      .where(sql`${echoeNotes.tags} LIKE ${`%"${normalizedTag}"%`}`);
+      .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${normalizedTag}"%`}`));
 
     let count = 0;
     for (const note of result) {
@@ -94,7 +94,7 @@ export class EchoeTagService {
   /**
    * Rename a tag across all notes
    */
-  async renameTag(oldName: string, dto: RenameTagDto): Promise<{ updated: number }> {
+  async renameTag(uid: string, oldName: string, dto: RenameTagDto): Promise<{ updated: number }> {
     const oldTag = oldName.toLowerCase().trim();
     const newTag = dto.newName.toLowerCase().trim();
 
@@ -108,7 +108,7 @@ export class EchoeTagService {
     const notes = await db
       .select({ id: echoeNotes.id, tags: echoeNotes.tags })
       .from(echoeNotes)
-      .where(sql`${echoeNotes.tags} LIKE ${`%"${oldTag}"%`}`);
+      .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${oldTag}"%`}`));
 
     let updated = 0;
     const now = Math.floor(Date.now() / 1000);
@@ -127,7 +127,7 @@ export class EchoeTagService {
           await db
             .update(echoeNotes)
             .set({ tags: JSON.stringify(newTags), mod: now, usn: 0 })
-            .where(eq(echoeNotes.id, note.id));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
 
           updated++;
         }
@@ -142,9 +142,9 @@ export class EchoeTagService {
   /**
    * Delete a tag (only if not in use)
    */
-  async deleteTag(tagName: string): Promise<{ deleted: boolean; message: string }> {
+  async deleteTag(uid: string, tagName: string): Promise<{ deleted: boolean; message: string }> {
     const normalizedTag = tagName.toLowerCase().trim();
-    const usageCount = await this.getTagUsageCount(normalizedTag);
+    const usageCount = await this.getTagUsageCount(uid, normalizedTag);
 
     if (usageCount > 0) {
       return {
@@ -165,7 +165,7 @@ export class EchoeTagService {
    * Merge one tag into another
    * Replaces source tag with target tag in all notes, then deletes source
    */
-  async mergeTags(dto: MergeTagsDto): Promise<{ updated: number }> {
+  async mergeTags(uid: string, dto: MergeTagsDto): Promise<{ updated: number }> {
     const sourceTag = dto.source.toLowerCase().trim();
     const targetTag = dto.target.toLowerCase().trim();
 
@@ -183,7 +183,7 @@ export class EchoeTagService {
     const notes = await db
       .select({ id: echoeNotes.id, tags: echoeNotes.tags })
       .from(echoeNotes)
-      .where(sql`${echoeNotes.tags} LIKE ${`%"${sourceTag}"%`}`);
+      .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${sourceTag}"%`}`));
 
     let updated = 0;
     const now = Math.floor(Date.now() / 1000);
@@ -204,7 +204,7 @@ export class EchoeTagService {
           await db
             .update(echoeNotes)
             .set({ tags: JSON.stringify(newTags), mod: now, usn: 0 })
-            .where(eq(echoeNotes.id, note.id));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
 
           updated++;
         }

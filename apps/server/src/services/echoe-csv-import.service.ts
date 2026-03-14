@@ -53,7 +53,7 @@ export class EchoeCsvImportService {
   /**
    * Execute CSV import
    */
-  async execute(buffer: Buffer, dto: CsvExecuteDto): Promise<CsvImportResultDto> {
+  async execute(uid: string, buffer: Buffer, dto: CsvExecuteDto): Promise<CsvImportResultDto> {
     const result: CsvImportResultDto = {
       added: 0,
       updated: 0,
@@ -128,7 +128,7 @@ export class EchoeCsvImportService {
           }
 
           // Create note via EchoeNoteService
-          await this.noteService.createNote({
+          await this.noteService.createNote(uid, {
             notetypeId: dto.notetypeId,
             deckId: dto.deckId,
             fields,

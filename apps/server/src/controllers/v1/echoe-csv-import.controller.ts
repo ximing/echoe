@@ -143,7 +143,7 @@ export class EchoeCsvImportController {
     };
 
     try {
-      const result = await this.csvImportService.execute(file.buffer, normalizedDto);
+      const result = await this.csvImportService.execute(userDto.uid, file.buffer, normalizedDto);
       return ResponseUtil.success(result);
     } catch (err) {
       logger.error('Failed to execute CSV import:', err);

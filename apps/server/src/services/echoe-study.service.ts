@@ -44,9 +44,6 @@ const FSRS_BOOLEAN_SCHEMA = z.boolean();
 const FSRS_STEPS_SCHEMA = z.array(z.union([z.number(), z.string()])).min(1).max(20);
 const FSRS_LEGACY_DIFFICULTY_FALLBACK = 2.5;
 
-// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
-const TEMP_UID = 'SYSTEM';
-
 @Service()
 export class EchoeStudyService {
   constructor(
@@ -57,18 +54,18 @@ export class EchoeStudyService {
   /**
    * Get study queue for a deck
    */
-  async getQueue(params: StudyQueueParams): Promise<StudyQueueItemDto[]> {
+  async getQueue(uid: string, params: StudyQueueParams): Promise<StudyQueueItemDto[]> {
     const db = getDatabase();
     const limit = params.limit || 20;
     const now = Date.now();
 
     // Build conditions
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(echoeCards.uid, uid)];
 
     // Filter by deck if provided
     if (params.deckId) {
       // Get all sub-deck IDs
-      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(TEMP_UID, params.deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, params.deckId);
       conditions.push(sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`);
     }
 
@@ -177,13 +174,13 @@ export class EchoeStudyService {
   /**
    * Submit a review for a card
    */
-  async submitReview(dto: ReviewSubmissionDto, uid?: string): Promise<StudyReviewResultDto> {
+  async submitReview(uid: string, dto: ReviewSubmissionDto): Promise<StudyReviewResultDto> {
     const db = getDatabase();
     const now = new Date();
 
     // Get the card
     const card = await db.query.echoeCards.findFirst({
-      where: eq(echoeCards.id, dto.cardId),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, dto.cardId)),
     });
 
     if (!card) {
@@ -192,7 +189,7 @@ export class EchoeStudyService {
 
     // Get the note
     const note = await db.query.echoeNotes.findFirst({
-      where: eq(echoeNotes.id, card.nid),
+      where: and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, card.nid)),
     });
 
     if (!note) {
@@ -201,7 +198,7 @@ export class EchoeStudyService {
 
     // Get the deck
     const deck = await db.query.echoeDecks.findFirst({
-      where: eq(echoeDecks.id, card.did),
+      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, card.did)),
     });
 
     if (!deck) {
@@ -298,7 +295,7 @@ export class EchoeStudyService {
     await db.insert(echoeRevlog).values({
       id: reviewId,
       cid: dto.cardId,
-      uid: uid ?? TEMP_UID,
+      uid,
       usn: -1,
       ease: dto.rating,
       ivl: schedulingResult.interval,
@@ -509,7 +506,7 @@ export class EchoeStudyService {
    * @param cardIds - Card IDs to bury
    * @param mode - 'card' for single card bury (queue=-2), 'note' for sibling bury (queue=-3)
    */
-  async buryCards(cardIds: number[], mode: 'card' | 'note' = 'card'): Promise<void> {
+  async buryCards(uid: string, cardIds: number[], mode: 'card' | 'note' = 'card'): Promise<void> {
     const db = getDatabase();
     const now = Math.floor(Date.now() / 1000);
 
@@ -518,7 +515,7 @@ export class EchoeStudyService {
       const noteIds = new Set<number>();
       for (const cardId of cardIds) {
         const card = await db.query.echoeCards.findFirst({
-          where: eq(echoeCards.id, cardId),
+          where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
         });
         if (card) {
           noteIds.add(card.nid);
@@ -538,6 +535,7 @@ export class EchoeStudyService {
             usn: -1,
           })
           .where(and(
+            eq(echoeCards.uid, uid),
             sql`(${sql.join(siblingConditions, sql` OR `)})`,
             sql`${echoeCards.queue} >= 0` // Only bury cards that are not already suspended/buried
           ));
@@ -551,7 +549,7 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(sql`${echoeCards.id} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`);
+        .where(and(eq(echoeCards.uid, uid), sql`${echoeCards.id} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`))
     }
   }
 
@@ -559,14 +557,14 @@ export class EchoeStudyService {
    * Forget cards (reset to new) via FSRSService.forgetCard() to ensure
    * all FSRS fields (including factor = stability * 1000) are correctly reset.
    */
-  async forgetCards(cardIds: number[]): Promise<void> {
+  async forgetCards(uid: string, cardIds: number[]): Promise<void> {
     const db = getDatabase();
     const now = new Date();
     const nowSec = Math.floor(now.getTime() / 1000);
 
     for (const cardId of cardIds) {
       const card = await db.query.echoeCards.findFirst({
-        where: eq(echoeCards.id, cardId),
+        where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
       });
       if (!card) continue;
 
@@ -712,21 +710,21 @@ export class EchoeStudyService {
   /**
    * Get study counts for a deck
    */
-  async getCounts(deckId?: number): Promise<StudyCountsDto> {
+  async getCounts(uid: string, deckId?: number): Promise<StudyCountsDto> {
     const db = getDatabase();
     const now = Date.now();
 
     // Build conditions
     let deckFilter: any = undefined;
     if (deckId) {
-      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(TEMP_UID, deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       deckFilter = sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`;
     }
 
     // New cards (queue=0)
     const newConditions = deckFilter
-      ? [deckFilter, eq(echoeCards.queue, 0)]
-      : [eq(echoeCards.queue, 0)];
+      ? [eq(echoeCards.uid, uid), deckFilter, eq(echoeCards.queue, 0)]
+      : [eq(echoeCards.uid, uid), eq(echoeCards.queue, 0)];
     const newCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
@@ -735,8 +733,8 @@ export class EchoeStudyService {
 
     // Learning cards due now (queue=1 or queue=3 and due <= now)
     const learnConditions = deckFilter
-      ? [deckFilter, sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`]
-      : [sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`];
+      ? [eq(echoeCards.uid, uid), deckFilter, sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`]
+      : [eq(echoeCards.uid, uid), sql`${echoeCards.queue} IN (1, 3)`, sql`${echoeCards.due} <= ${now}`];
     const learnCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
@@ -745,8 +743,8 @@ export class EchoeStudyService {
 
     // Review cards (queue=2 and due <= now)
     const reviewConditions = deckFilter
-      ? [deckFilter, eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${now}`]
-      : [eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${now}`];
+      ? [eq(echoeCards.uid, uid), deckFilter, eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${now}`]
+      : [eq(echoeCards.uid, uid), eq(echoeCards.queue, 2), sql`${echoeCards.due} <= ${now}`];
     const reviewCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
@@ -764,13 +762,13 @@ export class EchoeStudyService {
   /**
    * Get scheduling options for a card (preview of all rating outcomes)
    */
-  async getOptions(cardId: number): Promise<StudyOptionsDto> {
+  async getOptions(uid: string, cardId: number): Promise<StudyOptionsDto> {
     const db = getDatabase();
     const now = new Date();
 
     // Get the card
     const card = await db.query.echoeCards.findFirst({
-      where: eq(echoeCards.id, cardId),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
     });
 
     if (!card) {
@@ -779,7 +777,7 @@ export class EchoeStudyService {
 
     // Get the deck
     const deck = await db.query.echoeDecks.findFirst({
-      where: eq(echoeDecks.id, card.did),
+      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, card.did)),
     });
 
     if (!deck) {

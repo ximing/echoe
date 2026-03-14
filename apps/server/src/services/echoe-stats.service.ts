@@ -19,7 +19,7 @@ export class EchoeStatsService {
   /**
    * Get today's study statistics
    */
-  async getTodayStats(deckId?: number): Promise<StudyTodayStatsDto> {
+  async getTodayStats(uid: string, deckId?: number): Promise<StudyTodayStatsDto> {
     const db = getDatabase();
 
     // Get start of today (midnight UTC)
@@ -31,20 +31,12 @@ export class EchoeStatsService {
     let cardFilter: ReturnType<typeof inArray> | undefined = undefined;
     if (deckId !== undefined) {
       // Get deck and sub-deck IDs
-      const deckIds = await this.getDeckAndSubdeckIds(deckId);
+      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
       cardFilter = inArray(echoeCards.did, deckIds);
     }
 
     // Get today's reviews
-    let query = db
-      .select({
-        ease: echoeRevlog.ease,
-        time: echoeRevlog.time,
-        cid: echoeRevlog.cid,
-      })
-      .from(echoeRevlog)
-      .where(gte(echoeRevlog.id, todayStart * 1000));
-
+    let query;
     if (deckId !== undefined) {
       // Join with cards to filter by deck
       query = db
@@ -57,10 +49,21 @@ export class EchoeStatsService {
         .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
         .where(
           and(
+            eq(echoeRevlog.uid, uid),
+            eq(echoeCards.uid, uid),
             gte(echoeRevlog.id, todayStart * 1000),
             cardFilter
           )
         );
+    } else {
+      query = db
+        .select({
+          ease: echoeRevlog.ease,
+          time: echoeRevlog.time,
+          cid: echoeRevlog.cid,
+        })
+        .from(echoeRevlog)
+        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, todayStart * 1000)));
     }
 
     const reviews = await query;
@@ -101,7 +104,7 @@ export class EchoeStatsService {
   /**
    * Get study history for the last N days
    */
-  async getHistory(deckId?: number, days: number = 30): Promise<StudyHistoryDayDto[]> {
+  async getHistory(uid: string, deckId?: number, days: number = 30): Promise<StudyHistoryDayDto[]> {
     const db = getDatabase();
 
     // Get start date
@@ -112,7 +115,7 @@ export class EchoeStatsService {
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(deckId);
+      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           id: echoeRevlog.id,
@@ -123,6 +126,8 @@ export class EchoeStatsService {
         .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
         .where(
           and(
+            eq(echoeRevlog.uid, uid),
+            eq(echoeCards.uid, uid),
             gte(echoeRevlog.id, startTimestamp * 1000),
             inArray(echoeCards.did, deckIds)
           )
@@ -135,7 +140,7 @@ export class EchoeStatsService {
           time: echoeRevlog.time,
         })
         .from(echoeRevlog)
-        .where(gte(echoeRevlog.id, startTimestamp * 1000));
+        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, startTimestamp * 1000)));
     }
 
     const reviews = await query;
@@ -168,26 +173,27 @@ export class EchoeStatsService {
   /**
    * Get card maturity distribution using FSRS stability
    */
-  async getMaturity(deckId?: number): Promise<CardMaturityDto> {
+  async getMaturity(uid: string, deckId?: number): Promise<CardMaturityDto> {
     const db = getDatabase();
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(deckId);
+      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           stability: echoeCards.stability,
           lastReview: echoeCards.lastReview,
         })
         .from(echoeCards)
-        .where(inArray(echoeCards.did, deckIds));
+        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
     } else {
       query = db
         .select({
           stability: echoeCards.stability,
           lastReview: echoeCards.lastReview,
         })
-        .from(echoeCards);
+        .from(echoeCards)
+        .where(eq(echoeCards.uid, uid));
     }
 
     const cards = await query;
@@ -221,7 +227,7 @@ export class EchoeStatsService {
   /**
    * Get forecast of due cards for the next N days
    */
-  async getForecast(deckId?: number, days: number = 30): Promise<ForecastDayDto[]> {
+  async getForecast(uid: string, deckId?: number, days: number = 30): Promise<ForecastDayDto[]> {
     const db = getDatabase();
 
     const today = new Date();
@@ -232,7 +238,7 @@ export class EchoeStatsService {
 
     let query;
     if (deckId !== undefined) {
-      const deckIds = await this.getDeckAndSubdeckIds(deckId);
+      const deckIds = await this.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
           due: echoeCards.due,
@@ -241,6 +247,7 @@ export class EchoeStatsService {
         .from(echoeCards)
         .where(
           and(
+            eq(echoeCards.uid, uid),
             inArray(echoeCards.did, deckIds),
             // Cards that are review (queue=2) or learning (queue=1,3), within forecast window
             sql`${echoeCards.queue} IN (1, 2, 3)`,
@@ -257,6 +264,7 @@ export class EchoeStatsService {
         .from(echoeCards)
         .where(
           and(
+            eq(echoeCards.uid, uid),
             sql`${echoeCards.queue} IN (1, 2, 3)`,
             gte(echoeCards.due, todayStartMs),
             lte(echoeCards.due, forecastEndMs - 1)
@@ -300,7 +308,7 @@ export class EchoeStatsService {
   /**
    * Get the user's consecutive learning streak in days
    */
-  async getStreak(): Promise<number> {
+  async getStreak(uid: string): Promise<number> {
     const db = getDatabase();
 
     // Get today's start (UTC midnight)
@@ -317,7 +325,7 @@ export class EchoeStatsService {
     const reviews = await db
       .select({ id: echoeRevlog.id })
       .from(echoeRevlog)
-      .where(gte(echoeRevlog.id, startTimestamp * 1000));
+      .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, startTimestamp * 1000)));
 
     // Build a set of UTC date strings that have reviews
     const daysWithReviews = new Set<string>();
@@ -354,7 +362,7 @@ export class EchoeStatsService {
   /**
    * Get maturity distribution for all decks in a single query using FSRS stability
    */
-  async getMaturityBatch(): Promise<{
+  async getMaturityBatch(uid: string): Promise<{
     decks: Array<{
       deckId: number;
       new: number;
@@ -371,7 +379,8 @@ export class EchoeStatsService {
         stability: echoeCards.stability,
         lastReview: echoeCards.lastReview,
       })
-      .from(echoeCards);
+      .from(echoeCards)
+      .where(eq(echoeCards.uid, uid));
 
     const deckMap = new Map<
       number,
@@ -410,12 +419,12 @@ export class EchoeStatsService {
   /**
    * Get deck and all sub-deck IDs
    */
-  private async getDeckAndSubdeckIds(id: number): Promise<number[]> {
+  private async getDeckAndSubdeckIds(uid: string, id: number): Promise<number[]> {
     const db = getDatabase();
     const result: number[] = [id];
 
     // Get all decks
-    const decks = await db.select().from(echoeDecks);
+    const decks = await db.select().from(echoeDecks).where(eq(echoeDecks.uid, uid));
 
     // Find all sub-decks
     const findSubdecks = (parentId: number) => {

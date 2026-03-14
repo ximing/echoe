@@ -45,7 +45,7 @@ export class EchoeStudyController {
         preview,
       };
 
-      const queue = await this.echoeStudyService.getQueue(params);
+      const queue = await this.echoeStudyService.getQueue(userDto.uid, params);
       return ResponseUtil.success(queue);
     } catch (error) {
       logger.error('Get queue error:', error);
@@ -58,8 +58,12 @@ export class EchoeStudyController {
    * Submit a card review
    */
   @Post('/review')
-  async submitReview(@Body() dto: ReviewSubmissionDto, @CurrentUser() userDto: UserInfoDto) {
+  async submitReview(@Body() dto: ReviewSubmissionDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (dto == null || dto.cardId == null || dto.rating == null || dto.timeTaken == null) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
@@ -76,7 +80,7 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'timeTaken must be a non-negative number');
       }
 
-      const result = await this.echoeStudyService.submitReview(dto, userDto?.uid);
+      const result = await this.echoeStudyService.submitReview(userDto.uid, dto);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Submit review error:', error);
@@ -124,7 +128,7 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      await this.echoeStudyService.buryCards(dto.cardIds, dto.mode || 'card');
+      await this.echoeStudyService.buryCards(userDto.uid, dto.cardIds, dto.mode || 'card');
       return ResponseUtil.success({ success: true });
     } catch (error) {
       logger.error('Bury cards error:', error);
@@ -147,7 +151,7 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      await this.echoeStudyService.forgetCards(dto.cardIds);
+      await this.echoeStudyService.forgetCards(userDto.uid, dto.cardIds);
       return ResponseUtil.success({ success: true });
     } catch (error) {
       logger.error('Forget cards error:', error);
@@ -166,7 +170,7 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const counts = await this.echoeStudyService.getCounts(deckId);
+      const counts = await this.echoeStudyService.getCounts(userDto.uid, deckId);
       return ResponseUtil.success(counts);
     } catch (error) {
       logger.error('Get counts error:', error);
@@ -189,7 +193,7 @@ export class EchoeStudyController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'cardId is required');
       }
 
-      const options = await this.echoeStudyService.getOptions(cardId);
+      const options = await this.echoeStudyService.getOptions(userDto.uid, cardId);
       return ResponseUtil.success(options);
     } catch (error) {
       logger.error('Get options error:', error);

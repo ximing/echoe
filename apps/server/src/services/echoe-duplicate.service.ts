@@ -18,9 +18,6 @@ interface NoteRecord {
   fieldsJson?: Record<string, string> | null;
 }
 
-// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
-const TEMP_UID = 'SYSTEM';
-
 @Service()
 export class EchoeDuplicateService {
   /**
@@ -151,11 +148,12 @@ export class EchoeDuplicateService {
   /**
    * Find duplicate notes by note type and field
    */
-  async findDuplicates(dto: FindDuplicatesDto): Promise<DuplicateGroupDto[]> {
+  async findDuplicates(uid: string, dto: FindDuplicatesDto): Promise<DuplicateGroupDto[]> {
     const { getDatabase } = await import('../db/connection.js');
     const { echoeNotes } = await import('../db/schema/echoe-notes.js');
     const { echoeNotetypes } = await import('../db/schema/echoe-notetypes.js');
     const { logger } = await import('../utils/logger.js');
+    const { and, eq } = await import('drizzle-orm');
 
     const db = getDatabase();
     const { notetypeId, fieldName, threshold = 1.0 } = dto;
@@ -164,14 +162,14 @@ export class EchoeDuplicateService {
     const notes = await db
       .select()
       .from(echoeNotes)
-      .where(eq(echoeNotes.mid, notetypeId));
+      .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, notetypeId)));
 
     if (notes.length === 0) {
       return [];
     }
 
     // Get field definitions from notetypes to find field index
-    const notetypes = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.id, notetypeId));
+    const notetypes = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, notetypeId)));
 
     if (notetypes.length === 0) {
       return [];
@@ -197,12 +195,13 @@ export class EchoeDuplicateService {
   /**
    * Merge duplicates: keep one note, delete others
    */
-  async mergeDuplicates(dto: MergeDuplicatesDto): Promise<void> {
+  async mergeDuplicates(uid: string, dto: MergeDuplicatesDto): Promise<void> {
     const { getDatabase } = await import('../db/connection.js');
     const { echoeNotes } = await import('../db/schema/echoe-notes.js');
     const { echoeCards } = await import('../db/schema/echoe-cards.js');
     const { echoeGraves } = await import('../db/schema/echoe-graves.js');
     const { logger } = await import('../utils/logger.js');
+    const { and, eq, inArray } = await import('drizzle-orm');
 
     const db = getDatabase();
     const { keepId, deleteIds } = dto;
@@ -211,12 +210,12 @@ export class EchoeDuplicateService {
     const cardsToDelete = await db
       .select()
       .from(echoeCards)
-      .where(inArray(echoeCards.nid, deleteIds));
+      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, deleteIds)));
 
     // Add deleted notes to graves table
     for (const deleteId of deleteIds) {
       await db.insert(echoeGraves).values({
-        uid: TEMP_UID,
+        uid,
         usn: -1,
         oid: deleteId,
         type: 0, // note type
@@ -226,7 +225,7 @@ export class EchoeDuplicateService {
     // Add deleted cards to graves table
     for (const card of cardsToDelete) {
       await db.insert(echoeGraves).values({
-        uid: TEMP_UID,
+        uid,
         usn: -1,
         oid: card.id,
         type: 1, // card type
@@ -234,10 +233,10 @@ export class EchoeDuplicateService {
     }
 
     // Delete cards belonging to deleted notes
-    await db.delete(echoeCards).where(inArray(echoeCards.nid, deleteIds));
+    await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, deleteIds)));
 
     // Delete notes
-    await db.delete(echoeNotes).where(inArray(echoeNotes.id, deleteIds));
+    await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, deleteIds)));
 
     logger.info(`Merged duplicates: kept note ${keepId}, deleted ${deleteIds.length} notes`);
   }

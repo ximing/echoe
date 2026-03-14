@@ -37,7 +37,7 @@ export class EchoeTagController {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
 
-    const tags = await this.tagService.getAllTags();
+    const tags = await this.tagService.getAllTags(userDto.uid);
     return ResponseUtil.success(tags);
   }
 
@@ -51,7 +51,7 @@ export class EchoeTagController {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
 
-    const tags = await this.tagService.searchTags(query, limit);
+    const tags = await this.tagService.searchTags(userDto.uid, query, limit);
     return ResponseUtil.success(tags);
   }
 
@@ -65,7 +65,7 @@ export class EchoeTagController {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
 
-    const result = await this.tagService.renameTag(tag, dto);
+    const result = await this.tagService.renameTag(userDto.uid, tag, dto);
     return ResponseUtil.success(result);
   }
 
@@ -79,7 +79,7 @@ export class EchoeTagController {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
 
-    const result = await this.tagService.deleteTag(tag);
+    const result = await this.tagService.deleteTag(userDto.uid, tag);
     if (!result.deleted) {
       return ResponseUtil.error(ErrorCode.OPERATION_NOT_ALLOWED, result.message);
     }
@@ -96,7 +96,7 @@ export class EchoeTagController {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
 
-    const result = await this.tagService.mergeTags(dto);
+    const result = await this.tagService.mergeTags(userDto.uid, dto);
     return ResponseUtil.success(result);
   }
 }

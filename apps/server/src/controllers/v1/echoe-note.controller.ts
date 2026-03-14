@@ -55,7 +55,7 @@ export class EchoeNoteController {
         limit: limit || 20,
       };
 
-      const result = await this.echoeNoteService.getNotes(params);
+      const result = await this.echoeNoteService.getNotes(userDto.uid, params);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Get notes error:', error);
@@ -74,7 +74,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const note = await this.echoeNoteService.getNoteById(id);
+      const note = await this.echoeNoteService.getNoteById(userDto.uid, id);
       if (!note) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -100,7 +100,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const note = await this.echoeNoteService.createNote(dto);
+      const note = await this.echoeNoteService.createNote(userDto.uid, dto);
       return ResponseUtil.success(note);
     } catch (error) {
       logger.error('Create note error:', error);
@@ -122,7 +122,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const note = await this.echoeNoteService.updateNote(id, dto);
+      const note = await this.echoeNoteService.updateNote(userDto.uid, id, dto);
       if (!note) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -144,7 +144,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result = await this.echoeNoteService.deleteNote(id);
+      const result = await this.echoeNoteService.deleteNote(userDto.uid, id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -166,7 +166,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const card = await this.echoeNoteService.getCardById(id);
+      const card = await this.echoeNoteService.getCardById(userDto.uid, id);
       if (!card) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -209,7 +209,7 @@ export class EchoeNoteController {
         limit: limit || 50,
       };
 
-      const result = await this.echoeNoteService.getCards(params);
+      const result = await this.echoeNoteService.getCards(userDto.uid, params);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Get cards error:', error);
@@ -232,7 +232,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const result = await this.echoeNoteService.bulkCardOperation(dto);
+      const result = await this.echoeNoteService.bulkCardOperation(userDto.uid, dto);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Bulk card operation error:', error);
@@ -254,7 +254,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const noteTypes = await this.echoeNoteService.getAllNoteTypes();
+      const noteTypes = await this.echoeNoteService.getAllNoteTypes(userDto.uid);
       return ResponseUtil.success(noteTypes);
     } catch (error) {
       logger.error('Get all note types error:', error);
@@ -273,7 +273,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const noteType = await this.echoeNoteService.getNoteTypeById(id);
+      const noteType = await this.echoeNoteService.getNoteTypeById(userDto.uid, id);
       if (!noteType) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -299,7 +299,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const noteType = await this.echoeNoteService.createNoteType(dto);
+      const noteType = await this.echoeNoteService.createNoteType(userDto.uid, dto);
       return ResponseUtil.success(noteType);
     } catch (error) {
       logger.error('Create note type error:', error);
@@ -318,7 +318,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const noteType = await this.echoeNoteService.updateNoteType(id, dto);
+      const noteType = await this.echoeNoteService.updateNoteType(userDto.uid, id, dto);
       if (!noteType) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -340,7 +340,7 @@ export class EchoeNoteController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result = await this.echoeNoteService.deleteNoteType(id);
+      const result = await this.echoeNoteService.deleteNoteType(userDto.uid, id);
       if (!result.success) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, result.message);
       }

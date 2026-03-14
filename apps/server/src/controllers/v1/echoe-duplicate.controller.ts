@@ -24,7 +24,7 @@ export class EchoeDuplicateController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const duplicates = await this.echoeDuplicateService.findDuplicates(dto);
+      const duplicates = await this.echoeDuplicateService.findDuplicates(userDto.uid, dto);
       return ResponseUtil.success(duplicates);
     } catch (error) {
       logger.error('Find duplicates error:', error);
@@ -43,7 +43,7 @@ export class EchoeDuplicateController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      await this.echoeDuplicateService.mergeDuplicates(dto);
+      await this.echoeDuplicateService.mergeDuplicates(userDto.uid, dto);
       return ResponseUtil.success({ success: true });
     } catch (error) {
       logger.error('Merge duplicates error:', error);
