@@ -308,3 +308,131 @@ describe('EchoeNoteService.getCards - cross-tenant uid filtering in JOIN conditi
     expect(uidFilterCount).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('EchoeNoteService.updateNoteType - multi-field batch add', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+  });
+
+  /**
+   * Helper: builds the DB mock chains needed by updateNoteType.
+   * - select().from().where().limit(1)  → returns notetype row
+   * - update().set().where()            → captured for assertion
+   * - select().from().where().limit(1)  → getNoteTypeById at the end (returns null to simplify)
+   */
+  const buildUpdateNoteTypeDbMock = (existingFlds: any[]) => {
+    const updateWhereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: updateWhereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    const limitMock = jest.fn();
+    let selectCallCount = 0;
+    limitMock
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          uid: 'test-uid',
+          flds: JSON.stringify(existingFlds),
+          tmpls: JSON.stringify([]),
+          name: 'Test',
+          type: 0,
+          mod: 0,
+          usn: 0,
+          sortf: 0,
+          did: null,
+          css: '',
+          latexPre: '',
+          latexPost: '',
+        },
+      ])
+      // second call from getNoteTypeById – return empty to skip full return value check
+      .mockResolvedValue([]);
+
+    const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      return { from: fromMock };
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      update: updateMock,
+    } as any);
+
+    return { setMock, updateWhereMock };
+  };
+
+  it('should save ALL fields when dto.flds contains multiple new fields', async () => {
+    const existingFlds = [{ name: 'Front', ord: 0 }];
+    const { setMock } = buildUpdateNoteTypeDbMock(existingFlds);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('test-uid', 1, {
+      flds: [{ name: 'Back' }, { name: 'Extra' }],
+    } as any);
+
+    // update().set() must be called exactly twice:
+    // once for the base fields (mod/usn) and once for flds
+    const fldsCall = setMock.mock.calls.find(
+      (call: any[]) => call[0] && call[0].flds !== undefined
+    );
+    expect(fldsCall).toBeDefined();
+
+    const savedFields = JSON.parse(fldsCall![0].flds);
+    expect(savedFields).toHaveLength(3); // 1 existing + 2 new
+    expect(savedFields[0].name).toBe('Front');
+    expect(savedFields[1].name).toBe('Back');
+    expect(savedFields[2].name).toBe('Extra');
+  });
+
+  it('should write flds to DB exactly once regardless of how many fields are added', async () => {
+    const existingFlds: any[] = [];
+    const { setMock } = buildUpdateNoteTypeDbMock(existingFlds);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('test-uid', 1, {
+      flds: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
+    } as any);
+
+    const fldsCalls = setMock.mock.calls.filter(
+      (call: any[]) => call[0] && call[0].flds !== undefined
+    );
+    // Must be exactly ONE DB write for the flds section
+    expect(fldsCalls).toHaveLength(1);
+
+    const savedFields = JSON.parse(fldsCalls[0][0].flds);
+    expect(savedFields).toHaveLength(3);
+    expect(savedFields.map((f: any) => f.name)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('should assign correct ord values to all new fields', async () => {
+    const existingFlds = [{ name: 'Q', ord: 0 }, { name: 'A', ord: 1 }];
+    const { setMock } = buildUpdateNoteTypeDbMock(existingFlds);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await service.updateNoteType('test-uid', 1, {
+      flds: [{ name: 'Hint' }, { name: 'Source' }],
+    } as any);
+
+    const fldsCall = setMock.mock.calls.find(
+      (call: any[]) => call[0] && call[0].flds !== undefined
+    );
+    const savedFields = JSON.parse(fldsCall![0].flds);
+    expect(savedFields[2].ord).toBe(2); // newOrd + 0
+    expect(savedFields[3].ord).toBe(3); // newOrd + 1
+  });
+});

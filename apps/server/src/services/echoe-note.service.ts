@@ -1001,25 +1001,23 @@ export class EchoeNoteService {
     if (dto.flds) {
       const existingFields = JSON.parse(notetype[0].flds) as any[];
       const newOrd = existingFields.length;
+      const newFields = [...existingFields];
 
       for (let i = 0; i < dto.flds.length; i++) {
         const f = dto.flds[i];
-        const newFields = [
-          ...existingFields,
-          {
-            name: f.name,
-            ord: newOrd + i,
-            sticky: false,
-            rtl: false,
-            font: 'Arial',
-            size: 20,
-            description: '',
-            mathjax: false,
-            hidden: false,
-          },
-        ];
-        await db.update(echoeNotetypes).set({ flds: JSON.stringify(newFields) }).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
+        newFields.push({
+          name: f.name,
+          ord: newOrd + i,
+          sticky: false,
+          rtl: false,
+          font: 'Arial',
+          size: 20,
+          description: '',
+          mathjax: false,
+          hidden: false,
+        });
       }
+      await db.update(echoeNotetypes).set({ flds: JSON.stringify(newFields) }).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, id)));
     }
 
     // Add new templates if provided
