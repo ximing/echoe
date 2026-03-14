@@ -4,9 +4,19 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+jest.mock('drizzle-orm', () => {
+  const actual = jest.requireActual('drizzle-orm');
+  return {
+    ...actual,
+    and: jest.fn((...args) => ({ __type: 'and', args })),
+    eq: jest.fn((col, val) => ({ __type: 'eq', col, val })),
+  };
+});
+
 import { getDatabase } from '../db/connection.js';
 import { EchoeNoteService } from '../services/echoe-note.service.js';
 import { logger } from '../utils/logger.js';
+import { and, eq } from 'drizzle-orm';
 
 const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
@@ -217,5 +227,84 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
     expect(whereUpdateMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ success: true, affected: 1 });
+  });
+});
+
+describe('EchoeNoteService.getCards - cross-tenant uid filtering in JOIN conditions', () => {
+  let andMock: jest.Mock;
+  let eqMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    // drizzle-orm is mocked at module level; grab the mock references
+    andMock = and as unknown as jest.Mock;
+    eqMock = eq as unknown as jest.Mock;
+    andMock.mockClear();
+    eqMock.mockClear();
+  });
+
+  const buildDbMock = () => {
+    // Count query chain: db.select().from().leftJoin().where()
+    const countWhereMock = jest.fn().mockResolvedValue([{ count: 0 }]);
+    const countLeftJoinMock = jest.fn().mockReturnValue({ where: countWhereMock });
+    const countFromMock = jest.fn().mockReturnValue({ leftJoin: countLeftJoinMock, where: countWhereMock });
+
+    // Data query chain: db.select().from().leftJoin().leftJoin().leftJoin().where().orderBy().limit().offset()
+    const offsetMock = jest.fn().mockResolvedValue([]);
+    const limitMock = jest.fn().mockReturnValue({ offset: offsetMock });
+    const orderByMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const whereMock = jest.fn().mockReturnValue({ orderBy: orderByMock });
+    const innerLeftJoinMock = jest.fn().mockReturnValue({ where: whereMock });
+    const midLeftJoinMock = jest.fn().mockReturnValue({ leftJoin: innerLeftJoinMock });
+    const outerLeftJoinMock = jest.fn().mockReturnValue({ leftJoin: midLeftJoinMock });
+    const fromMock = jest.fn().mockReturnValue({ leftJoin: outerLeftJoinMock });
+
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      return selectCallCount === 1 ? { from: countFromMock } : { from: fromMock };
+    });
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+    return { outerLeftJoinMock, midLeftJoinMock, innerLeftJoinMock };
+  };
+
+  it('should include uid in echoeDecks leftJoin condition to prevent cross-tenant metadata leak', async () => {
+    const uid = 'user-A';
+    buildDbMock();
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      { getDeckAndSubdeckIds: jest.fn().mockResolvedValue([1001]) } as any,
+    );
+
+    await service.getCards(uid, { page: 1, limit: 10 });
+
+    // At least one `and()` call must include an eq for the uid value
+    // (covers both echoeDecks.uid and echoeNotetypes.uid JOIN conditions)
+    const andCalls = andMock.mock.calls;
+    const hasUidFilter = andCalls.some((args: any[]) =>
+      args.some((arg: any) => arg?.__type === 'eq' && arg?.val === uid)
+    );
+    expect(hasUidFilter).toBe(true);
+  });
+
+  it('should include uid in both echoeDecks and echoeNotetypes leftJoin conditions', async () => {
+    const uid = 'user-B';
+    buildDbMock();
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      { getDeckAndSubdeckIds: jest.fn().mockResolvedValue([]) } as any,
+    );
+
+    await service.getCards(uid, { page: 1, limit: 10 });
+
+    const andCalls = andMock.mock.calls;
+    // There must be at least 2 `and()` calls that include uid filtering (one for decks, one for notetypes)
+    const uidFilterCount = andCalls.filter((args: any[]) =>
+      args.some((arg: any) => arg?.__type === 'eq' && arg?.val === uid)
+    ).length;
+    expect(uidFilterCount).toBeGreaterThanOrEqual(2);
   });
 });
