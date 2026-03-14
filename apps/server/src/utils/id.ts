@@ -79,6 +79,36 @@ export const generateTypeId = (type: (typeof OBJECT_TYPE)[keyof typeof OBJECT_TY
     case OBJECT_TYPE.NOTIFICATION: {
       return `notif${typeid()}`;
     }
+    case OBJECT_TYPE.ECHOE_CARD: {
+      return `ec${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_NOTE: {
+      return `en${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_DECK: {
+      return `ed${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_NOTETYPE: {
+      return `ent${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_TEMPLATE: {
+      return `et${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_REVLOG: {
+      return `erl${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_COL: {
+      return `ecol${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_DECK_CONFIG: {
+      return `edc${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_GRAVE: {
+      return `eg${typeid()}`;
+    }
+    case OBJECT_TYPE.ECHOE_MEDIA: {
+      return `em${typeid()}`;
+    }
   }
   throw new Error(`Invalid type: ${type}`);
 };
