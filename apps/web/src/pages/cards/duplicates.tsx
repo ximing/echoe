@@ -27,12 +27,12 @@ const DuplicatesPageContent = view(() => {
   // State
   const [noteTypes, setNoteTypes] = useState<NoteTypeWithCount[]>([]);
   const [loadingNoteTypes, setLoadingNoteTypes] = useState(true);
-  const [selectedNoteTypeId, setSelectedNoteTypeId] = useState<number | null>(null);
+  const [selectedNoteTypeId, setSelectedNoteTypeId] = useState<string | null>(null);
   const [selectedFieldName, setSelectedFieldName] = useState<string>('');
   const [threshold, setThreshold] = useState(1.0);
   const [isSearching, setIsSearching] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroupDto[]>([]);
-  const [selectedToKeep, setSelectedToKeep] = useState<Record<number, number>>({});
+  const [selectedToKeep, setSelectedToKeep] = useState<Record<number, string>>({});
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Load note types on mount
@@ -187,7 +187,7 @@ const DuplicatesPageContent = view(() => {
               </label>
               <select
                 value={selectedNoteTypeId || ''}
-                onChange={(e) => setSelectedNoteTypeId(Number(e.target.value))}
+                onChange={(e) => setSelectedNoteTypeId(e.target.value || null)}
                 disabled={loadingNoteTypes}
                 className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
               >

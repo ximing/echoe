@@ -42,7 +42,7 @@ const CardBrowserPageContent = view(() => {
   const [cards, setCards] = useState<EchoeCardListItemDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [selectedCard, setSelectedCard] = useState<CardDetail | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
 
@@ -51,7 +51,7 @@ const CardBrowserPageContent = view(() => {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('added');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [deckFilter, setDeckFilter] = useState<number | undefined>(undefined);
+  const [deckFilter, setDeckFilter] = useState<string | undefined>(undefined);
 
   // Data
   const [decks, setDecks] = useState<EchoeDeckWithCountsDto[]>([]);
@@ -124,7 +124,7 @@ const CardBrowserPageContent = view(() => {
     }
   };
 
-  const toggleSelectCard = (cardId: number) => {
+  const toggleSelectCard = (cardId: string) => {
     const newSelected = new Set(selectedCards);
     if (newSelected.has(cardId)) {
       newSelected.delete(cardId);
@@ -322,7 +322,7 @@ const CardBrowserPageContent = view(() => {
           <select
             value={deckFilter || ''}
             onChange={(e) => {
-              setDeckFilter(e.target.value ? Number(e.target.value) : undefined);
+              setDeckFilter(e.target.value || undefined);
               setPage(1);
             }}
             className="px-3 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"

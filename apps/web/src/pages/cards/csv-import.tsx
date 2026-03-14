@@ -340,7 +340,7 @@ const CsvImportPageContent = view(() => {
                   <select
                     value={csvImportService.selectedDeckId || ''}
                     onChange={(e) =>
-                      csvImportService.setDeckId(e.target.value ? Number(e.target.value) : 0)
+                      csvImportService.setDeckId(e.target.value || '')
                     }
                     className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
@@ -365,7 +365,7 @@ const CsvImportPageContent = view(() => {
                     value={csvImportService.selectedNotetypeId || ''}
                     onChange={(e) =>
                       csvImportService.setNotetypeId(
-                        e.target.value ? Number(e.target.value) : 0
+                        e.target.value || ''
                       )
                     }
                     className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"

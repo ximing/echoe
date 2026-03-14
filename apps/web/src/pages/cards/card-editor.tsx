@@ -37,8 +37,6 @@ const CardEditorPageContent = view(() => {
   const toastService = useService(ToastService);
 
   const isEditMode = !!noteId || !!cardId;
-  const parsedNoteId = noteId ? parseInt(noteId, 10) : undefined;
-  const parsedCardId = cardId ? parseInt(cardId, 10) : undefined;
 
   const [selectedNotetype, setSelectedNotetype] = useState<EchoeNoteTypeDto | null>(null);
   const [selectedDeck, setSelectedDeck] = useState<EchoeDeckWithCountsDto | null>(null);
@@ -70,17 +68,17 @@ const [tags, setTags] = useState<string[]>([]);
     };
     loadData();
 
-    if (parsedNoteId) {
-      noteService.loadNote(parsedNoteId);
-    } else if (parsedCardId) {
-      noteService.loadCard(parsedCardId);
+    if (noteId) {
+      noteService.loadNote(noteId);
+    } else if (cardId) {
+      noteService.loadCard(cardId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsedNoteId, parsedCardId]);
+  }, [noteId, cardId]);
 
   // Set initial values when note loads (depends on both note and noteTypes being loaded)
   useEffect(() => {
-    if (noteService.currentNote && noteService.noteTypes.length > 0 && (parsedNoteId || parsedCardId)) {
+    if (noteService.currentNote && noteService.noteTypes.length > 0 && (noteId || cardId)) {
       const nt = noteService.getNoteTypeById(noteService.currentNote.mid);
       if (nt) {
         setSelectedNotetype(nt);
@@ -90,7 +88,7 @@ const [tags, setTags] = useState<string[]>([]);
       }
 
       // Try to find deck from card
-      if (parsedCardId && noteService.currentCard) {
+      if (cardId && noteService.currentCard) {
         const deck = deckService.decks.find((d) => d.id === noteService.currentCard?.did);
         if (deck) {
           setSelectedDeck(deck);
@@ -98,7 +96,7 @@ const [tags, setTags] = useState<string[]>([]);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteService.currentNote, noteService.noteTypes, parsedNoteId, parsedCardId]);
+  }, [noteService.currentNote, noteService.noteTypes, noteId, cardId]);
 
   // Set default notetype on first load
   useEffect(() => {
@@ -131,7 +129,7 @@ const [tags, setTags] = useState<string[]>([]);
   }, [selectedNotetype?.id]);
 
   // Handle notetype change
-  const handleNotetypeChange = (notetypeId: number) => {
+  const handleNotetypeChange = (notetypeId: string) => {
     const nt = noteService.noteTypes.find((n) => n.id === notetypeId);
     if (nt) {
       setSelectedNotetype(nt);
@@ -147,7 +145,7 @@ const [tags, setTags] = useState<string[]>([]);
   };
 
   // Handle deck change
-  const handleDeckChange = (deckId: number) => {
+  const handleDeckChange = (deckId: string) => {
     const deck = deckService.decks.find((d) => d.id === deckId);
     if (deck) {
       setSelectedDeck(deck);
@@ -314,9 +312,9 @@ const [tags, setTags] = useState<string[]>([]);
 
     setIsSaving(true);
     try {
-      if (parsedNoteId) {
+      if (noteId) {
         // Update existing note
-        const success = await noteService.updateExistingNote(parsedNoteId, {
+        const success = await noteService.updateExistingNote(noteId, {
           fields,
           tags,
           richTextFields: completeRichTextFields,
@@ -534,7 +532,7 @@ const [tags, setTags] = useState<string[]>([]);
               </label>
               <select
                 value={selectedNotetype?.id || ''}
-                onChange={(e) => handleNotetypeChange(parseInt(e.target.value, 10))}
+                onChange={(e) => handleNotetypeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 disabled={isEditMode}
               >
@@ -554,7 +552,7 @@ const [tags, setTags] = useState<string[]>([]);
               </label>
               <select
                 value={selectedDeck?.id || ''}
-                onChange={(e) => handleDeckChange(parseInt(e.target.value, 10))}
+                onChange={(e) => handleDeckChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="">Select deck</option>
