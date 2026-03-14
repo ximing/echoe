@@ -16,8 +16,8 @@ export class EchoeCsvImportService extends Service {
 
   // Column mapping state
   columnMapping: Record<number, string> = {};
-  selectedNotetypeId: number | null = null;
-  selectedDeckId: number | null = null;
+  selectedNotetypeId: string | null = null;
+  selectedDeckId: string | null = null;
   hasHeader = true;
 
   /**
@@ -77,14 +77,14 @@ export class EchoeCsvImportService extends Service {
   /**
    * Set the selected note type
    */
-  setNotetypeId(id: number): void {
+  setNotetypeId(id: string): void {
     this.selectedNotetypeId = id;
   }
 
   /**
    * Set the selected deck
    */
-  setDeckId(id: number): void {
+  setDeckId(id: string): void {
     this.selectedDeckId = id;
   }
 

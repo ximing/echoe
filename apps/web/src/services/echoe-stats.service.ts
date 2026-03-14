@@ -19,7 +19,7 @@ export class EchoeStatsService extends Service {
   forecast: ForecastDayDto[] = [];
 
   // Filters
-  selectedDeckId: number | undefined = undefined;
+  selectedDeckId: string | undefined = undefined;
 
   // Loading states
   isLoadingToday = false;
@@ -33,7 +33,7 @@ export class EchoeStatsService extends Service {
   /**
    * Set selected deck for filtering
    */
-  setDeckId(deckId: number | undefined): void {
+  setDeckId(deckId: string | undefined): void {
     this.selectedDeckId = deckId;
     // Reload all stats when deck changes
     this.loadAllStats();
