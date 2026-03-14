@@ -106,7 +106,7 @@ export class EchoeTagService {
 
     // Get all notes with the old tag
     const notes = await db
-      .select({ id: echoeNotes.id, tags: echoeNotes.tags })
+      .select({ noteId: echoeNotes.noteId, tags: echoeNotes.tags })
       .from(echoeNotes)
       .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${oldTag}"%`}`));
 
@@ -127,12 +127,12 @@ export class EchoeTagService {
           await db
             .update(echoeNotes)
             .set({ tags: JSON.stringify(newTags), mod: now, usn: 0 })
-            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, note.noteId)));
 
           updated++;
         }
       } catch (e) {
-        logger.warn('Failed to update note tags', { error: e, noteId: note.id });
+        logger.warn('Failed to update note tags', { error: e, noteId: note.noteId });
       }
     }
 
@@ -181,7 +181,7 @@ export class EchoeTagService {
 
     // Get all notes with the source tag
     const notes = await db
-      .select({ id: echoeNotes.id, tags: echoeNotes.tags })
+      .select({ noteId: echoeNotes.noteId, tags: echoeNotes.tags })
       .from(echoeNotes)
       .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${sourceTag}"%`}`));
 
@@ -204,12 +204,12 @@ export class EchoeTagService {
           await db
             .update(echoeNotes)
             .set({ tags: JSON.stringify(newTags), mod: now, usn: 0 })
-            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, note.id)));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, note.noteId)));
 
           updated++;
         }
       } catch (e) {
-        logger.warn('Failed to update note tags during merge', { error: e, noteId: note.id });
+        logger.warn('Failed to update note tags during merge', { error: e, noteId: note.noteId });
       }
     }
 

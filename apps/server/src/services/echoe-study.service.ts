@@ -893,7 +893,7 @@ export class EchoeStudyService {
       return DEFAULT_PER_DAY;
     }
 
-    const confIds: string[] = [...new Set(decksWithConf.map((d: { conf: string }) => d.conf))];
+    const confIds: string[] = Array.from(new Set(decksWithConf.map((d: { conf: string }) => d.conf)));
     const configs = await db
       .select({ newConfig: echoeDeckConfig.newConfig })
       .from(echoeDeckConfig)

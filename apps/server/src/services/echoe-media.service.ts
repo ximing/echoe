@@ -13,6 +13,8 @@ import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { config } from '../config/config.js';
 import { UnifiedStorageAdapterFactory } from '../sources/unified-storage-adapter/index.js';
 import { logger } from '../utils/logger.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 
 import type { UnifiedStorageAdapter } from '../sources/unified-storage-adapter/index.js';
 import type {
@@ -95,8 +97,10 @@ export class EchoeMediaService {
 
     // Save to database
     const db = getDatabase();
+    const mediaId = generateTypeId(OBJECT_TYPE.ECHOE_MEDIA);
     await db.insert(echoeMedia).values({
       uid,
+      mediaId,
       filename: storedFilename,
       originalFilename,
       size: buffer.length,
@@ -158,6 +162,7 @@ export class EchoeMediaService {
 
     return results.map((row: {
       id: number;
+      mediaId: string;
       filename: string;
       originalFilename: string;
       size: number;
@@ -166,7 +171,7 @@ export class EchoeMediaService {
       createdAt: number;
       usedInCards: number;
     }) => ({
-      id: row.id,
+      id: row.mediaId,
       filename: row.filename,
       originalFilename: row.originalFilename,
       size: row.size,
