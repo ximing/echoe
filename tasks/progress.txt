@@ -1,14 +1,17 @@
 # Echoe Multi-user Refactor - Progress
 
 ## Codebase Patterns
-- Pending discovery
+- **Drizzle schema unique constraints**: Use `unique('constraint_name').on(table.col1, table.col2)` for multi-column unique constraints
+- **Drizzle composite primary keys**: Use `primaryKey({ columns: [table.col1, table.col2] })` in the table's second parameter function
+- **Multi-user refactor approach**: This is a "one-shot migration" - schema changes define final state immediately, service refactoring follows in separate stories
+- **Temporary uid placeholders**: Use constants like `SEED_UID = 'SYSTEM'` for seed/test data until services are refactored to accept uid parameters
 
 ## User Stories Progress
 
 | ID | Title | Status |
 |----|-------|--------|
-| US-001 | Finalize schema for foundational Echoe tables | [ ] |
-| US-002 | Finalize schema for note, card, media, and log tables | [ ] |
+| US-001 | Finalize schema for foundational Echoe tables | [x] |
+| US-002 | Finalize schema for note, card, media, and log tables | [x] |
 | US-003 | Generate and validate one-shot migration | [ ] |
 | US-004 | Apply uid context to core Echoe controllers | [ ] |
 | US-005 | Apply uid context to edge Echoe controllers | [ ] |
@@ -26,3 +29,61 @@
 
 ## Execution Log
 
+
+## 2026-03-14 23:30 - US-001
+- Implemented uid NOT NULL for foundational Echoe tables (echoe_col, echoe_config, echoe_deck_config, echoe_decks, echoe_notetypes, echoe_templates)
+- Changed echoe_config primary key from single 'key' to composite (uid, key)
+- Added UNIQUE(uid) constraint to echoe_col
+- Added UNIQUE(uid, name) to echoe_decks and echoe_notetypes
+- Added UNIQUE(uid, ntid, ord) to echoe_templates
+- Added temporary placeholder uid constants (SEED_UID='SYSTEM', TEMP_UID='SYSTEM') to seed and deck services for typecheck compatibility
+- Files changed:
+  - apps/server/src/db/schema/echoe-col.ts
+  - apps/server/src/db/schema/echoe-config.ts
+  - apps/server/src/db/schema/echoe-deck-config.ts
+  - apps/server/src/db/schema/echoe-decks.ts
+  - apps/server/src/db/schema/echoe-notetypes.ts
+  - apps/server/src/db/schema/echoe-templates.ts
+  - apps/server/src/services/echoe-seed.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+- **Learnings for future iterations:**
+  - Drizzle schema: Use `unique()` helper from drizzle-orm/mysql-core for UNIQUE constraints
+  - Drizzle schema: Composite primary keys use `primaryKey({ columns: [table.col1, table.col2] })` in the second parameter function
+  - Seed/test data needs temporary uid placeholders until US-004-008 refactor services to accept uid parameters
+  - Schema changes must maintain typecheck compatibility even before service refactoring
+  - The multi-user refactor is a "one-shot migration" approach - schema is final state immediately, services will be refactored in subsequent stories
+---
+
+## 2026-03-14 23:45 - US-002
+- Implemented uid NOT NULL for note, card, media, graves, and revlog tables
+- Made echoe_revlog.uid non-null (was previously nullable)
+- Added UNIQUE(uid, guid) constraint to echoe_notes
+- Added UNIQUE(uid, filename) constraint to echoe_media
+- Created multi-user isolation indexes:
+  - echoe_notes: (uid, mid), (uid, sfld), (uid, mod)
+  - echoe_cards: (uid, nid), (uid, did, queue, due), (uid, last_review)
+  - echoe_revlog: (uid, cid), (uid, id)
+  - echoe_graves: (uid, oid, type)
+  - echoe_deck_config: (uid, name)
+- Added TEMP_UID='SYSTEM' placeholder constants to all affected services
+- Updated all insert statements to include uid field
+- Files changed:
+  - apps/server/src/db/schema/echoe-notes.ts
+  - apps/server/src/db/schema/echoe-cards.ts
+  - apps/server/src/db/schema/echoe-media.ts
+  - apps/server/src/db/schema/echoe-graves.ts
+  - apps/server/src/db/schema/echoe-revlog.ts
+  - apps/server/src/db/schema/echoe-deck-config.ts
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-study.service.ts
+  - apps/server/src/services/echoe-media.service.ts
+  - apps/server/src/services/echoe-import.service.ts
+  - apps/server/src/services/echoe-duplicate.service.ts
+  - apps/server/src/services/echoe-deck.service.ts
+- **Learnings for future iterations:**
+  - Drizzle index creation: Use `index('index_name').on(table.col1, table.col2, ...)` for multi-column indexes
+  - When adding uid to existing tables, grep for all `.insert()` statements to find places that need updating
+  - echoe_revlog had uid as nullable before - now it's required (matches other tables)
+  - All services that insert into these tables need TEMP_UID constant until US-004-008 refactor
+  - The pattern is consistent: add uid field to schema, add unique constraints where needed, add indexes for query performance, update all inserts
+---
