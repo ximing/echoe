@@ -1222,7 +1222,7 @@ export class EchoeImportService {
           lastReview,
           preStability,
           preDifficulty: difficulty,
-          preLastReview: preLastReview > 0 ? preLastReview : 0,
+          preLastReview: Math.max(preLastReview, 0),
           preDue: 0,
           preIvl: row.lastIvl,
           preFactor: row.factor,
