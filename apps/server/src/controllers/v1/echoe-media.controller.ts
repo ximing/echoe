@@ -112,7 +112,7 @@ export class EchoeMediaController {
       // Decode filename
       const decodedFilename = decodeURIComponent(filename);
 
-      const media = await this.mediaService.getMedia(decodedFilename);
+      const media = await this.mediaService.getMedia(userDto.uid, decodedFilename);
       if (!media) {
         return response.status(404).send('File not found');
       }
@@ -164,6 +164,7 @@ export class EchoeMediaController {
 
     try {
       const result: UploadMediaResultDto = await this.mediaService.uploadMedia(
+        userDto.uid,
         file.buffer,
         file.originalname
       );

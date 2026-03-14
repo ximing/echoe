@@ -76,7 +76,7 @@ export class EchoeMediaService {
    * Upload a media file
    * Returns the stored filename and URL
    */
-  async uploadMedia(buffer: Buffer, originalFilename: string): Promise<UploadMediaResultDto> {
+  async uploadMedia(uid: string, buffer: Buffer, originalFilename: string): Promise<UploadMediaResultDto> {
     // Generate unique filename using timestamp + hash
     const timestamp = Date.now();
     const hash = crypto.createHash('sha1').update(buffer).digest('hex').slice(0, 8);
@@ -99,7 +99,7 @@ export class EchoeMediaService {
     // Save to database
     const db = getDatabase();
     await db.insert(echoeMedia).values({
-      uid: TEMP_UID,
+      uid,
       filename: storedFilename,
       originalFilename,
       size: buffer.length,
@@ -115,11 +115,13 @@ export class EchoeMediaService {
   /**
    * Get a media file by filename
    * Returns the file buffer and content type
+   * Note: uid validation will be added in US-009 (media uid isolation)
    */
-  async getMedia(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  async getMedia(uid: string, filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     const storageKey = `${MEDIA_STORAGE_PREFIX}/${filename}`;
 
     try {
+      // TODO US-009: Add uid validation to ensure user can only access their own media
       const exists = await this.storageAdapter.fileExists(storageKey);
       if (!exists) {
         return null;

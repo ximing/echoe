@@ -382,7 +382,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards([1001]);
+    await service.forgetCards('test-uid', [1001]);
 
     expect(forgetCardMock).toHaveBeenCalledTimes(1);
     expect(forgetCardMock).toHaveBeenCalledWith(
@@ -420,7 +420,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards([9999]);
+    await service.forgetCards('test-uid', [9999]);
 
     expect(forgetCardMock).not.toHaveBeenCalled();
     expect(updateMock).not.toHaveBeenCalled();
@@ -456,7 +456,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards([1001, 1002]);
+    await service.forgetCards('test-uid', [1001, 1002]);
 
     expect(forgetCardMock).toHaveBeenCalledTimes(2);
     expect(updateMock).toHaveBeenCalledTimes(2);
@@ -724,7 +724,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
       },
     } as any);
 
-    await service.submitReview({ cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
 
     // 断言写库时 left = learningSteps（来自 FSRS 结果），而非硬编码 0
     expect(setMock).toHaveBeenCalledWith(
@@ -783,7 +783,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
       },
     } as any);
 
-    await service.submitReview({ cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
 
     expect(setMock).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -88,7 +88,7 @@ export class EchoeImportController {
     }
 
     try {
-      const result: ImportResultDto = await this.importService.importApkg(file.buffer);
+      const result: ImportResultDto = await this.importService.importApkg(userDto.uid, file.buffer);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Failed to import .apkg:', error);

@@ -44,7 +44,7 @@ export class EchoeExportController {
         format: formatValue,
       };
 
-      const result = await this.exportService.exportApkg(options);
+      const result = await this.exportService.exportApkg(userDto.uid, options);
 
       // Set response headers for file download
       res?.setHeader('Content-Type', 'application/apkg');

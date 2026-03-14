@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import JSZip from 'jszip';
 import { Service, Inject } from 'typedi';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeNotes, type NewEchoeNotes } from '../db/schema/echoe-notes.js';
@@ -131,9 +131,6 @@ interface EchoeNotetypeRow {
   req: string;
 }
 
-// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
-const TEMP_UID = 'SYSTEM';
-
 @Service()
 export class EchoeImportService {
   constructor(@Inject(() => EchoeMediaService) private mediaService: EchoeMediaService) {}
@@ -186,7 +183,7 @@ export class EchoeImportService {
   /**
    * Import an .apkg file
    */
-  async importApkg(buffer: Buffer): Promise<ImportResultDto> {
+  async importApkg(uid: string, buffer: Buffer): Promise<ImportResultDto> {
     const result: ImportResultDto = {
       notesAdded: 0,
       notesUpdated: 0,
@@ -209,9 +206,9 @@ export class EchoeImportService {
       logger.info(`Detected package type: ${packageType}`);
 
       if (packageType === 'standard-anki') {
-        return await this.importStandardAnki(zip, result);
+        return await this.importStandardAnki(uid, zip, result);
       } else {
-        return await this.importLegacyEchoe(zip, result);
+        return await this.importLegacyEchoe(uid, zip, result);
       }
     } catch (error) {
       logger.error('Import error:', error);
@@ -225,7 +222,7 @@ export class EchoeImportService {
    * Import Standard Anki APKG format
    * Supports both official format (collection.anki2/anki21) and legacy col.json.
    */
-  private async importStandardAnki(zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
+  private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
     try {
       // Find the collection file (required for Standard Anki)
       const collectionFile = zip.file('collection.anki21') || zip.file('collection.anki2');
@@ -273,24 +270,24 @@ export class EchoeImportService {
 
       try {
         // Import notetypes from col.models
-        const notetypeResult = await this.importNotetypesFromColJson(col);
+        const notetypeResult = await this.importNotetypesFromColJson(uid, col);
         result.notetypesAdded = notetypeResult.added;
         result.errors.push(...notetypeResult.errors);
 
         // Import decks from col.decks
-        const deckResult = await this.importDecksFromColJson(col);
+        const deckResult = await this.importDecksFromColJson(uid, col);
         result.decksAdded = deckResult.added;
         result.errors.push(...deckResult.errors);
 
         // Import notes from SQLite
-        const noteResult = await this.importNotesFromStandardAnki(db, col, mediaManifest);
+        const noteResult = await this.importNotesFromStandardAnki(uid, db, col, mediaManifest);
         result.notesAdded = noteResult.added;
         result.notesUpdated = noteResult.updated;
         result.notesSkipped = noteResult.skipped;
         result.errors.push(...noteResult.errors);
 
         // Import cards from SQLite with FSRS backfill
-        const cardResult = await this.importCardsFromStandardAnki(db, col);
+        const cardResult = await this.importCardsFromStandardAnki(uid, db, col);
         result.cardsAdded = cardResult.added;
         result.cardsUpdated = cardResult.updated;
         result.errors.push(...cardResult.errors);
@@ -300,11 +297,11 @@ export class EchoeImportService {
         result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
         // Import revlog
-        const revlogResult = await this.importRevlogFromStandardAnki(db);
+        const revlogResult = await this.importRevlogFromStandardAnki(uid, db);
         result.revlogImported = revlogResult;
 
         // Import media files
-        const mediaResult = await this.importMediaFromStandardAnki(zip, mediaManifest);
+        const mediaResult = await this.importMediaFromStandardAnki(uid, zip, mediaManifest);
         result.mediaImported = mediaResult;
       } finally {
         db.close();
@@ -320,7 +317,7 @@ export class EchoeImportService {
   /**
    * Import Echoe Legacy format
    */
-  private async importLegacyEchoe(zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
+  private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
     // Find the collection file (collection.anki21 or collection.anki2)
     let collectionFile = zip.file('collection.anki21');
     if (!collectionFile) {
@@ -339,24 +336,24 @@ export class EchoeImportService {
 
     try {
       // Import notetypes first
-      const notetypeResult = await this.importNotetypes(db);
+      const notetypeResult = await this.importNotetypes(uid, db);
       result.notetypesAdded = notetypeResult.added;
       result.errors.push(...notetypeResult.errors);
 
       // Import decks
-      const deckResult = await this.importDecks(db);
+      const deckResult = await this.importDecks(uid, db);
       result.decksAdded = deckResult.added;
       result.errors.push(...deckResult.errors);
 
       // Import notes
-      const noteResult = await this.importNotes(db);
+      const noteResult = await this.importNotes(uid, db);
       result.notesAdded = noteResult.added;
       result.notesUpdated = noteResult.updated;
       result.notesSkipped = noteResult.skipped;
       result.errors.push(...noteResult.errors);
 
       // Import cards
-      const cardResult = await this.importCards(db);
+      const cardResult = await this.importCards(uid, db);
       result.cardsAdded = cardResult.added;
       result.cardsUpdated = cardResult.updated;
       result.errors.push(...cardResult.errors);
@@ -366,11 +363,11 @@ export class EchoeImportService {
       result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
       // Import revlog
-      const revlogResult = await this.importRevlog(db);
+      const revlogResult = await this.importRevlog(uid, db);
       result.revlogImported = revlogResult;
 
       // Import media files
-      const mediaResult = await this.importMedia(zip);
+      const mediaResult = await this.importMedia(uid, zip);
       result.mediaImported = mediaResult;
     } finally {
       db.close();
@@ -407,7 +404,7 @@ export class EchoeImportService {
   /**
    * Import notetypes from col.json
    */
-  private async importNotetypesFromColJson(col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
+  private async importNotetypesFromColJson(uid: string, col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
 
@@ -436,17 +433,18 @@ export class EchoeImportService {
         try {
           const modelId = parseInt(mid, 10);
 
-          // Check if notetype already exists
+          // Check if notetype already exists in user scope
           const existing = await db
             .select({ id: echoeNotetypes.id })
             .from(echoeNotetypes)
-            .where(eq(echoeNotetypes.id, modelId))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, modelId)))
             .limit(1);
 
           if (existing.length === 0) {
             // Insert new notetype
             await db.insert(echoeNotetypes).values({
               id: modelId,
+              uid,
               name: model.name,
               mod: model.mod || 0,
               usn: model.usn || 0,
@@ -476,7 +474,7 @@ export class EchoeImportService {
   /**
    * Import decks from col.json
    */
-  private async importDecksFromColJson(col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
+  private async importDecksFromColJson(uid: string, col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
 
@@ -507,17 +505,18 @@ export class EchoeImportService {
             continue;
           }
 
-          // Check if deck already exists
+          // Check if deck already exists in user scope
           const existing = await db
             .select({ id: echoeDecks.id })
             .from(echoeDecks)
-            .where(eq(echoeDecks.id, deckId))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId)))
             .limit(1);
 
           if (existing.length === 0) {
             // Insert new deck
             await db.insert(echoeDecks).values({
               id: deckId,
+              uid,
               name: deck.name,
               conf: deck.conf || 1,
               extendNew: 20,
@@ -547,6 +546,7 @@ export class EchoeImportService {
    * Import notes from Standard Anki SQLite database
    */
   private async importNotesFromStandardAnki(
+    uid: string,
     sourceDb: Database.Database,
     col: Record<string, unknown>,
     mediaManifest: Map<string, string>
@@ -554,7 +554,7 @@ export class EchoeImportService {
     try {
       const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
       const notetypeFieldsMap = this.buildNotetypeFieldsMapFromColJson(col);
-      return await this.importNotesRows(rows, notetypeFieldsMap, mediaManifest);
+      return await this.importNotesRows(uid, rows, notetypeFieldsMap, mediaManifest);
     } catch (error) {
       return {
         added: 0,
@@ -607,19 +607,20 @@ export class EchoeImportService {
    * 3. If no revlog but card has scheduling data (type=2), use heuristic mapping
    */
   private async importCardsFromStandardAnki(
+    uid: string,
     sourceDb: Database.Database,
     _col: Record<string, unknown>
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
-    return this.importCardsRows(sourceDb, 'Could not read revlog for FSRS backfill');
+    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill');
   }
 
   /**
    * Import revlog from Standard Anki SQLite database
    */
-  private async importRevlogFromStandardAnki(sourceDb: Database.Database): Promise<number> {
+  private async importRevlogFromStandardAnki(uid: string, sourceDb: Database.Database): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
+      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -630,15 +631,16 @@ export class EchoeImportService {
    * Import media files from Standard Anki package
    * Supports both official format (numeric filenames + media manifest) and legacy format (media/ subdirectory).
    */
-  private async importMediaFromStandardAnki(zip: JSZip, mediaManifest: Map<string, string>): Promise<number> {
+  private async importMediaFromStandardAnki(uid: string, zip: JSZip, mediaManifest: Map<string, string>): Promise<number> {
     const mediaFiles = this.collectMediaPaths(zip, true);
-    return this.importMediaEntries(zip, mediaFiles, mediaManifest);
+    return this.importMediaEntries(uid, zip, mediaFiles, mediaManifest);
   }
 
   /**
    * Legacy import - kept for backward compatibility
    */
   private async importNotetypes(
+    uid: string,
     sourceDb: Database.Database
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
@@ -661,17 +663,18 @@ export class EchoeImportService {
           const tmpls = row.tmpls || '[]';
           const flds = row.flds || '[]';
 
-          // Check if notetype already exists
+          // Check if notetype already exists in user scope
           const existing = await db
             .select({ id: echoeNotetypes.id })
             .from(echoeNotetypes)
-            .where(eq(echoeNotetypes.id, row.id))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, row.id)))
             .limit(1);
 
           if (existing.length === 0) {
             // Insert new notetype
             await db.insert(echoeNotetypes).values({
               id: row.id,
+              uid,
               name: row.name,
               mod: row.mod,
               usn: row.usn,
@@ -702,6 +705,7 @@ export class EchoeImportService {
    * Import decks from source database
    */
   private async importDecks(
+    uid: string,
     sourceDb: Database.Database
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
@@ -723,17 +727,18 @@ export class EchoeImportService {
             continue;
           }
 
-          // Check if deck already exists
+          // Check if deck already exists in user scope
           const existing = await db
             .select({ id: echoeDecks.id })
             .from(echoeDecks)
-            .where(eq(echoeDecks.id, row.id))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, row.id)))
             .limit(1);
 
           if (existing.length === 0) {
             // Insert new deck
             await db.insert(echoeDecks).values({
               id: row.id,
+              uid,
               name: row.name,
               conf: row.conf || 1,
               extendNew: row.extendNew || 20,
@@ -776,12 +781,13 @@ export class EchoeImportService {
    * Import notes from source database
    */
   private async importNotes(
+    uid: string,
     sourceDb: Database.Database
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
       const notetypeFieldsMap = this.buildNotetypeFieldsMap(sourceDb);
-      return await this.importNotesRows(rows, notetypeFieldsMap);
+      return await this.importNotesRows(uid, rows, notetypeFieldsMap);
     } catch (error) {
       return {
         added: 0,
@@ -800,9 +806,10 @@ export class EchoeImportService {
    * 3. If no revlog but card has scheduling data (type=2), use heuristic mapping
    */
   private async importCards(
+    uid: string,
     sourceDb: Database.Database
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
-    return this.importCardsRows(sourceDb, 'Could not read revlog for FSRS backfill in legacy import');
+    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill in legacy import');
   }
 
   /**
@@ -835,10 +842,10 @@ export class EchoeImportService {
   /**
    * Import revlog from source database with FSRS fields (insert ignore duplicates)
    */
-  private async importRevlog(sourceDb: Database.Database): Promise<number> {
+  private async importRevlog(uid: string, sourceDb: Database.Database): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
+      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -848,9 +855,9 @@ export class EchoeImportService {
   /**
    * Import media files from the zip archive
    */
-  private async importMedia(zip: JSZip): Promise<number> {
+  private async importMedia(uid: string, zip: JSZip): Promise<number> {
     const mediaFiles = this.collectMediaPaths(zip, false);
-    return this.importMediaEntries(zip, mediaFiles);
+    return this.importMediaEntries(uid, zip, mediaFiles);
   }
 
   private buildNotetypeFieldsMapFromRows(rows: Array<{ id: number; flds: unknown }>): Map<number, string[]> {
@@ -881,6 +888,7 @@ export class EchoeImportService {
   }
 
   private async importNotesRows(
+    uid: string,
     rows: EchoeNoteRow[],
     notetypeFieldsMap: Map<number, string[]>,
     mediaManifest?: Map<string, string>
@@ -911,10 +919,11 @@ export class EchoeImportService {
 
         const normalized = normalizeNoteFields({ notetypeFields, fields });
 
+        // Check for existing note in user scope (uid, guid)
         const existing = await db
           .select({ id: echoeNotes.id })
           .from(echoeNotes)
-          .where(eq(echoeNotes.guid, row.guid))
+          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -929,12 +938,12 @@ export class EchoeImportService {
               fldNames: normalized.fldNames,
               fieldsJson: normalized.fieldsJson,
             })
-            .where(eq(echoeNotes.guid, row.guid));
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)));
           updated++;
         } else {
           const newNote: NewEchoeNotes = {
             id: row.id,
-            uid: TEMP_UID,
+            uid,
             guid: row.guid,
             mid: row.mid,
             mod: row.mod,
@@ -1033,6 +1042,7 @@ export class EchoeImportService {
   }
 
   private async importCardsRows(
+    uid: string,
     sourceDb: Database.Database,
     revlogWarnMessage: string
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
@@ -1063,10 +1073,11 @@ export class EchoeImportService {
 
       for (const row of rows) {
         try {
+          // Check for existing card in user scope
           const existing = await db
             .select({ id: echoeCards.id })
             .from(echoeCards)
-            .where(eq(echoeCards.id, row.id))
+            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, row.id)))
             .limit(1);
 
           const fsrs = this.resolveCardFsrsBackfill(row, latestRevlogMap.get(row.id), now);
@@ -1106,12 +1117,12 @@ export class EchoeImportService {
                 difficulty: fsrs.difficulty,
                 lastReview: fsrs.lastReview,
               })
-              .where(eq(echoeCards.id, row.id));
+              .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, row.id)));
             updated++;
           } else {
             const newCard: NewEchoeCards = {
               id: row.id,
-              uid: TEMP_UID,
+              uid,
               nid: row.nid,
               did: row.did,
               ord: row.ord,
@@ -1165,6 +1176,7 @@ export class EchoeImportService {
   }
 
   private async importRevlogRows(
+    uid: string,
     rows: EchoeRevlogRow[],
     options: { difficultyFallback: number }
   ): Promise<number> {
@@ -1177,10 +1189,11 @@ export class EchoeImportService {
 
     for (const row of rows) {
       try {
+        // Check for existing revlog in user scope
         const existing = await db
           .select({ id: echoeRevlog.id })
           .from(echoeRevlog)
-          .where(eq(echoeRevlog.id, row.id))
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, row.id)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -1196,7 +1209,7 @@ export class EchoeImportService {
         const newRevlog: NewEchoeRevlog = {
           id: row.id,
           cid: row.cid,
-          uid: TEMP_UID,
+          uid,
           usn: row.usn,
           ease: row.ease,
           ivl: row.ivl,
@@ -1266,6 +1279,7 @@ export class EchoeImportService {
   }
 
   private async importMediaEntries(
+    uid: string,
     zip: JSZip,
     mediaPaths: string[],
     mediaManifest?: Map<string, string>
@@ -1282,7 +1296,7 @@ export class EchoeImportService {
 
           const buffer = await file.async('nodebuffer');
           const filename = this.resolveImportMediaFilename(mediaPath, mediaManifest);
-          await this.mediaService.uploadMedia(buffer, filename);
+          await this.mediaService.uploadMedia(uid, buffer, filename);
           imported++;
         } catch (error) {
           logger.warn(`Failed to import media ${mediaPath}:`, error);

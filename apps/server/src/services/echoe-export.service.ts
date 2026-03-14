@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import JSZip from 'jszip';
 import { Service, Inject } from 'typedi';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
@@ -45,20 +45,20 @@ export class EchoeExportService {
   /**
    * Export a deck to .apkg format
    */
-  async exportApkg(options: ExportOptions): Promise<ExportResult> {
+  async exportApkg(uid: string, options: ExportOptions): Promise<ExportResult> {
     const { deckId, includeScheduling, format = 'anki' } = options;
 
     if (format === 'legacy') {
-      return this.exportLegacyApkg(deckId, includeScheduling);
+      return this.exportLegacyApkg(uid, deckId, includeScheduling);
     }
 
-    return this.exportStandardAnki(deckId, includeScheduling);
+    return this.exportStandardAnki(uid, deckId, includeScheduling);
   }
 
   /**
    * Export in Standard Anki format (col.json based)
    */
-  private async exportStandardAnki(deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
+  private async exportStandardAnki(uid: string, deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
     // Create a temporary SQLite database
     const tempDb = new Database(':memory:');
 
@@ -67,7 +67,7 @@ export class EchoeExportService {
       this.createStandardAnkiSchema(tempDb);
 
       // Get deck(s) to export
-      const decksToExport = await this.getDecksToExport(deckId);
+      const decksToExport = await this.getDecksToExport(uid, deckId);
       if (decksToExport.length === 0) {
         throw new Error('No decks found to export');
       }
@@ -76,10 +76,10 @@ export class EchoeExportService {
       const deckIds = this.getAllDeckIds(decksToExport);
 
       // Get notes in the deck(s)
-      const notes = await this.getNotesInDecks(deckIds);
+      const notes = await this.getNotesInDecks(uid, deckIds);
 
       // Export notetypes (as models in col.json)
-      const models = await this.exportModelsForStandardAnki(tempDb, notes);
+      const models = await this.exportModelsForStandardAnki(uid, tempDb, notes);
 
       // Export decks
       const decks = await this.exportDecksForStandardAnki(tempDb, decksToExport);
@@ -91,11 +91,11 @@ export class EchoeExportService {
       await this.exportNotes(tempDb, notes);
 
       // Export cards
-      const cardCount = await this.exportCards(tempDb, notes, includeScheduling);
+      const cardCount = await this.exportCards(uid, tempDb, notes, includeScheduling);
 
       // Export revlog if scheduling is included
       if (includeScheduling) {
-        await this.exportRevlog(tempDb, notes);
+        await this.exportRevlog(uid, tempDb, notes);
       }
 
       // Export media files
@@ -119,7 +119,7 @@ export class EchoeExportService {
       zip.file('col.json', JSON.stringify(colJson));
 
       // Add media manifest and files (root numeric filenames)
-      await this.addMediaToZipStandardAnki(zip, mediaFiles);
+      await this.addMediaToZipStandardAnki(uid, zip, mediaFiles);
 
       // Generate the final .apkg buffer
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -141,7 +141,7 @@ export class EchoeExportService {
   /**
    * Export in Legacy Echoe format (collection.anki21 based)
    */
-  private async exportLegacyApkg(deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
+  private async exportLegacyApkg(uid: string, deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
     // Create a temporary SQLite database
     const tempDb = new Database(':memory:');
 
@@ -150,7 +150,7 @@ export class EchoeExportService {
       this.createEchoeSchema(tempDb);
 
       // Get deck(s) to export
-      const decksToExport = await this.getDecksToExport(deckId);
+      const decksToExport = await this.getDecksToExport(uid, deckId);
       if (decksToExport.length === 0) {
         throw new Error('No decks found to export');
       }
@@ -159,10 +159,10 @@ export class EchoeExportService {
       const deckIds = this.getAllDeckIds(decksToExport);
 
       // Get notes in the deck(s)
-      const notes = await this.getNotesInDecks(deckIds);
+      const notes = await this.getNotesInDecks(uid, deckIds);
 
       // Export notetypes
-      const notetypeIds = await this.exportNotetypes(tempDb, notes);
+      const notetypeIds = await this.exportNotetypes(uid, tempDb, notes);
 
       // Export decks
       await this.exportDecks(tempDb, decksToExport);
@@ -171,15 +171,15 @@ export class EchoeExportService {
       await this.exportNotes(tempDb, notes);
 
       // Export cards
-      const cardCount = await this.exportCards(tempDb, notes, includeScheduling);
+      const cardCount = await this.exportCards(uid, tempDb, notes, includeScheduling);
 
       // Export revlog if scheduling is included
       if (includeScheduling) {
-        await this.exportRevlog(tempDb, notes);
+        await this.exportRevlog(uid, tempDb, notes);
       }
 
       // Export media files
-      const mediaCount = await this.exportMedia(tempDb, notes);
+      const mediaCount = await this.exportMedia(uid, tempDb, notes);
 
       logger.info(`Exported: ${notes.length} notes, ${cardCount} cards, ${mediaCount} media files`);
 
@@ -191,7 +191,7 @@ export class EchoeExportService {
       zip.file('collection.anki21', sqliteBuffer);
 
       // Add media files to the zip
-      await this.addMediaToZip(zip, notes);
+      await this.addMediaToZip(uid, zip, notes);
 
       // Generate the final .apkg buffer
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -213,32 +213,32 @@ export class EchoeExportService {
   /**
    * Get decks to export (including sub-decks)
    */
-  private async getDecksToExport(deckId?: number) {
+  private async getDecksToExport(uid: string, deckId?: number) {
     const db = getDatabase();
 
     if (deckId) {
       const deck = await db
         .select()
         .from(echoeDecks)
-        .where(eq(echoeDecks.id, deckId))
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId)))
         .limit(1);
 
       if (deck.length === 0) {
         return [];
       }
 
-      // Get all sub-decks
+      // Get all sub-decks in user scope
       const deckName = deck[0].name;
       const subDecks = await db
         .select()
         .from(echoeDecks)
-        .where(eq(echoeDecks.dyn, 0)); // Exclude filtered decks
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0))); // Exclude filtered decks
 
       return subDecks.filter((d: { name: string }) => d.name.startsWith(deckName + '::') || d.name === deckName);
     }
 
-    // Export all decks (excluding filtered decks)
-    return db.select().from(echoeDecks).where(eq(echoeDecks.dyn, 0));
+    // Export all decks (excluding filtered decks) in user scope
+    return db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0)));
   }
 
   /**
@@ -251,24 +251,24 @@ export class EchoeExportService {
   /**
    * Get notes in the specified decks
    */
-  private async getNotesInDecks(deckIds: number[]) {
+  private async getNotesInDecks(uid: string, deckIds: number[]) {
     if (deckIds.length === 0) return [];
 
     const db = getDatabase();
 
-    // Get all cards in the decks
+    // Get all cards in the decks for this user
     const cards = await db
       .select({ nid: echoeCards.nid })
       .from(echoeCards)
-      .where(inArray(echoeCards.did, deckIds));
+      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
     // Get unique note IDs (convert bigint to number)
     const noteIds = [...new Set(cards.map((c: { nid: number | string | bigint }) => Number(c.nid)))] as number[];
 
     if (noteIds.length === 0) return [];
 
-    // Get the notes
-    const notes = await db.select().from(echoeNotes).where(inArray(echoeNotes.id, noteIds));
+    // Get the notes for this user
+    const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
 
     return notes;
   }
@@ -563,6 +563,7 @@ export class EchoeExportService {
    * Export models (notetypes) for Standard Anki format and return models JSON
    */
   private async exportModelsForStandardAnki(
+    uid: string,
     tempDb: Database.Database,
     notes: { mid: number }[]
   ): Promise<Record<number, any>> {
@@ -575,11 +576,11 @@ export class EchoeExportService {
 
     if (notetypeIds.length === 0) return {};
 
-    // Get notetypes from database
+    // Get notetypes from database for this user
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(inArray(echoeNotetypes.id, notetypeIds));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.id, notetypeIds)));
 
     // Build models JSON for col.json
     const models: Record<number, any> = {};
@@ -798,7 +799,7 @@ export class EchoeExportService {
   /**
    * Add media to zip with manifest for Standard Anki format
    */
-  private async addMediaToZipStandardAnki(zip: JSZip, mediaFiles: Set<string>): Promise<void> {
+  private async addMediaToZipStandardAnki(uid: string, zip: JSZip, mediaFiles: Set<string>): Promise<void> {
     const mediaManifest: Record<string, string> = {};
 
     if (mediaFiles.size === 0) {
@@ -808,6 +809,7 @@ export class EchoeExportService {
 
     const sortedMediaFiles = [...mediaFiles].sort();
     await this.addMediaFilesToZip(
+      uid,
       zip,
       sortedMediaFiles,
       (_filename, index) => String(index),
@@ -823,6 +825,7 @@ export class EchoeExportService {
    * Export notetypes to temp database
    */
   private async exportNotetypes(
+    uid: string,
     tempDb: Database.Database,
     notes: { mid: number }[]
   ): Promise<number[]> {
@@ -835,11 +838,11 @@ export class EchoeExportService {
 
     if (notetypeIds.length === 0) return [];
 
-    // Get notetypes from database
+    // Get notetypes from database for this user
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(inArray(echoeNotetypes.id, notetypeIds));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.id, notetypeIds)));
 
     // Insert into temp database
     const stmt = tempDb.prepare(`
@@ -922,6 +925,7 @@ export class EchoeExportService {
    * Export cards to temp database
    */
   private async exportCards(
+    uid: string,
     tempDb: Database.Database,
     notes: { id: number }[],
     includeScheduling: boolean
@@ -930,9 +934,9 @@ export class EchoeExportService {
 
     const db = getDatabase();
 
-    // Get all cards for these notes
+    // Get all cards for these notes in user scope
     const noteIds = notes.map((n) => n.id);
-    const cards = await db.select().from(echoeCards).where(inArray(echoeCards.nid, noteIds));
+    const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
 
     const stmt = tempDb.prepare(`
       INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags, data)
@@ -1033,21 +1037,21 @@ export class EchoeExportService {
   /**
    * Export revlog entries to temp database
    */
-  private async exportRevlog(tempDb: Database.Database, notes: { id: number }[]) {
+  private async exportRevlog(uid: string, tempDb: Database.Database, notes: { id: number }[]) {
     if (notes.length === 0) return;
 
     const db = getDatabase();
 
-    // Get all cards for these notes
+    // Get all cards for these notes in user scope
     const noteIds = notes.map((n) => n.id);
-    const cards = await db.select({ id: echoeCards.id }).from(echoeCards).where(inArray(echoeCards.nid, noteIds));
+    const cards = await db.select({ id: echoeCards.id }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
 
     if (cards.length === 0) return;
 
     const cardIds = cards.map((c: { id: number }) => c.id);
 
-    // Get revlog entries for these cards
-    const revlogs = await db.select().from(echoeRevlog).where(inArray(echoeRevlog.cid, cardIds));
+    // Get revlog entries for these cards in user scope
+    const revlogs = await db.select().from(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
 
     const stmt = tempDb.prepare(`
       INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type)
@@ -1062,7 +1066,7 @@ export class EchoeExportService {
   /**
    * Export media files
    */
-  private async exportMedia(tempDb: Database.Database, notes: { flds: string }[]): Promise<number> {
+  private async exportMedia(uid: string, tempDb: Database.Database, notes: { flds: string }[]): Promise<number> {
     const mediaFiles = this.collectMediaFilesFromNotes(notes);
 
     if (mediaFiles.size === 0) return 0;
@@ -1071,7 +1075,7 @@ export class EchoeExportService {
     const mediaRecords = await db
       .select()
       .from(echoeMedia)
-      .where(inArray(echoeMedia.filename, [...mediaFiles]));
+      .where(and(eq(echoeMedia.uid, uid), inArray(echoeMedia.filename, [...mediaFiles])));
 
     tempDb.exec(`
       CREATE TABLE media (
@@ -1100,11 +1104,11 @@ export class EchoeExportService {
   /**
    * Add media files to the zip archive
    */
-  private async addMediaToZip(zip: JSZip, notes: { flds: string }[]) {
+  private async addMediaToZip(uid: string, zip: JSZip, notes: { flds: string }[]) {
     const mediaFiles = [...this.collectMediaFilesFromNotes(notes)];
     if (mediaFiles.length === 0) return;
 
-    await this.addMediaFilesToZip(zip, mediaFiles, (filename) => `media/${filename}`);
+    await this.addMediaFilesToZip(uid, zip, mediaFiles, (filename) => `media/${filename}`);
   }
 
   private collectMediaFilesFromNotes(notes: { flds: string }[]): Set<string> {
@@ -1131,6 +1135,7 @@ export class EchoeExportService {
   }
 
   private async addMediaFilesToZip(
+    uid: string,
     zip: JSZip,
     mediaFiles: string[],
     entryResolver: (filename: string, index: number) => string,
@@ -1140,7 +1145,7 @@ export class EchoeExportService {
 
     for (const filename of mediaFiles) {
       try {
-        const media = await this.mediaService.getMedia(filename);
+        const media = await this.mediaService.getMedia(uid, filename);
         if (!media) {
           continue;
         }
