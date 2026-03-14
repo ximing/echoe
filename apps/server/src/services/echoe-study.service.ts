@@ -432,9 +432,11 @@ export class EchoeStudyService {
   async undo(uid: string, reviewId?: number): Promise<UndoResultDto> {
     const db = getDatabase();
 
-    // Get the most recent revlog entry
+    // Get the most recent revlog entry, always filter by uid for tenant isolation
     const lastReview = await db.query.echoeRevlog.findFirst({
-      where: reviewId ? eq(echoeRevlog.id, reviewId) : undefined,
+      where: reviewId
+        ? and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, reviewId))
+        : eq(echoeRevlog.uid, uid),
       orderBy: [desc(echoeRevlog.id)],
     });
 
@@ -461,9 +463,9 @@ export class EchoeStudyService {
       };
     }
 
-    // Get the card at that point
+    // Get the card at that point, filter by uid for tenant isolation
     const card = await db.query.echoeCards.findFirst({
-      where: eq(echoeCards.id, lastReview.cid),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)),
     });
 
     if (!card) {
@@ -494,10 +496,10 @@ export class EchoeStudyService {
         mod: now,
         usn: -1,
       })
-      .where(eq(echoeCards.id, lastReview.cid));
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)));
 
-    // Remove the revlog entry
-    await db.delete(echoeRevlog).where(eq(echoeRevlog.id, lastReview.id));
+    // Remove the revlog entry, include uid condition for defense in depth
+    await db.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, lastReview.id)));
 
     return {
       success: true,
@@ -605,7 +607,7 @@ export class EchoeStudyService {
           difficulty: resetCard.difficulty,
           lastReview: 0,
         })
-        .where(eq(echoeCards.id, cardId));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)));
 
       affected += 1;
     }
