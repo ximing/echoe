@@ -26,8 +26,8 @@
 | US-013 | Refactor note service to string business IDs | [x] |
 | US-014 | Refactor deck service to string business IDs | [x] |
 | US-015 | Refactor study and stats services to string IDs | [x] |
-| US-016 | Refactor import/export services for string IDs | [ ] |
-| US-017 | Refactor remaining Echoe services to string IDs | [ ] |
+| US-016 | Refactor import/export services for string IDs | [x] |
+| US-017 | Refactor remaining Echoe services to string IDs | [x] |
 | US-018 | Remove legacy numeric Echoe ID generator usage | [ ] |
 | US-019 | Refactor core Echoe controllers for string ID params | [ ] |
 | US-020 | Refactor edge Echoe controllers for string ID params | [ ] |
@@ -232,4 +232,23 @@
   - Import service tests (3 tests) pass - FSRS difficulty backfill logic unaffected by ID refactoring
   - Controller type errors expected (US-019, US-020) - services compile cleanly
   - Full import/export functionality requires comprehensive ID mapping (track old numeric IDs -> new string business IDs throughout import process)
+---
+## 2026-03-15 - US-017
+- Refactored 5 remaining Echoe services to use string business IDs
+- Files changed: 
+  - echoe-duplicate.service.ts: Removed @ts-nocheck, updated NoteRecord interface, query by noteTypeId, use string Set for tracking
+  - echoe-media.service.ts: Added mediaId generation with generateTypeId(OBJECT_TYPE.ECHOE_MEDIA), updated DTO mapping
+  - echoe-tag.service.ts: Updated queries to use noteId instead of id
+  - echoe-study.service.ts: Fixed Array.from() type inference for confIds
+  - anki-duplicate.service.test.ts: Added noteId field to test data
+- **Learnings for future iterations:**
+  - echoe-csv-import.service.ts already used string IDs (notetypeId, deckId) - no changes needed
+  - echoe-config.service.ts uses composite key (uid, key) with no business IDs - no changes needed
+  - Duplicate service refactor pattern: Update NoteRecord interface, change Set<number> to Set<string>, query by business ID columns
+  - Media service required business ID generation on upload - use generateTypeId(OBJECT_TYPE.ECHOE_MEDIA)
+  - Tag service queries use noteId for updates/merges
+  - Array.from() provides better type inference than spread operator for Set<T> conversions
+  - Test failures due to missing business ID fields require immediate fix (not deferred to US-024)
+  - All 176 tests pass after service refactoring
+  - Controller and test type errors are expected and will be resolved in US-019, US-020, US-024
 ---
