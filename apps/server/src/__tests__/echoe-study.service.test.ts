@@ -5,6 +5,7 @@ jest.mock('../db/connection.js', () => ({
 }));
 
 import { sql } from 'drizzle-orm';
+import { MySqlDialect } from 'drizzle-orm/mysql-core';
 
 import { EchoeStudyService } from '../services/echoe-study.service.js';
 import { State } from '../services/fsrs.service.js';
@@ -382,8 +383,9 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards('test-uid', [1001]);
+    const affected = await service.forgetCards('test-uid', [1001]);
 
+    expect(affected).toBe(1);
     expect(forgetCardMock).toHaveBeenCalledTimes(1);
     expect(forgetCardMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -420,8 +422,9 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards('test-uid', [9999]);
+    const affected = await service.forgetCards('test-uid', [9999]);
 
+    expect(affected).toBe(0);
     expect(forgetCardMock).not.toHaveBeenCalled();
     expect(updateMock).not.toHaveBeenCalled();
   });
@@ -456,8 +459,9 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    await service.forgetCards('test-uid', [1001, 1002]);
+    const affected = await service.forgetCards('test-uid', [1001, 1002]);
 
+    expect(affected).toBe(2);
     expect(forgetCardMock).toHaveBeenCalledTimes(2);
     expect(updateMock).toHaveBeenCalledTimes(2);
     expect(whereMock).toHaveBeenCalledTimes(2);
@@ -466,6 +470,17 @@ describe('EchoeStudyService - forgetCards', () => {
 
 describe('EchoeStudyService - unburyAtDayBoundary ownership guard', () => {
   let service: EchoeStudyService;
+
+  const extractWhereSqlText = (expr: unknown): string => {
+    const maybeWrapper = expr as { getSQL?: () => unknown } | null | undefined;
+    const sqlExpr = typeof maybeWrapper?.getSQL === 'function' ? maybeWrapper.getSQL() : expr;
+
+    if (!sqlExpr || typeof (sqlExpr as { toQuery?: unknown }).toQuery !== 'function') {
+      return '';
+    }
+
+    return new MySqlDialect().sqlToQuery(sqlExpr as any).sql;
+  };
 
   beforeEach(() => {
     mockedGetDatabase.mockReset();
@@ -534,6 +549,27 @@ describe('EchoeStudyService - unburyAtDayBoundary ownership guard', () => {
       })
     );
     expect(whereUpdateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should scope unbury query to card uid to prevent cross-user unbury', async () => {
+    const whereSelectMock = jest.fn().mockResolvedValue([]);
+    const leftJoinMock = jest.fn().mockReturnValue({ where: whereSelectMock });
+    const fromMock = jest.fn().mockReturnValue({ leftJoin: leftJoinMock });
+    const selectDistinctMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({
+      selectDistinct: selectDistinctMock,
+    } as any);
+
+    await service.unburyAtDayBoundary('user-c');
+
+    expect(whereSelectMock).toHaveBeenCalledTimes(1);
+    const whereSql = extractWhereSqlText(whereSelectMock.mock.calls[0]?.[0]);
+
+    // Must include card ownership boundary to avoid cross-user unbury on isNull(revlog.cid) path.
+    expect(whereSql).toMatch(/echoe_cards.*uid/i);
+    expect(whereSql).toContain('IN (-2, -3)');
+    expect(whereSql).toMatch(/is null/i);
   });
 
   it('should unbury new cards with no revlog (sibling-buried before first review)', async () => {

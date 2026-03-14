@@ -557,10 +557,11 @@ export class EchoeStudyService {
    * Forget cards (reset to new) via FSRSService.forgetCard() to ensure
    * all FSRS fields (including factor = stability * 1000) are correctly reset.
    */
-  async forgetCards(uid: string, cardIds: number[]): Promise<void> {
+  async forgetCards(uid: string, cardIds: number[]): Promise<number> {
     const db = getDatabase();
     const now = new Date();
     const nowSec = Math.floor(now.getTime() / 1000);
+    let affected = 0;
 
     for (const cardId of cardIds) {
       const card = await db.query.echoeCards.findFirst({
@@ -601,7 +602,11 @@ export class EchoeStudyService {
           lastReview: 0,
         })
         .where(eq(echoeCards.id, cardId));
+
+      affected += 1;
     }
+
+    return affected;
   }
 
   /**
@@ -632,7 +637,7 @@ export class EchoeStudyService {
 
   /**
    * Unbury cards at day boundary for a specific user.
-   * Only cards that have revlog ownership for the given uid are unburied.
+   * Card ownership is enforced by echoe_cards.uid, with revlog ownership as a secondary signal.
    */
   async unburyAtDayBoundary(uid: string): Promise<number> {
     const db = getDatabase();
@@ -648,10 +653,11 @@ export class EchoeStudyService {
     // Find buried cards belonging to this user.
     //
     // Ownership is determined via two complementary paths:
+    //   - hard tenant boundary: card row must belong to uid (echoe_cards.uid = uid)
     //   1. Cards with at least one revlog row whose uid matches → clearly owned by this user.
     //   2. Cards with NO revlog at all (e.g. brand-new cards that were sibling-buried before
     //      ever being reviewed) → they have no owner signal in revlog, so we include them to
-    //      prevent permanent entombment.  A LEFT JOIN with revlog.cid IS NULL captures this.
+    //      prevent permanent entombment. A LEFT JOIN with revlog.cid IS NULL captures this.
     //
     // Using INNER JOIN would miss path-2 cards entirely, leaving them buried forever.
     const buriedCards = await db
@@ -663,6 +669,7 @@ export class EchoeStudyService {
       .leftJoin(echoeRevlog, eq(echoeRevlog.cid, echoeCards.id))
       .where(
         and(
+          eq(echoeCards.uid, uid),
           sql`${echoeCards.queue} IN (-2, -3)`,
           or(
             eq(echoeRevlog.uid, uid),      // path 1: has a revlog owned by this user

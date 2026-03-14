@@ -11,6 +11,7 @@ import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
+import { EchoeStudyService } from './echoe-study.service.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 import { generateNoteId, generateCardId, generateNoteTypeId } from '../utils/id.js';
 import type { RichTextFields } from '../types/note-fields.js';
@@ -37,6 +38,8 @@ import type {
 
 @Service()
 export class EchoeNoteService {
+  constructor(private echoeStudyService: EchoeStudyService) {}
+
   /**
    * Get notes with optional filters
    */
@@ -579,6 +582,47 @@ export class EchoeNoteService {
   }
 
   /**
+   * Restore card queues by their FSRS type for unsuspend/unbury actions.
+   */
+  private async restoreQueueByCardType(uid: string, cards: Array<Pick<EchoeCards, 'id' | 'type'>>, now: number, action: 'unsuspend' | 'unbury'): Promise<void> {
+    const db = getDatabase();
+
+    const knownTypeCardIds = new Map<number, number[]>();
+    const unknownTypeCards: Array<Pick<EchoeCards, 'id' | 'type'>> = [];
+
+    for (const card of cards) {
+      if ([0, 1, 2, 3].includes(card.type)) {
+        const ids = knownTypeCardIds.get(card.type) || [];
+        ids.push(card.id);
+        knownTypeCardIds.set(card.type, ids);
+      } else {
+        unknownTypeCards.push(card);
+      }
+    }
+
+    await Promise.all(
+      Array.from(knownTypeCardIds.entries()).map(([type, ids]) =>
+        db
+          .update(echoeCards)
+          .set({ queue: type, mod: now, usn: 0 })
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, ids)))
+      )
+    );
+
+    if (unknownTypeCards.length > 0) {
+      logger.warn(`Fallback queue restore for unknown card type in ${action}`, {
+        uid,
+        cardTypes: unknownTypeCards.map((card: Pick<EchoeCards, 'id' | 'type'>) => ({ id: card.id, type: card.type })),
+        fallbackQueue: 0,
+      });
+      await db
+        .update(echoeCards)
+        .set({ queue: 0, mod: now, usn: 0 })
+        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, unknownTypeCards.map((card: Pick<EchoeCards, 'id'>) => card.id))));
+    }
+  }
+
+  /**
    * Perform bulk card operations
    */
   async bulkCardOperation(uid: string, dto: BulkCardOperationDto): Promise<{ success: boolean; affected: number }> {
@@ -599,32 +643,9 @@ export class EchoeNoteService {
       }
 
       case 'unsuspend': {
-        // Get all cards at once to determine their types (batch query)
+        // Get all cards at once and restore queue based on card type.
         const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
-
-        // Batch update by type
-        const type0Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 0);
-        const type1Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 1);
-        const type2Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 2);
-
-        if (type0Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 0, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type0Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
-        if (type1Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 1, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type1Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
-        if (type2Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 2, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type2Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
+        await this.restoreQueueByCardType(uid, cards, now, 'unsuspend');
         affected = cards.length;
         break;
       }
@@ -639,53 +660,16 @@ export class EchoeNoteService {
       }
 
       case 'unbury': {
-        // Get all cards at once to determine their types (batch query)
+        // Get all cards at once and restore queue based on card type.
         const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
-
-        // Batch update by type
-        const type0Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 0);
-        const type1Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 1);
-        const type2Cards = cards.filter((c: Pick<EchoeCards, 'type' | 'id'>) => c.type === 2);
-
-        if (type0Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 0, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type0Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
-        if (type1Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 1, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type1Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
-        if (type2Cards.length > 0) {
-          await db
-            .update(echoeCards)
-            .set({ queue: 2, mod: now, usn: 0 })
-            .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, type2Cards.map((c: Pick<EchoeCards, 'id'>) => c.id))));
-        }
+        await this.restoreQueueByCardType(uid, cards, now, 'unbury');
         affected = cards.length;
         break;
       }
 
       case 'forget': {
-        // Reset card scheduling
-        await db
-          .update(echoeCards)
-          .set({
-            queue: 0,
-            due: 0,
-            ivl: 0,
-            factor: 0,
-            reps: 0,
-            lapses: 0,
-            left: 0,
-            mod: now,
-            usn: 0,
-          })
-          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.id, cardIds)));
-        affected = cardIds.length;
+        // Delegate to study service to keep FSRS reset semantics consistent across entry points.
+        affected = await this.echoeStudyService.forgetCards(uid, cardIds);
         break;
       }
 
