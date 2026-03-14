@@ -33,7 +33,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const decks = await this.echoeDeckService.getAllDecks();
+      const decks = await this.echoeDeckService.getAllDecks(userDto.uid);
       return ResponseUtil.success(decks);
     } catch (error) {
       logger.error('Get all decks error:', error);
@@ -52,7 +52,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const deck = await this.echoeDeckService.getDeckById(id);
+      const deck = await this.echoeDeckService.getDeckById(userDto.uid, id);
       if (!deck) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -78,7 +78,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const deck = await this.echoeDeckService.createDeck(dto);
+      const deck = await this.echoeDeckService.createDeck(userDto.uid, dto);
       return ResponseUtil.success(deck);
     } catch (error) {
       logger.error('Create deck error:', error);
@@ -100,7 +100,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const deck = await this.echoeDeckService.updateDeck(id, dto);
+      const deck = await this.echoeDeckService.updateDeck(userDto.uid, id, dto);
       if (!deck) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -126,7 +126,7 @@ export class EchoeDeckController {
       }
 
       const deleteCardsBool = deleteCards === 'true';
-      const result = await this.echoeDeckService.deleteDeck(id, deleteCardsBool);
+      const result = await this.echoeDeckService.deleteDeck(userDto.uid, id, deleteCardsBool);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -148,7 +148,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const config = await this.echoeDeckService.getDeckConfig(id);
+      const config = await this.echoeDeckService.getDeckConfig(userDto.uid, id);
       if (!config) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -170,7 +170,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const config = await this.echoeDeckService.updateDeckConfig(id, dto);
+      const config = await this.echoeDeckService.updateDeckConfig(userDto.uid, id, dto);
       if (!config) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -196,7 +196,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const deck = await this.echoeDeckService.createFilteredDeck(dto, true);
+      const deck = await this.echoeDeckService.createFilteredDeck(userDto.uid, dto, true);
       return ResponseUtil.success(deck);
     } catch (error) {
       logger.error('Create filtered deck error:', error);
@@ -215,7 +215,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result = await this.echoeDeckService.rebuildFilteredDeck(id);
+      const result = await this.echoeDeckService.rebuildFilteredDeck(userDto.uid, id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -237,7 +237,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result = await this.echoeDeckService.emptyFilteredDeck(id);
+      const result = await this.echoeDeckService.emptyFilteredDeck(userDto.uid, id);
       if (!result) {
         return ResponseUtil.error(ErrorCode.NOT_FOUND);
       }
@@ -263,7 +263,7 @@ export class EchoeDeckController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const preview = await this.echoeDeckService.previewFilteredDeck(searchQuery, limit);
+      const preview = await this.echoeDeckService.previewFilteredDeck(userDto.uid, searchQuery, limit);
       return ResponseUtil.success(preview);
     } catch (error) {
       logger.error('Preview filtered deck error:', error);

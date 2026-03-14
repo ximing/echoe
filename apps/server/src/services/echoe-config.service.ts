@@ -1,7 +1,7 @@
 import { Service } from 'typedi';
 import { getDatabase } from '../db/connection.js';
 import { echoeConfig } from '../db/schema/echoe-config.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import type {
   EchoeGlobalSettingsDto,
@@ -26,11 +26,11 @@ export class EchoeConfigService {
   /**
    * Get global echoe settings
    */
-  async getSettings(): Promise<EchoeGlobalSettingsDto> {
+  async getSettings(uid: string): Promise<EchoeGlobalSettingsDto> {
     const db = getDatabase();
 
     try {
-      const rows = await db.select().from(echoeConfig).where(eq(echoeConfig.key, 'global_settings'));
+      const rows = await db.select().from(echoeConfig).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'global_settings')));
 
       if (rows.length === 0) {
         // Return default settings
@@ -48,12 +48,12 @@ export class EchoeConfigService {
   /**
    * Update global echoe settings
    */
-  async updateSettings(dto: UpdateEchoeGlobalSettingsDto): Promise<EchoeGlobalSettingsDto> {
+  async updateSettings(uid: string, dto: UpdateEchoeGlobalSettingsDto): Promise<EchoeGlobalSettingsDto> {
     const db = getDatabase();
 
     try {
       // Get existing settings
-      const rows = await db.select().from(echoeConfig).where(eq(echoeConfig.key, 'global_settings'));
+      const rows = await db.select().from(echoeConfig).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'global_settings')));
 
       let currentSettings: EchoeGlobalSettingsDto;
       if (rows.length === 0) {
@@ -97,9 +97,9 @@ export class EchoeConfigService {
       const value = JSON.stringify(updatedSettings);
 
       if (rows.length === 0) {
-        await db.insert(echoeConfig).values({ key: 'global_settings', value });
+        await db.insert(echoeConfig).values({ uid, key: 'global_settings', value });
       } else {
-        await db.update(echoeConfig).set({ value }).where(eq(echoeConfig.key, 'global_settings'));
+        await db.update(echoeConfig).set({ value }).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'global_settings')));
       }
 
       return updatedSettings;
@@ -112,11 +112,11 @@ export class EchoeConfigService {
   /**
    * Get all deck config presets
    */
-  async getPresets(): Promise<EchoeDeckConfigPresetDto[]> {
+  async getPresets(uid: string): Promise<EchoeDeckConfigPresetDto[]> {
     const db = getDatabase();
 
     try {
-      const rows = await db.select().from(echoeConfig).where(eq(echoeConfig.key, 'deck_config_presets'));
+      const rows = await db.select().from(echoeConfig).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'deck_config_presets')));
 
       if (rows.length === 0) {
         return [];
@@ -132,12 +132,12 @@ export class EchoeConfigService {
   /**
    * Save a new deck config preset
    */
-  async savePreset(dto: CreateDeckConfigPresetDto): Promise<EchoeDeckConfigPresetDto> {
+  async savePreset(uid: string, dto: CreateDeckConfigPresetDto): Promise<EchoeDeckConfigPresetDto> {
     const db = getDatabase();
 
     try {
       // Get existing presets
-      const presets = await this.getPresets();
+      const presets = await this.getPresets(uid);
 
       // Create new preset
       const newPreset: EchoeDeckConfigPresetDto = {
@@ -151,12 +151,12 @@ export class EchoeConfigService {
 
       // Save to database
       const value = JSON.stringify(presets);
-      const rows = await db.select().from(echoeConfig).where(eq(echoeConfig.key, 'deck_config_presets'));
+      const rows = await db.select().from(echoeConfig).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'deck_config_presets')));
 
       if (rows.length === 0) {
-        await db.insert(echoeConfig).values({ key: 'deck_config_presets', value });
+        await db.insert(echoeConfig).values({ uid, key: 'deck_config_presets', value });
       } else {
-        await db.update(echoeConfig).set({ value }).where(eq(echoeConfig.key, 'deck_config_presets'));
+        await db.update(echoeConfig).set({ value }).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'deck_config_presets')));
       }
 
       return newPreset;
@@ -169,12 +169,12 @@ export class EchoeConfigService {
   /**
    * Delete a deck config preset
    */
-  async deletePreset(presetId: string): Promise<void> {
+  async deletePreset(uid: string, presetId: string): Promise<void> {
     const db = getDatabase();
 
     try {
       // Get existing presets
-      const presets = await this.getPresets();
+      const presets = await this.getPresets(uid);
 
       // Filter out the preset to delete
       const filteredPresets = presets.filter((p) => p.id !== presetId);
@@ -185,7 +185,7 @@ export class EchoeConfigService {
 
       // Save to database
       const value = JSON.stringify(filteredPresets);
-      await db.update(echoeConfig).set({ value }).where(eq(echoeConfig.key, 'deck_config_presets'));
+      await db.update(echoeConfig).set({ value }).where(and(eq(echoeConfig.uid, uid), eq(echoeConfig.key, 'deck_config_presets')));
     } catch (error) {
       logger.error('Delete preset error:', error);
       throw error;

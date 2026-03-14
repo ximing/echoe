@@ -17,8 +17,6 @@ import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import type { EchoeCards } from '../db/schema/echoe-cards.js';
 import type { EchoeNotes } from '../db/schema/echoe-notes.js';
-// Temporary placeholder UID for pre-refactor compatibility (will be removed in US-006)
-const TEMP_UID = 'SYSTEM';
 
 import type {
   EchoeDeckWithCountsDto,
@@ -40,11 +38,11 @@ export class EchoeDeckService {
   /**
    * Get all decks with counts for today
    */
-  async getAllDecks(): Promise<EchoeDeckWithCountsDto[]> {
+  async getAllDecks(uid: string): Promise<EchoeDeckWithCountsDto[]> {
     const db = getDatabase();
 
     // Get all decks
-    const decks = await db.select().from(echoeDecks).orderBy(echoeDecks.name);
+    const decks = await db.select().from(echoeDecks).where(eq(echoeDecks.uid, uid)).orderBy(echoeDecks.name);
 
     // Use millisecond timestamp semantics for all card due checks
     const nowMs = Date.now();
@@ -58,6 +56,7 @@ export class EchoeDeckService {
         reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
+      .where(eq(echoeCards.uid, uid))
       .groupBy(echoeCards.did);
 
     // Get FSRS stats grouped by deck
@@ -78,6 +77,7 @@ export class EchoeDeckService {
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
+      .where(eq(echoeCards.uid, uid))
       .groupBy(echoeCards.did);
 
     // Create maps for quick lookup
@@ -247,10 +247,10 @@ export class EchoeDeckService {
   /**
    * Get a single deck by ID
    */
-  async getDeckById(id: number): Promise<EchoeDeckWithCountsDto | null> {
+  async getDeckById(uid: string, id: number): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, id)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
 
     if (deck.length === 0) {
       return null;
@@ -266,7 +266,7 @@ export class EchoeDeckService {
         reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
-      .where(eq(echoeCards.did, id))
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id)))
       .groupBy(echoeCards.did);
 
     // Get FSRS stats for this deck
@@ -283,7 +283,7 @@ export class EchoeDeckService {
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
-      .where(eq(echoeCards.did, id))
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id)))
       .groupBy(echoeCards.did);
 
     const count = counts[0] || { newCount: 0, learnCount: 0, reviewCount: 0 };
@@ -322,7 +322,7 @@ export class EchoeDeckService {
   /**
    * Create a new deck
    */
-  async createDeck(dto: CreateEchoeDeckDto): Promise<EchoeDeckWithCountsDto> {
+  async createDeck(uid: string, dto: CreateEchoeDeckDto): Promise<EchoeDeckWithCountsDto> {
     const db = getDatabase();
 
     // Generate deck ID (Unix timestamp in ms)
@@ -332,7 +332,7 @@ export class EchoeDeckService {
     // If name contains '::', check if parent exists (not for filtered decks)
     if (!dto.dyn && dto.name.includes('::')) {
       const parentName = dto.name.substring(0, dto.name.lastIndexOf('::'));
-      const parent = await db.select().from(echoeDecks).where(eq(echoeDecks.name, parentName)).limit(1);
+      const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName))).limit(1);
       if (parent.length === 0) {
         throw new Error(`Parent deck '${parentName}' does not exist`);
       }
@@ -345,7 +345,7 @@ export class EchoeDeckService {
 
     const newDeck: NewEchoeDecks = {
       id: id,
-      uid: TEMP_UID,
+      uid,
       name: dto.name,
       conf: dto.conf || 1,
       extendNew: 20,
@@ -363,7 +363,7 @@ export class EchoeDeckService {
 
     // If this is a filtered deck and has a search query, build it
     if (isFiltered && dto.searchQuery) {
-      await this.buildFilteredDeck(id, dto.searchQuery, false);
+      await this.buildFilteredDeck(uid, id, dto.searchQuery, false);
     }
 
     return {
@@ -392,10 +392,10 @@ export class EchoeDeckService {
   /**
    * Update a deck
    */
-  async updateDeck(id: number, dto: UpdateEchoeDeckDto): Promise<EchoeDeckWithCountsDto | null> {
+  async updateDeck(uid: string, id: number, dto: UpdateEchoeDeckDto): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, id)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
 
     if (deck.length === 0) {
       return null;
@@ -411,7 +411,7 @@ export class EchoeDeckService {
       // Check if new parent exists if using ::
       if (dto.name.includes('::')) {
         const parentName = dto.name.substring(0, dto.name.lastIndexOf('::'));
-        const parent = await db.select().from(echoeDecks).where(eq(echoeDecks.name, parentName)).limit(1);
+        const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName))).limit(1);
         if (parent.length === 0) {
           throw new Error(`Parent deck '${parentName}' does not exist`);
         }
@@ -423,18 +423,18 @@ export class EchoeDeckService {
       updates.desc = dto.desc;
     }
 
-    await db.update(echoeDecks).set(updates).where(eq(echoeDecks.id, id));
+    await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
 
-    return this.getDeckById(id);
+    return this.getDeckById(uid, id);
   }
 
   /**
    * Delete a deck
    */
-  async deleteDeck(id: number, deleteCards: boolean = false): Promise<boolean> {
+  async deleteDeck(uid: string, id: number, deleteCards: boolean = false): Promise<boolean> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, id)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
 
     if (deck.length === 0) {
       return false;
@@ -442,36 +442,36 @@ export class EchoeDeckService {
 
     if (deleteCards) {
       // Delete all cards in this deck and sub-decks
-      const deckIds = await this.getDeckAndSubdeckIds(id);
+      const deckIds = await this.getDeckAndSubdeckIds(uid, id);
 
       // Find notes in these decks
-      const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(inArray(echoeCards.did, deckIds));
+      const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
       const noteIds: number[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid))));
 
       if (noteIds.length > 0) {
         // Add notes to graves
         const now = Math.floor(Date.now() / 1000);
         for (const nid of noteIds) {
-          await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: nid, type: 1 });
+          await db.insert(echoeGraves).values({ uid, usn: 0, oid: nid, type: 1 });
         }
 
         // Delete cards
-        await db.delete(echoeCards).where(inArray(echoeCards.did, deckIds));
+        await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
         // Delete notes
-        await db.delete(echoeNotes).where(inArray(echoeNotes.id, noteIds));
+        await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
       }
 
       // Delete sub-decks
-      await db.delete(echoeDecks).where(inArray(echoeDecks.id, deckIds.slice(1)));
+      await db.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.id, deckIds.slice(1))));
     }
 
     // Add deck to graves
     const now = Math.floor(Date.now() / 1000);
-    await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: id, type: 0 });
+    await db.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 0 });
 
     // Delete deck
-    await db.delete(echoeDecks).where(eq(echoeDecks.id, id));
+    await db.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
 
     return true;
   }
@@ -479,13 +479,13 @@ export class EchoeDeckService {
   /**
    * Get deck and all sub-deck IDs
    */
-  async getDeckAndSubdeckIds(id: number): Promise<number[]> {
+  async getDeckAndSubdeckIds(uid: string, id: number): Promise<number[]> {
     const db = getDatabase();
 
     const deck = await db
       .select({ name: echoeDecks.name })
       .from(echoeDecks)
-      .where(eq(echoeDecks.id, id))
+      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)))
       .limit(1);
 
     if (deck.length === 0) {
@@ -496,7 +496,7 @@ export class EchoeDeckService {
     const subDecks = await db
       .select({ id: echoeDecks.id })
       .from(echoeDecks)
-      .where(like(echoeDecks.name, `${deck[0].name}::%`));
+      .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deck[0].name}::%`)));
 
     for (const subDeck of subDecks) {
       result.push(Number(subDeck.id));
@@ -508,16 +508,16 @@ export class EchoeDeckService {
   /**
    * Get deck config by deck ID
    */
-  async getDeckConfig(deckId: number): Promise<EchoeDeckConfigDto | null> {
+  async getDeckConfig(uid: string, deckId: number): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, deckId)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(eq(echoeDeckConfig.id, deck[0].conf)).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -529,16 +529,16 @@ export class EchoeDeckService {
   /**
    * Update deck config
    */
-  async updateDeckConfig(deckId: number, dto: UpdateEchoeDeckConfigDto): Promise<EchoeDeckConfigDto | null> {
+  async updateDeckConfig(uid: string, deckId: number, dto: UpdateEchoeDeckConfigDto): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, deckId)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(eq(echoeDeckConfig.id, deck[0].conf)).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -601,9 +601,9 @@ export class EchoeDeckService {
       updates.lapseConfig = JSON.stringify({ ...currentLapseConfig, ...dto.lapseConfig });
     }
 
-    await db.update(echoeDeckConfig).set(updates).where(eq(echoeDeckConfig.id, deck[0].conf));
+    await db.update(echoeDeckConfig).set(updates).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf)));
 
-    const updated = await db.select().from(echoeDeckConfig).where(eq(echoeDeckConfig.id, deck[0].conf)).limit(1);
+    const updated = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
 
     return this.mapConfigToDto(updated[0]);
   }
@@ -748,7 +748,7 @@ export class EchoeDeckService {
   /**
    * Create a filtered deck
    */
-  async createFilteredDeck(dto: CreateFilteredDeckDto, buildNow: boolean = true): Promise<EchoeDeckWithCountsDto> {
+  async createFilteredDeck(uid: string, dto: CreateFilteredDeckDto, buildNow: boolean = true): Promise<EchoeDeckWithCountsDto> {
     const db = getDatabase();
 
     // Generate deck ID (Unix timestamp in ms)
@@ -757,7 +757,7 @@ export class EchoeDeckService {
 
     const newDeck: NewEchoeDecks = {
       id: id,
-      uid: TEMP_UID,
+      uid,
       name: dto.name,
       conf: 1,
       extendNew: 20,
@@ -774,20 +774,20 @@ export class EchoeDeckService {
     await db.insert(echoeDecks).values(newDeck);
 
     if (buildNow) {
-      await this.buildFilteredDeck(id, dto.searchQuery, dto.rebuildDaily ?? false);
+      await this.buildFilteredDeck(uid, id, dto.searchQuery, dto.rebuildDaily ?? false);
     }
 
-    return this.getDeckById(id) as Promise<EchoeDeckWithCountsDto>;
+    return this.getDeckById(uid, id) as Promise<EchoeDeckWithCountsDto>;
   }
 
   /**
    * Rebuild a filtered deck by running the search query
    */
-  async rebuildFilteredDeck(deckId: number): Promise<boolean> {
+  async rebuildFilteredDeck(uid: string, deckId: number): Promise<boolean> {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, deckId)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -798,10 +798,10 @@ export class EchoeDeckService {
     const rebuildDaily = deck[0].extendNew > 0; // Use extendNew as rebuildDaily flag
 
     // First, empty current filtered cards back to their original decks
-    await this.emptyFilteredDeck(deckId);
+    await this.emptyFilteredDeck(uid, deckId);
 
     // Then rebuild with new cards
-    await this.buildFilteredDeck(deckId, searchQuery, rebuildDaily);
+    await this.buildFilteredDeck(uid, deckId, searchQuery, rebuildDaily);
 
     return true;
   }
@@ -809,11 +809,11 @@ export class EchoeDeckService {
   /**
    * Empty a filtered deck - return cards to their original decks
    */
-  async emptyFilteredDeck(deckId: number): Promise<boolean> {
+  async emptyFilteredDeck(uid: string, deckId: number): Promise<boolean> {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, deckId)).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -823,7 +823,7 @@ export class EchoeDeckService {
     const cards = await db
       .select()
       .from(echoeCards)
-      .where(and(eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != 0`));
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != 0`));
 
     if (cards.length === 0) {
       return true;
@@ -841,7 +841,7 @@ export class EchoeDeckService {
           mod: now,
           usn: 0,
         })
-        .where(eq(echoeCards.id, card.id));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, card.id)));
     }
 
     return true;
@@ -850,9 +850,9 @@ export class EchoeDeckService {
   /**
    * Preview a filtered deck - show sample cards without modifying data
    */
-  async previewFilteredDeck(searchQuery: string, limit: number = 5): Promise<FilteredDeckPreviewDto> {
+  async previewFilteredDeck(uid: string, searchQuery: string, limit: number = 5): Promise<FilteredDeckPreviewDto> {
     const db = getDatabase();
-    const cards = await this.findCardsBySearch(searchQuery, limit);
+    const cards = await this.findCardsBySearch(uid, searchQuery, limit);
 
     // Map to DTO format
     const sampleCards: EchoeCardListItemDto[] = await Promise.all(
@@ -910,12 +910,12 @@ export class EchoeDeckService {
   /**
    * Build filtered deck - find cards matching search and move to filtered deck
    */
-  private async buildFilteredDeck(deckId: number, searchQuery: string, rebuildDaily: boolean): Promise<void> {
+  private async buildFilteredDeck(uid: string, deckId: number, searchQuery: string, rebuildDaily: boolean): Promise<void> {
     const db = getDatabase();
     const now = Math.floor(Date.now() / 1000);
 
     // Find cards matching search
-    const cards = await this.findCardsBySearch(searchQuery, 10000); // Limit to 10000 cards
+    const cards = await this.findCardsBySearch(uid, searchQuery, 10000); // Limit to 10000 cards
 
     if (cards.length === 0) {
       return;
@@ -933,14 +933,14 @@ export class EchoeDeckService {
           mod: now,
           usn: 0,
         })
-        .where(eq(echoeCards.id, card.id));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, card.id)));
     }
   }
 
   /**
    * Find cards by search query
    */
-  private async findCardsBySearch(searchQuery: string, limit: number = 1000): Promise<any[]> {
+  private async findCardsBySearch(uid: string, searchQuery: string, limit: number = 1000): Promise<any[]> {
     const db = getDatabase();
     const nowMs = Date.now();
 
@@ -953,7 +953,7 @@ export class EchoeDeckService {
       if (term.startsWith('deck:')) {
         // Filter by deck name
         const deckName = term.substring(5).replace(/"/g, '');
-        const decks = await db.select().from(echoeDecks).where(sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`);
+        const decks = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`));
         const deckIds = decks.map((d: Pick<EchoeDecks, 'id'>) => Number(d.id));
         if (deckIds.length > 0) {
           conditions.push(inArray(echoeCards.did, deckIds));
@@ -961,7 +961,7 @@ export class EchoeDeckService {
       } else if (term.startsWith('tag:')) {
         // Filter by tag
         const tag = term.substring(4).replace(/"/g, '');
-        const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`);
+        const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
@@ -994,7 +994,7 @@ export class EchoeDeckService {
         const notes = await db
           .select({ id: echoeNotes.id })
           .from(echoeNotes)
-          .where(sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`);
+          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
@@ -1007,7 +1007,7 @@ export class EchoeDeckService {
         const notes = await db
           .select({ id: echoeNotes.id })
           .from(echoeNotes)
-          .where(sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`);
+          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.id, noteIds));
@@ -1039,15 +1039,15 @@ export class EchoeDeckService {
         }
 
         // Get cards for these notes
-        const cardRecords = await db.select().from(echoeCards).where(inArray(echoeCards.nid, noteIds));
+        const cardRecords = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
         cards = cardRecords;
       } else {
         // Direct card conditions
-        cards = await db.select().from(echoeCards).where(and(...conditions));
+        cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), ...conditions));
       }
     } else {
       // No conditions - return all cards (limited)
-      cards = await db.select().from(echoeCards).limit(limit);
+      cards = await db.select().from(echoeCards).where(eq(echoeCards.uid, uid)).limit(limit);
     }
 
     return cards.slice(0, limit);

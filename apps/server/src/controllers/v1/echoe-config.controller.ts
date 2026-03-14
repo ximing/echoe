@@ -24,7 +24,7 @@ export class EchoeConfigController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const settings = await this.echoeConfigService.getSettings();
+      const settings = await this.echoeConfigService.getSettings(userDto.uid);
       return ResponseUtil.success(settings);
     } catch (error) {
       logger.error('Get echoe settings error:', error);
@@ -43,7 +43,7 @@ export class EchoeConfigController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const settings = await this.echoeConfigService.updateSettings(dto);
+      const settings = await this.echoeConfigService.updateSettings(userDto.uid, dto);
       return ResponseUtil.success(settings);
     } catch (error) {
       logger.error('Update echoe settings error:', error);
@@ -62,7 +62,7 @@ export class EchoeConfigController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const presets = await this.echoeConfigService.getPresets();
+      const presets = await this.echoeConfigService.getPresets(userDto.uid);
       return ResponseUtil.success(presets);
     } catch (error) {
       logger.error('Get presets error:', error);
@@ -81,7 +81,7 @@ export class EchoeConfigController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const preset = await this.echoeConfigService.savePreset(dto);
+      const preset = await this.echoeConfigService.savePreset(userDto.uid, dto);
       return ResponseUtil.success(preset);
     } catch (error) {
       logger.error('Save preset error:', error);
@@ -100,7 +100,7 @@ export class EchoeConfigController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      await this.echoeConfigService.deletePreset(id);
+      await this.echoeConfigService.deletePreset(userDto.uid, id);
       return ResponseUtil.success({ deleted: true });
     } catch (error) {
       logger.error('Delete preset error:', error);

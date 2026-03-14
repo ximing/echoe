@@ -68,7 +68,7 @@ export class EchoeStudyService {
     // Filter by deck if provided
     if (params.deckId) {
       // Get all sub-deck IDs
-      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(params.deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(TEMP_UID, params.deckId);
       conditions.push(sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`);
     }
 
@@ -719,7 +719,7 @@ export class EchoeStudyService {
     // Build conditions
     let deckFilter: any = undefined;
     if (deckId) {
-      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(deckId);
+      const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(TEMP_UID, deckId);
       deckFilter = sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`;
     }
 

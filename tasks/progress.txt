@@ -127,3 +127,29 @@
   - Service methods still need refactoring (US-006-008) to accept uid parameters - controllers now capture uid but don't pass it yet
   - Typecheck passes via `pnpm build:server` which runs tsc
 ---
+## 2026-03-14 15:45 - US-005
+- Added @CurrentUser() decorator to all edge Echoe controllers
+- Implemented unauthorized response (401) when userDto.uid is missing
+- Updated echoe-stats.controller.ts: Added uid context to all 6 methods (getTodayStats, getHistory, getMaturity, getForecast, getStreak, getMaturityBatch)
+- Updated echoe-tag.controller.ts: Added uid context to all 5 methods (getTags, searchTags, renameTag, deleteTag, mergeTags)
+- Updated echoe-media.controller.ts: Added uid context to all 5 methods (listMedia, getMedia, uploadMedia, checkUnusedMedia, deleteBulk)
+- Updated echoe-import.controller.ts: Added uid context to importApkg method
+- Updated echoe-export.controller.ts: Added uid context to exportApkg method
+- Updated echoe-csv-import.controller.ts: Added uid context to both methods (previewCsv, executeCsv)
+- Updated echoe-duplicate.controller.ts: Added uid context to both methods (findDuplicates, mergeDuplicates)
+- Files changed:
+  - apps/server/src/controllers/v1/echoe-stats.controller.ts
+  - apps/server/src/controllers/v1/echoe-tag.controller.ts
+  - apps/server/src/controllers/v1/echoe-media.controller.ts
+  - apps/server/src/controllers/v1/echoe-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-export.controller.ts
+  - apps/server/src/controllers/v1/echoe-csv-import.controller.ts
+  - apps/server/src/controllers/v1/echoe-duplicate.controller.ts
+- **Learnings for future iterations:**
+  - Edge controllers follow the same pattern as core controllers: (1) Import CurrentUser and UserInfoDto, (2) Add @CurrentUser() userDto?: UserInfoDto parameter to each method, (3) Check if (!userDto?.uid) return UNAUTHORIZED
+  - For controllers that return raw Response objects (like export and media serving), use res?.status(401).send('Unauthorized') instead of ResponseUtil.error()
+  - File upload controllers need uid check BEFORE file processing to prevent unauthorized uploads
+  - All 7 edge controllers (stats, tag, media, import, export, csv-import, duplicate) now enforce uid context
+  - Service methods still need refactoring (US-006-008) to accept and use uid parameters - controllers now capture uid but don't pass it yet
+  - Typecheck passes via `pnpm --filter @echoe/server build` which runs tsc
+---
