@@ -50,6 +50,20 @@
       "when": 1773419456468,
       "tag": "0006_brief_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1773458223362,
+      "tag": "0007_soft_marvel_apes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1773458297244,
+      "tag": "0008_handy_sabretooth",
+      "breakpoints": true
     }
   ]
 }
