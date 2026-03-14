@@ -17,10 +17,11 @@ import type { CanonicalFields, RichTextFields } from '../../types/note-fields.js
 export const echoeNotes = mysqlTable(
   'echoe_notes',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Unique ID (Unix timestamp in ms * 1000 + random)
+    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    noteId: varchar('note_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     guid: varchar('guid', { length: 191 }).notNull(), // Globally unique ID for sync (40 char hex string)
-    mid: bigint('mid', { mode: 'number' }).notNull(), // Model ID (note type ID)
+    mid: varchar('mid', { length: 191 }).notNull(), // Model ID (note type ID) - now business ID string
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
     tags: text('tags').notNull().$type<string>(), // JSON array of tags
@@ -34,11 +35,13 @@ export const echoeNotes = mysqlTable(
     fieldsJson: json('fields_json').$type<CanonicalFields>().notNull().default({}), // Primary structured field storage (field name → plain text value)
   },
   (table) => ({
+    noteIdIdx: index('note_id_idx').on(table.noteId),
     guidIdx: index('guid_idx').on(table.guid),
     midIdx: index('mid_idx').on(table.mid),
     usnIdx: index('usn_idx').on(table.usn),
     sfldIdx: index('sfld_idx').on(table.sfld),
     uidGuidUnique: unique('uid_guid_unique').on(table.uid, table.guid),
+    uidNoteIdIdx: index('uid_note_id_idx').on(table.uid, table.noteId),
     uidMidIdx: index('uid_mid_idx').on(table.uid, table.mid),
     uidSfldIdx: index('uid_sfld_idx').on(table.uid, table.sfld),
     uidModIdx: index('uid_mod_idx').on(table.uid, table.mod),
