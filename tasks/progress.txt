@@ -293,3 +293,16 @@
   - Type errors in test files (deck, note, study service tests) are expected and will be resolved in US-024
   - Controller changes are straightforward - just parameter type updates and removing numeric conversions
 ---
+## 2026-03-15 - US-021
+- Refactored apps/web/src/api/echoe.ts to use string business IDs throughout
+- Files changed: apps/web/src/api/echoe.ts
+- **Learnings for future iterations:**
+  - Web API client refactor pattern: Change all ID parameters from `number` to `string` for business IDs
+  - Remove `.toString()` conversions for ID query params - pass string IDs directly
+  - Keep `.toString()` only for non-ID numeric values (limit, days, etc.)
+  - Updated 23 function signatures: getDeck, updateDeck, deleteDeck, getDeckConfig, updateDeckConfig, rebuildFilteredDeck, emptyFilteredDeck, getStudyQueue, undoReview, buryCards, forgetCards, getStudyCounts, getStudyOptions, getNoteType, updateNoteType, deleteNoteType, getNote, updateNote, deleteNote, getCard, getTodayStats, getHistory, getMaturity, getForecast
+  - Updated 1 interface: MaturityBatchDeck.deckId from number to string
+  - Updated CSV import: removed .toString() for notetypeId and deckId in executeCsvImport
+  - Typecheck passes with no errors - API client now matches backend string ID contracts
+  - Type errors in web services (US-022) and pages (US-023) are expected and will be resolved next
+---
