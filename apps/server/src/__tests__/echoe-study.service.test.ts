@@ -397,7 +397,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [1001]);
+    const affected = await service.forgetCards('test-uid', ['ec_1001']);
 
     expect(affected).toBe(1);
     expect(forgetCardMock).toHaveBeenCalledTimes(1);
@@ -436,7 +436,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [9999]);
+    const affected = await service.forgetCards('test-uid', ['ec_9999']);
 
     expect(affected).toBe(0);
     expect(forgetCardMock).not.toHaveBeenCalled();
@@ -473,7 +473,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [1001, 1002]);
+    const affected = await service.forgetCards('test-uid', ['ec_1001', 'ec_1002']);
 
     expect(affected).toBe(2);
     expect(forgetCardMock).toHaveBeenCalledTimes(2);
@@ -774,7 +774,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
       },
     }) as any);
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 3, timeTaken: 5000 });
 
     // 断言写库时 left = learningSteps（来自 FSRS 结果），而非硬编码 0
     expect(setMock).toHaveBeenCalledWith(
@@ -833,7 +833,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
       },
     }) as any);
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 3, timeTaken: 5000 });
 
     expect(setMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -952,7 +952,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     scheduleCardMock.mockReturnValue(buildRelearningResult());
     const { updateMock, setMock } = buildMockDb({ leechAction: 0 });
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     // updateMock is called for: (1) card scheduling, (2) card suspension, (3) note tag
     const allSetCalls = setMock.mock.calls;
@@ -975,7 +975,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     scheduleCardMock.mockReturnValue(buildRelearningResult());
     const { updateMock, setMock } = buildMockDb({ leechAction: 1 });
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     const allSetCalls = setMock.mock.calls;
 
@@ -999,7 +999,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     // lapseConfig without leechAction field
     const { setMock } = buildMockDb({});
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     const allSetCalls = setMock.mock.calls;
     const suspendCall = allSetCalls.find((args) => (args[0] as Record<string, unknown>).queue === -1);
@@ -1011,7 +1011,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     // Note already has 'leech' tag
     const { updateMock } = buildMockDb({ leechAction: 0 }, '["leech"]');
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     // Only 2 update calls: (1) card scheduling, (2) card suspension (no tag update needed)
     expect(updateMock).toHaveBeenCalledTimes(2);
@@ -1286,7 +1286,7 @@ describe('EchoeStudyService - empty deckIds guard (getQueue)', () => {
     const selectMock = jest.fn();
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getQueue('user-a', { deckId: 9999, limit: 20 });
+    const result = await service.getQueue('user-a', { deckId: 'ed_9999', limit: 20 });
 
     expect(result).toEqual([]);
     // DB select must NOT be called — the guard should short-circuit before any SQL query
@@ -1304,7 +1304,7 @@ describe('EchoeStudyService - empty deckIds guard (getQueue)', () => {
 
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getQueue('user-a', { deckId: 100, limit: 20 });
+    const result = await service.getQueue('user-a', { deckId: 'ed_100', limit: 20 });
 
     expect(result).toEqual([]);
     expect(selectMock).toHaveBeenCalled();
@@ -1347,7 +1347,7 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
     const selectMock = jest.fn();
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getCounts('user-a', 9999);
+    const result = await service.getCounts('user-a', 'ed_9999');
 
     expect(result).toEqual({ newCount: 0, learnCount: 0, reviewCount: 0, totalCount: 0 });
     // DB select must NOT be called — the guard should short-circuit before any SQL query
@@ -1371,7 +1371,7 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
 
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getCounts('user-a', 200);
+    const result = await service.getCounts('user-a', 'ed_200');
 
     expect(selectMock).toHaveBeenCalled();
     expect(result).toHaveProperty('newCount');

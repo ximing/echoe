@@ -48,11 +48,11 @@ describe('EchoeNoteService - bulk forget consistency', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [1001, 1002],
+      cardIds: ['ec_1001', 'ec_1002'],
       action: 'forget',
     });
 
-    expect(forgetCardsMock).toHaveBeenCalledWith('test-uid', [1001, 1002]);
+    expect(forgetCardsMock).toHaveBeenCalledWith('test-uid', ['ec_1001', 'ec_1002']);
     expect(updateMock).not.toHaveBeenCalled();
     expect(result).toEqual({ success: true, affected: 2 });
   });
@@ -68,7 +68,7 @@ describe('EchoeNoteService - bulk forget consistency', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [1001, 9999],
+      cardIds: ['ec_1001', 'ec_9999'],
       action: 'forget',
     });
 
@@ -112,7 +112,7 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [2001],
+      cardIds: ['ec_2001'],
       action: 'unsuspend',
     });
 
@@ -135,7 +135,7 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [2002],
+      cardIds: ['ec_2002'],
       action: 'unbury',
     });
 
@@ -159,7 +159,7 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [3001],
+      cardIds: ['ec_3001'],
       action: 'unsuspend',
     });
 
@@ -194,7 +194,7 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [4001, 4002, 4003, 4004],
+      cardIds: ['ec_4001', 'ec_4002', 'ec_4003', 'ec_4004'],
       action: 'unsuspend',
     });
 
@@ -215,7 +215,7 @@ describe('EchoeNoteService - unsuspend/unbury relearning restore', () => {
     );
 
     const result = await service.bulkCardOperation('test-uid', {
-      cardIds: [5001],
+      cardIds: ['ec_5001'],
       action: 'unbury',
     });
 
@@ -380,7 +380,7 @@ describe('EchoeNoteService.updateNoteType - multi-field batch add', () => {
       {} as any,
     );
 
-    await service.updateNoteType('test-uid', 1, {
+    await service.updateNoteType('test-uid', 'ent_test_001', {
       flds: [{ name: 'Back' }, { name: 'Extra' }],
     } as any);
 
@@ -407,7 +407,7 @@ describe('EchoeNoteService.updateNoteType - multi-field batch add', () => {
       {} as any,
     );
 
-    await service.updateNoteType('test-uid', 1, {
+    await service.updateNoteType('test-uid', 'ent_test_001', {
       flds: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
     } as any);
 
@@ -431,7 +431,7 @@ describe('EchoeNoteService.updateNoteType - multi-field batch add', () => {
       {} as any,
     );
 
-    await service.updateNoteType('test-uid', 1, {
+    await service.updateNoteType('test-uid', 'ent_test_001', {
       flds: [{ name: 'Hint' }, { name: 'Source' }],
     } as any);
 
@@ -483,9 +483,9 @@ describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation'
 
     await expect(
       service.bulkCardOperation('user-A', {
-        cardIds: [101],
+        cardIds: ['ec_101'],
         action: 'move',
-        payload: { deckId: 9999 },
+        payload: { deckId: 'ed_9999' },
       })
     ).rejects.toThrow('FORBIDDEN:');
   });
@@ -500,9 +500,9 @@ describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation'
 
     await expect(
       service.bulkCardOperation('user-A', {
-        cardIds: [101, 102],
+        cardIds: ['ec_101', 'ec_102'],
         action: 'move',
-        payload: { deckId: 9999 },
+        payload: { deckId: 'ed_9999' },
       })
     ).rejects.toThrow();
 
@@ -518,14 +518,14 @@ describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation'
     );
 
     const result = await service.bulkCardOperation('user-A', {
-      cardIds: [101, 102],
+      cardIds: ['ec_101', 'ec_102'],
       action: 'move',
-      payload: { deckId: 42 },
+      payload: { deckId: 'ed_042' },
     });
 
     expect(result).toEqual({ success: true, affected: 2 });
     expect(setMock).toHaveBeenCalledWith(
-      expect.objectContaining({ did: 42, usn: 0 })
+      expect.objectContaining({ did: 'ed_042', usn: 0 })
     );
   });
 
@@ -540,7 +540,7 @@ describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation'
 
     await expect(
       service.bulkCardOperation('user-A', {
-        cardIds: [101],
+        cardIds: ['ec_101'],
         action: 'move',
       })
     ).rejects.toThrow('deckId is required for move action');
@@ -636,7 +636,7 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
       {} as any,
     );
 
-    await service.updateNoteType('uid-test', 10, {
+    await service.updateNoteType('uid-test', 'ent_test_010', {
       fldRenames: [{ from: 'Front', to: 'Question' }],
     } as any);
 
@@ -670,7 +670,7 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
       {} as any,
     );
 
-    await service.updateNoteType('uid-test', 10, {
+    await service.updateNoteType('uid-test', 'ent_test_010', {
       fldRenames: [{ from: 'OldName', to: 'NewName' }],
     } as any);
 
@@ -730,7 +730,7 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
       {} as any,
     );
 
-    await service.updateNoteType('uid-test', 10, {
+    await service.updateNoteType('uid-test', 'ent_test_010', {
       fldRenames: [{ from: 'Front', to: 'Front' }],
     } as any);
 
@@ -752,7 +752,7 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
       {} as any,
     );
 
-    await service.updateNoteType('uid-test', 10, {
+    await service.updateNoteType('uid-test', 'ent_test_010', {
       fldRenames: [{ from: 'Front', to: 'Question' }],
     } as any);
 
@@ -787,7 +787,7 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
       {} as any,
     );
 
-    await service.updateNoteType('uid-test', 10, {
+    await service.updateNoteType('uid-test', 'ent_test_010', {
       fldRenames: [{ from: 'Term', to: 'Word' }],
     } as any);
 
@@ -841,7 +841,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     buildDeleteNoteDbMock([], []);
 
     const service = new EchoeNoteService({} as any, {} as any);
-    const result = await service.deleteNote('uid-x', 999);
+    const result = await service.deleteNote('uid-x', 'en_999');
 
     expect(result).toBe(false);
     expect(mockedWithTransaction).not.toHaveBeenCalled();
@@ -851,7 +851,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     buildDeleteNoteDbMock([{ id: 1 }], [{ id: 101 }, { id: 102 }]);
 
     const service = new EchoeNoteService({} as any, {} as any);
-    const result = await service.deleteNote('uid-x', 1);
+    const result = await service.deleteNote('uid-x', 'en_001');
 
     expect(result).toBe(true);
     expect(mockedWithTransaction).toHaveBeenCalledTimes(1);
@@ -864,7 +864,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     mockedWithTransaction.mockRejectedValue(new Error('DB write failure'));
 
     const service = new EchoeNoteService({} as any, {} as any);
-    await expect(service.deleteNote('uid-x', 1)).rejects.toThrow('DB write failure');
+    await expect(service.deleteNote('uid-x', 'en_001')).rejects.toThrow('DB write failure');
   });
 
   it('should insert card graves and note grave inside transaction before deleting', async () => {
@@ -894,7 +894,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     });
 
     const service = new EchoeNoteService({} as any, {} as any);
-    await service.deleteNote('uid-x', 10);
+    await service.deleteNote('uid-x', 'en_010');
 
     // Graves: 2 card graves (type=2) + 1 note grave (type=1)
     expect(txInsertValues).toHaveLength(3);
@@ -902,7 +902,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     const noteGraves = txInsertValues.filter((v: any) => v.type === 1);
     expect(cardGraves).toHaveLength(2);
     expect(noteGraves).toHaveLength(1);
-    expect(noteGraves[0].oid).toBe(10);
+    expect(noteGraves[0].oid).toBe('en_010');
 
     // Two delete calls: cards then note
     expect(txDeleteCalls).toHaveLength(2);
