@@ -387,7 +387,7 @@ export class EchoeStudyService {
 
     // Return the updated card
     const updatedCard = await db.query.echoeCards.findFirst({
-      where: eq(echoeCards.id, dto.cardId),
+      where: and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)),
     });
 
     if (!updatedCard) {
@@ -395,7 +395,7 @@ export class EchoeStudyService {
     }
 
     const fullNote = await db.query.echoeNotes.findFirst({
-      where: eq(echoeNotes.id, updatedCard.nid),
+      where: and(eq(echoeNotes.id, updatedCard.nid), eq(echoeNotes.uid, uid)),
     });
 
     return {
