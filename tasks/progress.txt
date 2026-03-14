@@ -19,7 +19,7 @@
 | US-006 | Refactor graves/media schema and index alignment | [x] |
 | US-007 | Finalize schema exports and build input | [x] |
 | US-008 | Generate migration for ID refactor | [x] |
-| US-009 | Run migration and verify constraints | [ ] |
+| US-009 | Run migration and verify constraints | [x] |
 | US-010 | Convert core DTO entity ID types to string | [ ] |
 | US-011 | Convert DTO command and query payload IDs | [ ] |
 | US-012 | Build DTO package after ID contract changes | [ ] |
@@ -121,4 +121,19 @@
   - Migration metadata is stored in drizzle/meta/ with snapshot and journal files
   - Drizzle-kit reads from dist/db/schema/index.js (compiled output), not TypeScript source
   - The migration drops and recreates the echoe_col uid_unique index due to schema changes
+---
+## 2026-03-15 - US-009
+- Executed migration 0009 successfully on remote test database
+- Fixed migration SQL to use conditional DROP INDEX statements (following pattern from migration 0007)
+- Manually created missing business ID indexes after partial migration failure
+- Files changed: apps/server/drizzle/0009_silly_vulture.sql
+- **Learnings for future iterations:**
+  - When migrations fail mid-execution, check __drizzle_migrations table to see which migrations are recorded
+  - Use conditional DROP INDEX pattern for robustness: check information_schema.STATISTICS before dropping
+  - Migration failures can leave database in partial state - verify actual schema state before regenerating migrations
+  - Create verification scripts to systematically check all acceptance criteria (columns, types, indexes)
+  - Business ID columns: All 10 tables now have unique varchar(191) NOT NULL *_id columns
+  - Relation columns: All foreign key fields (mid, nid, did, odid, cid, conf, ntid, oid) successfully converted to varchar(191)
+  - Indexes: All 20 business ID indexes created (single-column *_id_idx + composite uid_*_id_idx)
+  - Remote database at 222.128.65.91:13306 (echoe_test_db) used for testing
 ---
