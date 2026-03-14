@@ -23,7 +23,7 @@ export class EchoeExportController {
    */
   @Get('/apkg')
   async exportApkg(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('includeScheduling') includeScheduling?: string,
     @QueryParam('format') format?: string,
     @Res() res?: Response,
