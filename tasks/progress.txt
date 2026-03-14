@@ -13,7 +13,7 @@
 | US-001 | Finalize schema for foundational Echoe tables | [x] |
 | US-002 | Finalize schema for note, card, media, and log tables | [x] |
 | US-003 | Generate and validate one-shot migration | [x] |
-| US-004 | Apply uid context to core Echoe controllers | [ ] |
+| US-004 | Apply uid context to core Echoe controllers | [x] |
 | US-005 | Apply uid context to edge Echoe controllers | [ ] |
 | US-006 | Refactor foundational services for uid filtering | [ ] |
 | US-007 | Refactor study-domain services for uid filtering | [ ] |
@@ -106,4 +106,24 @@
   - Combined migrations 0007+0008 form the complete multi-user refactor migration set
   - Typecheck passes after migration generation confirms schema consistency
   - Manual database testing required when Docker is not available - document this in progress notes
+---
+## 2026-03-14 14:30 - US-004
+- Added @CurrentUser() decorator to all methods in core Echoe controllers
+- Implemented unauthorized response when userDto.uid is missing
+- Updated echoe-config.controller.ts: Added uid context to all 5 methods (getSettings, updateSettings, getPresets, savePreset, deletePreset)
+- Updated echoe-deck.controller.ts: Added uid context to all 11 methods (getAllDecks, getDeckById, createDeck, updateDeck, deleteDeck, getDeckConfig, updateDeckConfig, createFilteredDeck, rebuildFilteredDeck, emptyFilteredDeck, previewFilteredDeck)
+- Updated echoe-note.controller.ts: Added uid context to all 13 methods (getNotes, getNoteById, createNote, updateNote, deleteNote, getCardById, getCards, bulkCardOperation, getAllNoteTypes, getNoteTypeById, createNoteType, updateNoteType, deleteNoteType)
+- Updated echoe-study.controller.ts: Added uid context to remaining 5 methods (getQueue, buryCards, forgetCards, getCounts, getOptions) - submitReview and undo already had it
+- Files changed:
+  - apps/server/src/controllers/v1/echoe-config.controller.ts
+  - apps/server/src/controllers/v1/echoe-deck.controller.ts
+  - apps/server/src/controllers/v1/echoe-note.controller.ts
+  - apps/server/src/controllers/v1/echoe-study.controller.ts
+- **Learnings for future iterations:**
+  - @CurrentUser() decorator from routing-controllers automatically injects authenticated user info
+  - UserInfoDto has uid, email, nickname, and avatar fields - uid is the key field for multi-user isolation
+  - Pattern for adding uid context: (1) Import CurrentUser and UserInfoDto, (2) Add @CurrentUser() userDto?: UserInfoDto parameter to each method, (3) Check if (!userDto?.uid) return UNAUTHORIZED
+  - echoe-study.controller.ts already had @CurrentUser() in submitReview and undo methods - this is the pattern we followed for all others
+  - Service methods still need refactoring (US-006-008) to accept uid parameters - controllers now capture uid but don't pass it yet
+  - Typecheck passes via `pnpm build:server` which runs tsc
 ---
