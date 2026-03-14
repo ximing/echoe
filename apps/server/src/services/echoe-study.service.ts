@@ -350,7 +350,7 @@ export class EchoeStudyService {
             mod: Math.floor(now.getTime() / 1000),
             usn: -1,
           })
-          .where(eq(echoeNotes.id, card.nid));
+          .where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid)));
       }
     }
 

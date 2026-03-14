@@ -34,7 +34,7 @@ describe('EchoeStudyController submitReview validation', () => {
 
     expect(response.code).toBe(ErrorCode.SUCCESS);
     expect(response.data).toEqual({ reviewId: 1 });
-    expect(submitReviewMock).toHaveBeenCalledWith(dto, mockUser.uid);
+    expect(submitReviewMock).toHaveBeenCalledWith(mockUser.uid, dto);
   });
 
   it('should reject negative timeTaken', async () => {
