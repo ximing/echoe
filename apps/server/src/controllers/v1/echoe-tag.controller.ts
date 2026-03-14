@@ -12,6 +12,7 @@ import {
   Body,
   Param,
   QueryParam,
+  CurrentUser,
 } from 'routing-controllers';
 import { Service } from 'typedi';
 
@@ -19,7 +20,7 @@ import { EchoeTagService } from '../../services/echoe-tag.service.js';
 import { ResponseUtil } from '../../utils/response.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 
-import type { EchoeTagDto, RenameTagDto, MergeTagsDto } from '@echoe/dto';
+import type { EchoeTagDto, RenameTagDto, MergeTagsDto, UserInfoDto } from '@echoe/dto';
 
 @JsonController('/api/v1')
 @Service()
@@ -31,7 +32,11 @@ export class EchoeTagController {
    * Get all tags with usage count, sorted by count descending
    */
   @Get('/tags')
-  async getTags() {
+  async getTags(@CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     const tags = await this.tagService.getAllTags();
     return ResponseUtil.success(tags);
   }
@@ -41,7 +46,11 @@ export class EchoeTagController {
    * Search tags by prefix (for autocomplete)
    */
   @Get('/tags/search')
-  async searchTags(@QueryParam('q') query: string, @QueryParam('limit') limit?: number) {
+  async searchTags(@QueryParam('q') query: string, @QueryParam('limit') limit?: number, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     const tags = await this.tagService.searchTags(query, limit);
     return ResponseUtil.success(tags);
   }
@@ -51,7 +60,11 @@ export class EchoeTagController {
    * Rename a tag across all notes
    */
   @Put('/tags/:tag/rename')
-  async renameTag(@Param('tag') tag: string, @Body() dto: RenameTagDto) {
+  async renameTag(@Param('tag') tag: string, @Body() dto: RenameTagDto, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     const result = await this.tagService.renameTag(tag, dto);
     return ResponseUtil.success(result);
   }
@@ -61,7 +74,11 @@ export class EchoeTagController {
    * Delete a tag (only if not in use)
    */
   @Delete('/tags/:tag')
-  async deleteTag(@Param('tag') tag: string) {
+  async deleteTag(@Param('tag') tag: string, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     const result = await this.tagService.deleteTag(tag);
     if (!result.deleted) {
       return ResponseUtil.error(ErrorCode.OPERATION_NOT_ALLOWED, result.message);
@@ -74,7 +91,11 @@ export class EchoeTagController {
    * Merge one tag into another
    */
   @Post('/tags/merge')
-  async mergeTags(@Body() dto: MergeTagsDto) {
+  async mergeTags(@Body() dto: MergeTagsDto, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     const result = await this.tagService.mergeTags(dto);
     return ResponseUtil.success(result);
   }

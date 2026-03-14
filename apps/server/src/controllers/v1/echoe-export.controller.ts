@@ -3,13 +3,14 @@
  * Handles exporting decks to .apkg files
  */
 
-import { JsonController, Get, QueryParam, Res } from 'routing-controllers';
+import { JsonController, Get, QueryParam, Res, CurrentUser } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
 import { EchoeExportService, ExportOptions } from '../../services/echoe-export.service.js';
 import { logger } from '../../utils/logger.js';
 import type { Response } from 'express';
+import type { UserInfoDto } from '@echoe/dto';
 
 @Service()
 @JsonController('/api/v1/export')
@@ -25,9 +26,15 @@ export class EchoeExportController {
     @QueryParam('deckId') deckId?: number,
     @QueryParam('includeScheduling') includeScheduling?: string,
     @QueryParam('format') format?: string,
-    @Res() res?: Response
+    @Res() res?: Response,
+    @CurrentUser() userDto?: UserInfoDto
   ): Promise<void> {
     try {
+      if (!userDto?.uid) {
+        res?.status(401).send('Unauthorized');
+        return;
+      }
+
       const includeSchedulingBool = includeScheduling === 'true';
       const formatValue = format === 'legacy' ? 'legacy' : 'anki';
 

@@ -4,7 +4,7 @@
  */
 
 import multer from 'multer';
-import { JsonController, Post, Req } from 'routing-controllers';
+import { JsonController, Post, Req, CurrentUser } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 import type { Request, Response } from 'express';
 
@@ -13,7 +13,7 @@ import { EchoeImportService } from '../../services/echoe-import.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
-import type { ImportResultDto } from '@echoe/dto';
+import type { ImportResultDto, UserInfoDto } from '@echoe/dto';
 
 // Max file size: 500MB
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
@@ -64,7 +64,11 @@ export class EchoeImportController {
    * Import an .apkg file
    */
   @Post('/apkg')
-  async importApkg(@Req() request: Request) {
+  async importApkg(@Req() request: Request, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     try {
       await runSingleFileUpload(request);
     } catch (error: unknown) {

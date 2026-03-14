@@ -13,6 +13,7 @@ import {
   Param,
   Req,
   Res,
+  CurrentUser,
 } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 import type { Request, Response } from 'express';
@@ -27,6 +28,7 @@ import type {
   DeleteMediaBulkDto,
   CheckUnusedMediaResultDto,
   UploadMediaResultDto,
+  UserInfoDto,
 } from '@echoe/dto';
 
 // Multer middleware for file upload
@@ -82,8 +84,12 @@ export class EchoeMediaController {
    * List all media files
    */
   @Get('/')
-  async listMedia() {
+  async listMedia(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const media = await this.mediaService.listMedia();
       return ResponseUtil.success(media);
     } catch (error) {
@@ -97,8 +103,12 @@ export class EchoeMediaController {
    * Serve a media file
    */
   @Get('/:filename')
-  async getMedia(@Param('filename') filename: string, @Res() response: Response) {
+  async getMedia(@Param('filename') filename: string, @Res() response: Response, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return response.status(401).send('Unauthorized');
+      }
+
       // Decode filename
       const decodedFilename = decodeURIComponent(filename);
 
@@ -126,7 +136,11 @@ export class EchoeMediaController {
    * Upload a media file
    */
   @Post('/upload')
-  async uploadMedia(@Req() request: Request) {
+  async uploadMedia(@Req() request: Request, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     try {
       await runSingleFileUpload(request);
     } catch (error: unknown) {
@@ -165,8 +179,12 @@ export class EchoeMediaController {
    * Check for unused media files
    */
   @Post('/check-unused')
-  async checkUnusedMedia() {
+  async checkUnusedMedia(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result: CheckUnusedMediaResultDto = await this.mediaService.checkUnusedMedia();
       return ResponseUtil.success(result);
     } catch (error) {
@@ -180,8 +198,12 @@ export class EchoeMediaController {
    * Delete media files in bulk
    */
   @Delete('/bulk')
-  async deleteBulk(@Body() dto: DeleteMediaBulkDto) {
+  async deleteBulk(@Body() dto: DeleteMediaBulkDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       if (!dto.filenames || dto.filenames.length === 0) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No filenames provided');
       }

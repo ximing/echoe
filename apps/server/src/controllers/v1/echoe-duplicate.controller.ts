@@ -1,4 +1,4 @@
-import { JsonController, Post, Body } from 'routing-controllers';
+import { JsonController, Post, Body, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -6,7 +6,7 @@ import { EchoeDuplicateService } from '../../services/echoe-duplicate.service.js
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
-import type { FindDuplicatesDto, MergeDuplicatesDto } from '@echoe/dto';
+import type { FindDuplicatesDto, MergeDuplicatesDto, UserInfoDto } from '@echoe/dto';
 
 @Service()
 @JsonController('/api/v1')
@@ -18,8 +18,12 @@ export class EchoeDuplicateController {
    * Find duplicate notes by note type and field
    */
   @Post('/notes/find-duplicates')
-  async findDuplicates(@Body() dto: FindDuplicatesDto) {
+  async findDuplicates(@Body() dto: FindDuplicatesDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const duplicates = await this.echoeDuplicateService.findDuplicates(dto);
       return ResponseUtil.success(duplicates);
     } catch (error) {
@@ -33,8 +37,12 @@ export class EchoeDuplicateController {
    * Merge duplicates: keep one note, delete others
    */
   @Post('/notes/merge-duplicates')
-  async mergeDuplicates(@Body() dto: MergeDuplicatesDto) {
+  async mergeDuplicates(@Body() dto: MergeDuplicatesDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       await this.echoeDuplicateService.mergeDuplicates(dto);
       return ResponseUtil.success({ success: true });
     } catch (error) {

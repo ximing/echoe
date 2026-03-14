@@ -4,7 +4,7 @@
  */
 
 import multer from 'multer';
-import { JsonController, Post, Req } from 'routing-controllers';
+import { JsonController, Post, Req, CurrentUser } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 import type { Request, Response } from 'express';
 
@@ -13,7 +13,7 @@ import { EchoeCsvImportService } from '../../services/echoe-csv-import.service.j
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
-import type { CsvExecuteDto } from '@echoe/dto';
+import type { CsvExecuteDto, UserInfoDto } from '@echoe/dto';
 
 // Max file size: 100MB
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -67,7 +67,11 @@ export class EchoeCsvImportController {
    * Preview CSV file - detect encoding, delimiter, return first 5 rows
    */
   @Post('/preview')
-  async previewCsv(@Req() request: Request) {
+  async previewCsv(@Req() request: Request, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     try {
       await runSingleFileUpload(request);
     } catch (error: unknown) {
@@ -100,7 +104,11 @@ export class EchoeCsvImportController {
    * Execute CSV import with column mapping and target deck
    */
   @Post('/execute')
-  async executeCsv(@Req() request: Request) {
+  async executeCsv(@Req() request: Request, @CurrentUser() userDto?: UserInfoDto) {
+    if (!userDto?.uid) {
+      return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+    }
+
     try {
       await runSingleFileUpload(request);
     } catch (error: unknown) {

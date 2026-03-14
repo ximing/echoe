@@ -1,10 +1,12 @@
-import { JsonController, Get, QueryParam } from 'routing-controllers';
+import { JsonController, Get, QueryParam, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
 import { EchoeStatsService } from '../../services/echoe-stats.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
+
+import type { UserInfoDto } from '@echoe/dto';
 
 @Service()
 @JsonController('/api/v1/stats')
@@ -16,8 +18,12 @@ export class EchoeStatsController {
    * Get today's study statistics
    */
   @Get('/today')
-  async getTodayStats(@QueryParam('deckId') deckId?: number) {
+  async getTodayStats(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const stats = await this.echoeStatsService.getTodayStats(deckId);
       return ResponseUtil.success(stats);
     } catch (error) {
@@ -33,9 +39,14 @@ export class EchoeStatsController {
   @Get('/history')
   async getHistory(
     @QueryParam('deckId') deckId?: number,
-    @QueryParam('days') daysStr?: string
+    @QueryParam('days') daysStr?: string,
+    @CurrentUser() userDto?: UserInfoDto
   ) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const days = daysStr ? parseInt(daysStr, 10) : 30;
       if (isNaN(days) || days < 1 || days > 365) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'days must be between 1 and 365');
@@ -53,8 +64,12 @@ export class EchoeStatsController {
    * Get card maturity distribution
    */
   @Get('/maturity')
-  async getMaturity(@QueryParam('deckId') deckId?: number) {
+  async getMaturity(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const maturity = await this.echoeStatsService.getMaturity(deckId);
       return ResponseUtil.success(maturity);
     } catch (error) {
@@ -70,9 +85,14 @@ export class EchoeStatsController {
   @Get('/forecast')
   async getForecast(
     @QueryParam('deckId') deckId?: number,
-    @QueryParam('days') daysStr?: string
+    @QueryParam('days') daysStr?: string,
+    @CurrentUser() userDto?: UserInfoDto
   ) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const days = daysStr ? parseInt(daysStr, 10) : 30;
       if (isNaN(days) || days < 1 || days > 365) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'days must be between 1 and 365');
@@ -90,8 +110,12 @@ export class EchoeStatsController {
    * Get the user's consecutive learning streak in days
    */
   @Get('/streak')
-  async getStreak() {
+  async getStreak(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const streak = await this.echoeStatsService.getStreak();
       return ResponseUtil.success({ streak });
     } catch (error) {
@@ -105,8 +129,12 @@ export class EchoeStatsController {
    * Get maturity distribution for all decks in a single request
    */
   @Get('/maturity/batch')
-  async getMaturityBatch() {
+  async getMaturityBatch(@CurrentUser() userDto?: UserInfoDto) {
     try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
       const result = await this.echoeStatsService.getMaturityBatch();
       return ResponseUtil.success(result);
     } catch (error) {
