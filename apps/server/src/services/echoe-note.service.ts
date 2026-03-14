@@ -11,6 +11,7 @@ import { echoeTemplates } from '../db/schema/echoe-templates.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { logger } from '../utils/logger.js';
+import { safeJsonParse, parseNoteFields, parseTags } from '../utils/echoe-note.utils.js';
 import { EchoeStudyService } from './echoe-study.service.js';
 import { EchoeDeckService } from './echoe-deck.service.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
@@ -525,7 +526,7 @@ export class EchoeNoteService {
         }
 
         // Get front field from fieldsJson (primary source)
-        const noteFields = note ? this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld) : {};
+        const noteFields = note ? parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld) : {};
         let front = '';
         const firstFieldValue = Object.values(noteFields)[0] || '';
         front = firstFieldValue.replace(/<[^>]*>/g, '').trim();
@@ -548,7 +549,7 @@ export class EchoeNoteService {
           lapses: card.lapses,
           front,
           fields: noteFields,
-          tags: note ? this.parseNoteTags(note.tags) : [],
+          tags: note ? parseTags(note.tags) : [],
           mid: Number(note?.mid || 0),
           notetypeName: notetype?.name || 'Unknown',
           notetypeType: notetype?.type || 0,
@@ -559,30 +560,6 @@ export class EchoeNoteService {
       .filter((item: EchoeCardListItemDto | null): item is EchoeCardListItemDto => item !== null);
 
     return { cards: result, total };
-  }
-
-  /**
-   * Parse note fields, preferring fieldsJson as primary source
-   */
-  private parseNoteFields(fieldsJson: Record<string, string> | null | undefined, sfld: string | null): Record<string, string> {
-    if (fieldsJson && typeof fieldsJson === 'object' && Object.keys(fieldsJson).length > 0) {
-      return fieldsJson;
-    }
-    return sfld ? { Front: sfld } : {};
-  }
-
-  /**
-   * Parse note tags from JSON string
-   */
-  private parseNoteTags(tagsJson: string | null): string[] {
-    if (!tagsJson) {
-      return [];
-    }
-    try {
-      return JSON.parse(tagsJson) as string[];
-    } catch {
-      return [];
-    }
   }
 
   /**
@@ -1126,19 +1103,6 @@ export class EchoeNoteService {
   }
 
   /**
-   * Safely parse JSON with fallback
-   */
-  private safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
-    if (!json) return fallback;
-    try {
-      return JSON.parse(json) as T;
-    } catch (error) {
-      logger.error('Failed to parse JSON', { error });
-      return fallback;
-    }
-  }
-
-  /**
    * Map database note to DTO
    */
   private mapNoteToDto(note: any): EchoeNoteDto {
@@ -1153,7 +1117,7 @@ export class EchoeNoteService {
       guid: note.guid,
       mid: Number(note.mid),
       mod: note.mod,
-      tags: this.safeJsonParse<string[]>(note.tags, []),
+      tags: safeJsonParse<string[]>(note.tags, []),
       fields,
       sfld: note.sfld,
       csum: Number(note.csum),

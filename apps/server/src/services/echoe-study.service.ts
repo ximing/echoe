@@ -12,6 +12,7 @@ import { logger } from '../utils/logger.js';
 import { calculateRetrievability } from '../utils/fsrs-retrievability.js';
 import { generateRevlogId } from '../utils/id.js';
 import { parseStepToMinutes, minutesToFsrsSteps } from '../utils/fsrs-steps.js';
+import { safeJsonParse, parseNoteFields, parseTags } from '../utils/echoe-note.utils.js';
 import type { FSRSConfig, FSRSInput } from './fsrs.service.js';
 
 import type {
@@ -123,7 +124,7 @@ export class EchoeStudyService {
 
       if (!noteType) continue;
 
-      const templates = this.safeJsonParse<any[]>(noteType.tmpls, []);
+      const templates = safeJsonParse<any[]>(noteType.tmpls, []);
 
       // Get the template for this card
       const template = templates[card.ord] || templates[0];
@@ -255,8 +256,8 @@ export class EchoeStudyService {
             mid: note.mid,
             mod: note.mod,
             csum: note.csum,
-            tags: this.parseTags(note.tags),
-            fields: this.parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
+          tags: parseTags(note.tags),
+          fields: parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
           } : undefined,
         } as any,
         nextDue,
@@ -340,7 +341,7 @@ export class EchoeStudyService {
         .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
 
       // Add 'leech' tag to the note if not already present
-      const currentTags = this.parseTags(note.tags);
+      const currentTags = parseTags(note.tags);
       if (!currentTags.includes('leech')) {
         currentTags.push('leech');
         await db
@@ -413,8 +414,8 @@ export class EchoeStudyService {
           mid: fullNote.mid,
           mod: fullNote.mod,
           csum: fullNote.csum,
-          tags: this.parseTags(fullNote.tags),
-          fields: this.parseNoteFields(fullNote.fieldsJson as Record<string, string> | null, fullNote.sfld),
+          tags: parseTags(fullNote.tags),
+          fields: parseNoteFields(fullNote.fieldsJson as Record<string, string> | null, fullNote.sfld),
         } : undefined,
       } as any,
       nextDue,
@@ -956,47 +957,6 @@ export class EchoeStudyService {
   }
 
   /**
-   * Safely parse JSON with fallback
-   */
-  private safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
-    if (!json) return fallback;
-    try {
-      return JSON.parse(json) as T;
-    } catch {
-      return fallback;
-    }
-  }
-
-  /**
-   * Parse note fields into a record, preferring fieldsJson as primary source
-   */
-  private parseNoteFields(fieldsJson: Record<string, string> | null | undefined, sfld: string | null): Record<string, string> {
-    if (fieldsJson && typeof fieldsJson === 'object' && Object.keys(fieldsJson).length > 0) {
-      return fieldsJson;
-    }
-    return sfld ? { Front: sfld } : {};
-  }
-
-  /**
-   * Parse tags from storage
-   */
-  private parseTags(tagsJson: string | null): string[] {
-    if (!tagsJson) return [];
-    try {
-      const parsed = JSON.parse(tagsJson);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((t): t is string => typeof t === 'string');
-      }
-    } catch {
-      // Not JSON, might be space-delimited (Anki format)
-      if (typeof tagsJson === 'string') {
-        return tagsJson.trim().split(/\s+/).filter(Boolean);
-      }
-    }
-    return [];
-  }
-
-  /**
    * Replace {{FrontSide}} in back template with rendered front content.
    */
   private injectFrontSide(template: string, frontContent: string): string {
@@ -1178,7 +1138,7 @@ export class EchoeStudyService {
       return {};
     }
 
-    const parsed = this.safeJsonParse<unknown>(rawConfig, {});
+    const parsed = safeJsonParse<unknown>(rawConfig, {});
     return this.getRecord(parsed);
   }
 
