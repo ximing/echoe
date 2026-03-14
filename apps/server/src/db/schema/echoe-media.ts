@@ -14,7 +14,8 @@ import {
 export const echoeMedia = mysqlTable(
   'echoe_media',
   {
-    id: int('id').primaryKey().autoincrement(), // Media file ID
+    id: int('id').primaryKey().autoincrement(), // Auto-increment internal primary key
+    mediaId: varchar('media_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     filename: varchar('filename', { length: 191 }).notNull(), // Stored filename
     originalFilename: varchar('original_filename', { length: 191 }).notNull(), // Original uploaded filename
@@ -25,8 +26,10 @@ export const echoeMedia = mysqlTable(
     usedInCards: tinyint('used_in_cards').notNull().default(0), // Whether file is referenced in any card
   },
   (table) => ({
+    mediaIdIdx: index('media_id_idx').on(table.mediaId),
     filenameIdx: index('filename_idx').on(table.filename),
     hashIdx: index('hash_idx').on(table.hash),
+    uidMediaIdIdx: index('uid_media_id_idx').on(table.uid, table.mediaId),
     uidFilenameUnique: unique('uid_filename_unique').on(table.uid, table.filename),
   })
 );
