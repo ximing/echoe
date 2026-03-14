@@ -24,8 +24,8 @@
 | US-011 | Convert DTO command and query payload IDs | [x] |
 | US-012 | Build DTO package after ID contract changes | [x] |
 | US-013 | Refactor note service to string business IDs | [x] |
-| US-014 | Refactor deck service to string business IDs | [ ] |
-| US-015 | Refactor study and stats services to string IDs | [ ] |
+| US-014 | Refactor deck service to string business IDs | [x] |
+| US-015 | Refactor study and stats services to string IDs | [x] |
 | US-016 | Refactor import/export services for string IDs | [ ] |
 | US-017 | Refactor remaining Echoe services to string IDs | [ ] |
 | US-018 | Remove legacy numeric Echoe ID generator usage | [ ] |
@@ -203,4 +203,33 @@
   - Type annotation fix: When mapping arrays, add explicit type: const noteIds: string[] = Array.from(...)
   - All 6 deck service tests pass - string IDs work correctly with existing test infrastructure
   - Type errors in controllers, study service, and other tests are expected and will be resolved in US-015+
+---
+## 2026-03-15 - US-015
+- Refactored echoe-study.service.ts and echoe-stats.service.ts to use string business IDs
+- Files changed: apps/server/src/services/echoe-study.service.ts, echoe-stats.service.ts
+- **Learnings for future iterations:**
+  - Study service refactor pattern: Replace generateRevlogId() with generateTypeId(OBJECT_TYPE.ECHOE_REVLOG)
+  - Query by business ID columns (cardId, noteId, deckId, noteTypeId, deckConfigId, revlogId) instead of numeric id
+  - Method signatures: Change id: number to id: string for all business ID parameters
+  - Sibling IDs tracking: Use string[] instead of number[]
+  - Important distinction: revlog.id (bigint) is used for timestamp-based queries, revlog.revlogId (varchar) is the business ID
+  - Keep timestamp comparisons using the numeric id field (e.g., gte(echoeRevlog.id, timestamp * 1000))
+  - Remove Number()/parseInt() conversions for business ID fields only, keep them for numeric data (time, counts, intervals)
+  - Join conditions must use business ID columns (eq(echoeRevlog.cid, echoeCards.cardId))
+  - All 11 test suites pass - string IDs work correctly with existing test infrastructure
+  - Type errors in controllers and tests are expected and will be resolved in US-019, US-020, US-024
+---
+## 2026-03-15 - US-016
+- Refactored echoe-import.service.ts and echoe-export.service.ts to use string business IDs
+- Files changed: apps/server/src/services/echoe-import.service.ts, echoe-export.service.ts
+- **Learnings for future iterations:**
+  - Import service generates new business IDs for all imported entities using generateTypeId(OBJECT_TYPE.XXX)
+  - ID mapping strategy: Import uses temporary String() conversions for foreign keys until full ID mapping is implemented
+  - Export service updated to query by business ID columns (noteId, deckId, cardId) instead of numeric id
+  - Removed parseInt/Number conversions for business ID parsing from col.json
+  - Method signatures updated to accept string IDs (deckId?: string)
+  - Type annotations required for Set<string> operations to help TypeScript inference
+  - Import service tests (3 tests) pass - FSRS difficulty backfill logic unaffected by ID refactoring
+  - Controller type errors expected (US-019, US-020) - services compile cleanly
+  - Full import/export functionality requires comprehensive ID mapping (track old numeric IDs -> new string business IDs throughout import process)
 ---
