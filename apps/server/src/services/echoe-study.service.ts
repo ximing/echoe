@@ -326,21 +326,26 @@ export class EchoeStudyService {
     let isLeech = false;
     const lapseConfig = deckConfig?.lapseConfig ? JSON.parse(deckConfig.lapseConfig) : null;
     const leechFails = lapseConfig?.leechFails || 8;
+    // leechAction: 0 = suspend + tag (default), 1 = tag only (do NOT suspend)
+    const leechAction = lapseConfig?.leechAction ?? 0;
     const newLapses = schedulingResult.state === State.Relearning ? card.lapses + 1 : card.lapses;
 
     if (newLapses >= leechFails) {
       isLeech = true;
-      // Suspend the leech card
-      await db
-        .update(echoeCards)
-        .set({
-          queue: -1, // Suspended
-          mod: Math.floor(now.getTime() / 1000),
-          usn: -1,
-        })
-        .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
 
-      // Add 'leech' tag to the note if not already present
+      if (leechAction === 0) {
+        // Suspend the leech card
+        await db
+          .update(echoeCards)
+          .set({
+            queue: -1, // Suspended
+            mod: Math.floor(now.getTime() / 1000),
+            usn: -1,
+          })
+          .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
+      }
+
+      // Always add 'leech' tag to the note if not already present
       const currentTags = parseTags(note.tags);
       if (!currentTags.includes('leech')) {
         currentTags.push('leech');

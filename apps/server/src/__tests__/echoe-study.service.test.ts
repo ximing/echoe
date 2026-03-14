@@ -829,6 +829,181 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
   });
 });
 
+describe('EchoeStudyService - submitReview leech detection with leechAction', () => {
+  let service: EchoeStudyService;
+  let scheduleCardMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    scheduleCardMock = jest.fn();
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+        scheduleCard: scheduleCardMock,
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  const buildLeechCard = (lapses: number) => ({
+    id: 1001,
+    nid: 2001,
+    did: 3001,
+    ord: 0,
+    due: Date.now() - 1000,
+    ivl: 1,
+    factor: 2500,
+    reps: lapses + 1,
+    lapses,
+    left: 0,
+    type: State.Review,
+    queue: 2,
+    stability: 2.5,
+    difficulty: 5.0,
+    lastReview: Date.now() - 86400000,
+    mod: 0,
+    usn: -1,
+  });
+
+  const buildMockNote = () => ({
+    id: 2001,
+    mid: 4001,
+    sfld: 'Front',
+    tags: '[]',
+    fieldsJson: { Front: 'Question', Back: 'Answer' },
+    mod: 0,
+    csum: 0,
+  });
+
+  const buildRelearningResult = () => ({
+    nextDue: new Date(Date.now() + 600000),
+    interval: 1,
+    stability: 1.5,
+    difficulty: 6.0,
+    state: State.Relearning, // lapse occurred
+    scheduledDays: 0,
+    learningSteps: 1,
+  });
+
+  const buildMockDb = (lapseConfigOverrides: Record<string, unknown>, noteTagsOverride = '[]') => {
+    const whereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: whereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+    const insertIntoValuesMock = jest.fn().mockResolvedValue(undefined);
+    const insertMock = jest.fn().mockReturnValue({ values: insertIntoValuesMock });
+
+    // lapses=7, after Relearning transition newLapses=8 which hits leechFails=8
+    const card = buildLeechCard(7);
+    const updatedCard = { ...card };
+
+    mockedGetDatabase.mockReturnValue({
+      update: updateMock,
+      insert: insertMock,
+      query: {
+        echoeCards: {
+          findFirst: jest.fn()
+            .mockResolvedValueOnce(card)
+            .mockResolvedValueOnce(updatedCard),
+        },
+        echoeNotes: {
+          findFirst: jest.fn().mockResolvedValue({
+            ...buildMockNote(),
+            tags: noteTagsOverride,
+          }),
+        },
+        echoeDecks: {
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+        },
+        echoeDeckConfig: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 1,
+            lapseConfig: JSON.stringify({ leechFails: 8, ...lapseConfigOverrides }),
+          }),
+        },
+        echoeNotetypes: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 4001, type: 0,
+            tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
+          }),
+        },
+      },
+    } as any);
+
+    return { updateMock, setMock, whereMock };
+  };
+
+  it('should suspend card AND add leech tag when leechAction=0 (default)', async () => {
+    scheduleCardMock.mockReturnValue(buildRelearningResult());
+    const { updateMock, setMock } = buildMockDb({ leechAction: 0 });
+
+    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+
+    // updateMock is called for: (1) card scheduling, (2) card suspension, (3) note tag
+    const allSetCalls = setMock.mock.calls;
+
+    // Check card suspension call: queue=-1
+    const suspendCall = allSetCalls.find((args) => (args[0] as Record<string, unknown>).queue === -1);
+    expect(suspendCall).toBeDefined();
+
+    // Check note tag call: tags includes 'leech'
+    const tagCall = allSetCalls.find((args) => {
+      const tagsValue = (args[0] as Record<string, unknown>).tags;
+      return typeof tagsValue === 'string' && tagsValue.includes('leech');
+    });
+    expect(tagCall).toBeDefined();
+
+    expect(updateMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('should NOT suspend card but still add leech tag when leechAction=1 (tag only)', async () => {
+    scheduleCardMock.mockReturnValue(buildRelearningResult());
+    const { updateMock, setMock } = buildMockDb({ leechAction: 1 });
+
+    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+
+    const allSetCalls = setMock.mock.calls;
+
+    // Must NOT have suspension call (queue=-1)
+    const suspendCall = allSetCalls.find((args) => (args[0] as Record<string, unknown>).queue === -1);
+    expect(suspendCall).toBeUndefined();
+
+    // Must still add 'leech' tag
+    const tagCall = allSetCalls.find((args) => {
+      const tagsValue = (args[0] as Record<string, unknown>).tags;
+      return typeof tagsValue === 'string' && tagsValue.includes('leech');
+    });
+    expect(tagCall).toBeDefined();
+
+    // Only 2 update calls: (1) card scheduling, (2) note tag (no suspension)
+    expect(updateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('should default to suspend behavior when leechAction is not set', async () => {
+    scheduleCardMock.mockReturnValue(buildRelearningResult());
+    // lapseConfig without leechAction field
+    const { setMock } = buildMockDb({});
+
+    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+
+    const allSetCalls = setMock.mock.calls;
+    const suspendCall = allSetCalls.find((args) => (args[0] as Record<string, unknown>).queue === -1);
+    expect(suspendCall).toBeDefined();
+  });
+
+  it('should not add leech tag if already present, regardless of leechAction', async () => {
+    scheduleCardMock.mockReturnValue(buildRelearningResult());
+    // Note already has 'leech' tag
+    const { updateMock } = buildMockDb({ leechAction: 0 }, '["leech"]');
+
+    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+
+    // Only 2 update calls: (1) card scheduling, (2) card suspension (no tag update needed)
+    expect(updateMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('fsrs-retrievability utility', () => {
   const extractSqlText = (expr: unknown): string => {
     const chunks = (expr as { queryChunks?: unknown[] } | null | undefined)?.queryChunks;
