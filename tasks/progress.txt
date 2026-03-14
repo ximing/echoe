@@ -279,3 +279,17 @@
   - Remaining typecheck errors are in test files (US-024) and edge controllers (US-020)
   - All 176 tests pass - controller refactoring did not break existing functionality
 ---
+## 2026-03-15 - US-020
+- Refactored edge Echoe controllers to use string business IDs
+- Files changed: 
+  - echoe-stats.controller.ts: Changed deckId query params from number to string (4 endpoints: /today, /history, /maturity, /forecast)
+  - echoe-export.controller.ts: Changed deckId query param from number to string
+  - echoe-csv-import.controller.ts: Changed Number() conversions to String() for notetypeId and deckId in normalizedDto
+- **Learnings for future iterations:**
+  - Edge controller refactor pattern: Change @QueryParam('deckId') deckId?: number to deckId?: string
+  - Remove Number() conversions for business IDs, replace with String() where type coercion is needed
+  - Controllers without ID params (tag, media, import, duplicate) were already correct - no changes needed
+  - All 176 tests pass - controller refactoring did not break existing functionality
+  - Type errors in test files (deck, note, study service tests) are expected and will be resolved in US-024
+  - Controller changes are straightforward - just parameter type updates and removing numeric conversions
+---
