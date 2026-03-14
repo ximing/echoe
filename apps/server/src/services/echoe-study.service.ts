@@ -67,6 +67,15 @@ export class EchoeStudyService {
     if (params.deckId) {
       // Get all sub-deck IDs
       const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, params.deckId);
+      // Guard: deck not found or not owned by this user — return empty result immediately
+      // to avoid generating an invalid `IN ()` SQL predicate.
+      if (deckIds.length === 0) {
+        logger.debug('getQueue: no accessible decks found, returning empty result', {
+          uid,
+          deckId: params.deckId,
+        });
+        return [];
+      }
       conditions.push(sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`);
     }
 
@@ -738,6 +747,15 @@ export class EchoeStudyService {
     let deckIds: number[] = [];
     if (deckId) {
       deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
+      // Guard: deck not found or not owned by this user — return zero counts immediately
+      // to avoid generating an invalid `IN ()` SQL predicate.
+      if (deckIds.length === 0) {
+        logger.debug('getCounts: no accessible decks found, returning zero counts', {
+          uid,
+          deckId,
+        });
+        return { newCount: 0, learnCount: 0, reviewCount: 0, totalCount: 0 };
+      }
       deckFilter = sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`;
     }
 

@@ -1250,3 +1250,142 @@ describe('EchoeStudyService - applyNewCardDailyLimit', () => {
     expect(result).toBe(10);
   });
 });
+
+describe('EchoeStudyService - empty deckIds guard (getQueue)', () => {
+  let service: EchoeStudyService;
+  let getDeckAndSubdeckIdsMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    getDeckAndSubdeckIdsMock = jest.fn();
+
+    service = new EchoeStudyService(
+      { createCard: jest.fn() } as any,
+      { getDeckAndSubdeckIds: getDeckAndSubdeckIdsMock } as any
+    );
+  });
+
+  it('should return empty array when deckId is provided but deck is not accessible (empty deckIds)', async () => {
+    // getDeckAndSubdeckIds returns [] when deck is not found or not owned by the user
+    getDeckAndSubdeckIdsMock.mockResolvedValue([]);
+
+    const selectMock = jest.fn();
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getQueue('user-a', { deckId: 9999, limit: 20 });
+
+    expect(result).toEqual([]);
+    // DB select must NOT be called — the guard should short-circuit before any SQL query
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('should proceed with DB query when deckId is provided and accessible (non-empty deckIds)', async () => {
+    getDeckAndSubdeckIdsMock.mockResolvedValue([100, 101]);
+
+    const limitMock = jest.fn().mockResolvedValue([]);
+    const orderByMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const whereMock = jest.fn().mockReturnValue({ orderBy: orderByMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getQueue('user-a', { deckId: 100, limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(selectMock).toHaveBeenCalled();
+  });
+
+  it('should not call getDeckAndSubdeckIds when no deckId is given', async () => {
+    const limitMock = jest.fn().mockResolvedValue([]);
+    const orderByMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const whereMock = jest.fn().mockReturnValue({ orderBy: orderByMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getQueue('user-a', { limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(getDeckAndSubdeckIdsMock).not.toHaveBeenCalled();
+    expect(selectMock).toHaveBeenCalled();
+  });
+});
+
+describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
+  let service: EchoeStudyService;
+  let getDeckAndSubdeckIdsMock: jest.Mock;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    getDeckAndSubdeckIdsMock = jest.fn();
+
+    service = new EchoeStudyService(
+      { createCard: jest.fn() } as any,
+      { getDeckAndSubdeckIds: getDeckAndSubdeckIdsMock } as any
+    );
+  });
+
+  it('should return zero counts when deckId is provided but deck is not accessible (empty deckIds)', async () => {
+    getDeckAndSubdeckIdsMock.mockResolvedValue([]);
+
+    const selectMock = jest.fn();
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getCounts('user-a', 9999);
+
+    expect(result).toEqual({ newCount: 0, learnCount: 0, reviewCount: 0, totalCount: 0 });
+    // DB select must NOT be called — the guard should short-circuit before any SQL query
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it('should proceed with DB query when deckId is provided and accessible (non-empty deckIds)', async () => {
+    getDeckAndSubdeckIdsMock.mockResolvedValue([200]);
+
+    // Build a minimal chainable mock that returns count=0 for all four select calls
+    const thenMock = jest.fn((fn: (v: unknown) => unknown) =>
+      Promise.resolve(fn([{ count: 0 }]))
+    );
+    const chain: Record<string, unknown> = {};
+    const methods = ['from', 'where', 'select'];
+    for (const m of methods) {
+      chain[m] = jest.fn().mockReturnValue(chain);
+    }
+    chain['then'] = thenMock;
+    const selectMock = jest.fn().mockReturnValue(chain);
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getCounts('user-a', 200);
+
+    expect(selectMock).toHaveBeenCalled();
+    expect(result).toHaveProperty('newCount');
+    expect(result).toHaveProperty('learnCount');
+    expect(result).toHaveProperty('reviewCount');
+    expect(result).toHaveProperty('totalCount');
+  });
+
+  it('should not call getDeckAndSubdeckIds when no deckId is given', async () => {
+    const thenMock = jest.fn((fn: (v: unknown) => unknown) =>
+      Promise.resolve(fn([{ count: 0 }]))
+    );
+    const chain: Record<string, unknown> = {};
+    const methods = ['from', 'where', 'select'];
+    for (const m of methods) {
+      chain[m] = jest.fn().mockReturnValue(chain);
+    }
+    chain['then'] = thenMock;
+    const selectMock = jest.fn().mockReturnValue(chain);
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+
+    const result = await service.getCounts('user-a');
+
+    expect(getDeckAndSubdeckIdsMock).not.toHaveBeenCalled();
+    expect(result).toHaveProperty('newCount');
+    expect(result).toHaveProperty('learnCount');
+    expect(result).toHaveProperty('reviewCount');
+    expect(result).toHaveProperty('totalCount');
+  });
+});
