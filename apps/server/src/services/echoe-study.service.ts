@@ -712,7 +712,7 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(eq(echoeCards.id, Number(card.id)));
+        .where(and(eq(echoeCards.id, Number(card.id)), eq(echoeCards.uid, uid)));
 
       unburiedCount++;
     }
