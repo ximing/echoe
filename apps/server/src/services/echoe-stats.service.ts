@@ -1,4 +1,3 @@
-// @ts-nocheck - Temporary: Schema changed to string IDs, service refactor in US-013+
 import { Service } from 'typedi';
 import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
 
@@ -21,7 +20,7 @@ export class EchoeStatsService {
   /**
    * Get today's study statistics
    */
-  async getTodayStats(uid: string, deckId?: number): Promise<StudyTodayStatsDto> {
+  async getTodayStats(uid: string, deckId?: string): Promise<StudyTodayStatsDto> {
     const db = getDatabase();
 
     // Get start of today (midnight UTC)
@@ -48,7 +47,7 @@ export class EchoeStatsService {
           cid: echoeRevlog.cid,
         })
         .from(echoeRevlog)
-        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
             eq(echoeRevlog.uid, uid),
@@ -106,7 +105,7 @@ export class EchoeStatsService {
   /**
    * Get study history for the last N days
    */
-  async getHistory(uid: string, deckId?: number, days: number = 30): Promise<StudyHistoryDayDto[]> {
+  async getHistory(uid: string, deckId?: string, days: number = 30): Promise<StudyHistoryDayDto[]> {
     const db = getDatabase();
 
     // Get start date
@@ -125,7 +124,7 @@ export class EchoeStatsService {
           time: echoeRevlog.time,
         })
         .from(echoeRevlog)
-        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
             eq(echoeRevlog.uid, uid),
@@ -175,7 +174,7 @@ export class EchoeStatsService {
   /**
    * Get card maturity distribution using FSRS stability
    */
-  async getMaturity(uid: string, deckId?: number): Promise<CardMaturityDto> {
+  async getMaturity(uid: string, deckId?: string): Promise<CardMaturityDto> {
     const db = getDatabase();
 
     let query;
@@ -229,7 +228,7 @@ export class EchoeStatsService {
   /**
    * Get forecast of due cards for the next N days
    */
-  async getForecast(uid: string, deckId?: number, days: number = 30): Promise<ForecastDayDto[]> {
+  async getForecast(uid: string, deckId?: string, days: number = 30): Promise<ForecastDayDto[]> {
     const db = getDatabase();
 
     const today = new Date();
@@ -366,7 +365,7 @@ export class EchoeStatsService {
    */
   async getMaturityBatch(uid: string): Promise<{
     decks: Array<{
-      deckId: number;
+      deckId: string;
       new: number;
       learning: number;
       young: number;
@@ -385,7 +384,7 @@ export class EchoeStatsService {
       .where(eq(echoeCards.uid, uid));
 
     const deckMap = new Map<
-      number,
+      string,
       { new: number; learning: number; young: number; mature: number }
     >();
 
