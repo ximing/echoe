@@ -2,6 +2,7 @@ import { Service } from 'typedi';
 import { eq, and, inArray, like, sql } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/transaction.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
@@ -531,40 +532,46 @@ export class EchoeDeckService {
       return false;
     }
 
+    // Pre-fetch data needed inside the transaction to minimize read locks
+    let deckIds: number[] = [];
+    let noteIds: number[] = [];
+
     if (deleteCards) {
-      // Delete all cards in this deck and sub-decks
-      const deckIds = await this.getDeckAndSubdeckIds(uid, id);
-
-      // Find notes in these decks
+      deckIds = await this.getDeckAndSubdeckIds(uid, id);
       const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
-      const noteIds: number[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid))));
-
-      if (noteIds.length > 0) {
-        // Add notes to graves
-        const now = Math.floor(Date.now() / 1000);
-        for (const nid of noteIds) {
-          await db.insert(echoeGraves).values({ uid, usn: 0, oid: nid, type: 1 });
-        }
-
-        // Delete cards
-        await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
-
-        // Delete notes
-        await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
-      }
-
-      // Delete sub-decks
-      await db.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.id, deckIds.slice(1))));
+      noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid))));
     }
 
-    // Add deck to graves
-    const now = Math.floor(Date.now() / 1000);
-    await db.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 0 });
+    // Wrap all mutation operations in a transaction to prevent partial-delete state
+    return withTransaction(async (tx) => {
+      const now = Math.floor(Date.now() / 1000);
 
-    // Delete deck
-    await db.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
+      if (deleteCards) {
+        if (noteIds.length > 0) {
+          // Add notes to graves
+          for (const nid of noteIds) {
+            await tx.insert(echoeGraves).values({ uid, usn: 0, oid: nid, type: 1 });
+          }
 
-    return true;
+          // Delete cards
+          await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+
+          // Delete notes
+          await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
+        }
+
+        // Delete sub-decks
+        await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.id, deckIds.slice(1))));
+      }
+
+      // Add deck to graves
+      await tx.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 0 });
+
+      // Delete deck
+      await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
+
+      return true;
+    });
   }
 
   /**

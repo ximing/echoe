@@ -4,9 +4,18 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+jest.mock('../db/transaction.js', () => ({
+  withTransaction: jest.fn((cb: (tx: any) => Promise<any>) => cb({ insert: jest.fn(), delete: jest.fn() })),
+}));
+
+import { getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/transaction.js';
 import { EchoeDeckService } from '../services/echoe-deck.service.js';
 
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
+
+const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
+const mockedWithTransaction = withTransaction as jest.MockedFunction<typeof withTransaction>;
 
 describe('EchoeDeckService - averageRetrievability aggregation', () => {
   let service: EchoeDeckService;
@@ -93,5 +102,102 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
     expect(result).toHaveLength(1);
     expect(result[0].totalCount).toBe(11);
     expect(result[0].averageRetrievability).toBe(0);
+  });
+});
+
+describe('EchoeDeckService.deleteDeck - transaction protection', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    mockedWithTransaction.mockReset();
+    // Default: execute callback immediately (simulates successful transaction)
+    mockedWithTransaction.mockImplementation((cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
+        delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+      };
+      return cb(tx);
+    });
+  });
+
+  /**
+   * Builds the DB mock for deleteDeck:
+   *  - select call 1: deck existence check (.limit(1))
+   *  - select call 2 (optional): card fetch for deleteCards path (.where())
+   *  - select call 3 (optional): getDeckAndSubdeckIds → deck name fetch (.limit(1)) + sub-deck fetch (.where())
+   */
+  const buildDeleteDeckDbMock = (deckRows: any[]) => {
+    const limitMock = jest.fn().mockResolvedValue(deckRows);
+    const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+    return { selectMock, limitMock };
+  };
+
+  it('should return false without entering transaction when deck does not exist', async () => {
+    buildDeleteDeckDbMock([]);
+
+    const svc = new EchoeDeckService();
+    const result = await svc.deleteDeck('uid-d', 1);
+
+    expect(result).toBe(false);
+    expect(mockedWithTransaction).not.toHaveBeenCalled();
+  });
+
+  it('should call withTransaction when deck exists (deleteCards=false)', async () => {
+    buildDeleteDeckDbMock([{ id: 1, name: 'TestDeck' }]);
+
+    const svc = new EchoeDeckService();
+    const result = await svc.deleteDeck('uid-d', 1, false);
+
+    expect(result).toBe(true);
+    expect(mockedWithTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('should roll back all DB mutations when an error occurs inside the transaction', async () => {
+    buildDeleteDeckDbMock([{ id: 1, name: 'TestDeck' }]);
+
+    // Simulate transaction failure
+    mockedWithTransaction.mockRejectedValue(new Error('TX failure'));
+
+    const svc = new EchoeDeckService();
+    await expect(svc.deleteDeck('uid-d', 1)).rejects.toThrow('TX failure');
+  });
+
+  it('should insert deck grave and delete deck inside transaction (deleteCards=false)', async () => {
+    buildDeleteDeckDbMock([{ id: 50, name: 'MyDeck' }]);
+
+    const txInsertValues: any[] = [];
+    const txDeleteCalls: number[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      let callOrder = 0;
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((v: any) => {
+            txInsertValues.push(v);
+            return Promise.resolve();
+          }),
+        }),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation(() => {
+            txDeleteCalls.push(++callOrder);
+            return Promise.resolve();
+          }),
+        }),
+      };
+      return cb(tx);
+    });
+
+    const svc = new EchoeDeckService();
+    await svc.deleteDeck('uid-d', 50, false);
+
+    // 1 grave insert (type=0 for deck)
+    expect(txInsertValues).toHaveLength(1);
+    expect(txInsertValues[0].type).toBe(0);
+    expect(txInsertValues[0].oid).toBe(50);
+
+    // 1 delete call (deck itself)
+    expect(txDeleteCalls).toHaveLength(1);
   });
 });

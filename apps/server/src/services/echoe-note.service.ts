@@ -352,26 +352,29 @@ export class EchoeNoteService {
       return false;
     }
 
-    // Get cards for this note
+    // Get cards for this note (read before transaction to avoid holding read locks longer than necessary)
     const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
 
     const now = Math.floor(Date.now() / 1000);
 
-    // Add cards to graves
-    for (const card of cards) {
-      await db.insert(echoeGraves).values({ uid, usn: 0, oid: Number(card.id), type: 2 });
-    }
+    // Wrap all mutation operations in a transaction to prevent partial-delete state
+    return withTransaction(async (tx) => {
+      // Add cards to graves
+      for (const card of cards) {
+        await tx.insert(echoeGraves).values({ uid, usn: 0, oid: Number(card.id), type: 2 });
+      }
 
-    // Add note to graves
-    await db.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 1 });
+      // Add note to graves
+      await tx.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 1 });
 
-    // Delete cards
-    await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
+      // Delete cards
+      await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
 
-    // Delete note
-    await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id)));
+      // Delete note
+      await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, id)));
 
-    return true;
+      return true;
+    });
   }
 
   /**

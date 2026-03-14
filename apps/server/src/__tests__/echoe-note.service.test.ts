@@ -4,6 +4,10 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+jest.mock('../db/transaction.js', () => ({
+  withTransaction: jest.fn((cb: (tx: any) => Promise<any>) => cb({ insert: jest.fn(), delete: jest.fn() })),
+}));
+
 jest.mock('drizzle-orm', () => {
   const actual = jest.requireActual('drizzle-orm');
   return {
@@ -14,9 +18,12 @@ jest.mock('drizzle-orm', () => {
 });
 
 import { getDatabase } from '../db/connection.js';
+import { withTransaction } from '../db/transaction.js';
 import { EchoeNoteService } from '../services/echoe-note.service.js';
 import { logger } from '../utils/logger.js';
 import { and, eq } from 'drizzle-orm';
+
+const mockedWithTransaction = withTransaction as jest.MockedFunction<typeof withTransaction>;
 
 const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
@@ -786,10 +793,118 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
 
     const noteUpdateCall = updateSetCalls.find((c: any) => c.fieldsJson !== undefined);
     expect(noteUpdateCall).toBeDefined();
-    expect(noteUpdateCall.fieldsJson).toEqual({
+      expect(noteUpdateCall.fieldsJson).toEqual({
       Word: 'apple',
       Definition: 'a fruit',
       Extra: 'red',
     });
+  });
+});
+
+describe('EchoeNoteService.deleteNote - transaction protection', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    mockedWithTransaction.mockReset();
+    // Default: execute callback immediately (simulates successful transaction)
+    mockedWithTransaction.mockImplementation((cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
+        delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+      };
+      return cb(tx);
+    });
+  });
+
+  const buildDeleteNoteDbMock = (noteRows: any[], cardRows: any[]) => {
+    // Tracks select calls: 1st → note existence check, 2nd → card fetch
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        // Note existence check: .select().from().where().limit(1)
+        const limitMock = jest.fn().mockResolvedValue(noteRows);
+        const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+        const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+        return { from: fromMock };
+      }
+      // Card fetch: .select().from().where()
+      const whereMock = jest.fn().mockResolvedValue(cardRows);
+      const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+      return { from: fromMock };
+    });
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+    return { selectMock };
+  };
+
+  it('should return false without entering transaction when note does not exist', async () => {
+    buildDeleteNoteDbMock([], []);
+
+    const service = new EchoeNoteService({} as any, {} as any);
+    const result = await service.deleteNote('uid-x', 999);
+
+    expect(result).toBe(false);
+    expect(mockedWithTransaction).not.toHaveBeenCalled();
+  });
+
+  it('should call withTransaction when note exists', async () => {
+    buildDeleteNoteDbMock([{ id: 1 }], [{ id: 101 }, { id: 102 }]);
+
+    const service = new EchoeNoteService({} as any, {} as any);
+    const result = await service.deleteNote('uid-x', 1);
+
+    expect(result).toBe(true);
+    expect(mockedWithTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('should roll back all DB mutations when an error occurs inside the transaction', async () => {
+    buildDeleteNoteDbMock([{ id: 1 }], [{ id: 201 }]);
+
+    // Simulate transaction rollback: callback throws, withTransaction re-throws
+    mockedWithTransaction.mockRejectedValue(new Error('DB write failure'));
+
+    const service = new EchoeNoteService({} as any, {} as any);
+    await expect(service.deleteNote('uid-x', 1)).rejects.toThrow('DB write failure');
+  });
+
+  it('should insert card graves and note grave inside transaction before deleting', async () => {
+    const cards = [{ id: 301 }, { id: 302 }];
+    buildDeleteNoteDbMock([{ id: 10 }], cards);
+
+    const txInsertValues: any[] = [];
+    const txDeleteCalls: number[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      let callOrder = 0;
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((v: any) => {
+            txInsertValues.push(v);
+            return Promise.resolve();
+          }),
+        }),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation(() => {
+            txDeleteCalls.push(++callOrder);
+            return Promise.resolve();
+          }),
+        }),
+      };
+      return cb(tx);
+    });
+
+    const service = new EchoeNoteService({} as any, {} as any);
+    await service.deleteNote('uid-x', 10);
+
+    // Graves: 2 card graves (type=2) + 1 note grave (type=1)
+    expect(txInsertValues).toHaveLength(3);
+    const cardGraves = txInsertValues.filter((v: any) => v.type === 2);
+    const noteGraves = txInsertValues.filter((v: any) => v.type === 1);
+    expect(cardGraves).toHaveLength(2);
+    expect(noteGraves).toHaveLength(1);
+    expect(noteGraves[0].oid).toBe(10);
+
+    // Two delete calls: cards then note
+    expect(txDeleteCalls).toHaveLength(2);
   });
 });
