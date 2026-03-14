@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -16,6 +17,7 @@ export const echoeCol = mysqlTable(
   'echoe_col',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Creation time (Unix timestamp in ms)
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     crt: int('crt').notNull(), // Day that the collection was created (Unix timestamp in seconds, midnight local)
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     scm: int('scm').notNull(), // Schema modified time (Unix timestamp in seconds)
@@ -31,6 +33,7 @@ export const echoeCol = mysqlTable(
   },
   (table) => ({
     usnIdx: index('usn_idx').on(table.usn),
+    uidUnique: unique('uid_unique').on(table.uid),
   })
 );
 

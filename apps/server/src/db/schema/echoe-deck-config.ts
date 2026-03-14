@@ -6,6 +6,7 @@ import {
   tinyint,
   text,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -16,6 +17,7 @@ export const echoeDeckConfig = mysqlTable(
   'echoe_deck_config',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Config ID
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Config name
     replayq: tinyint('replayq').notNull().default(1), // Replay queue on answer
     timer: int('timer').notNull().default(0), // Show timer (0=off, 1=on)
@@ -31,6 +33,7 @@ export const echoeDeckConfig = mysqlTable(
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
+    uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
   })
 );
 

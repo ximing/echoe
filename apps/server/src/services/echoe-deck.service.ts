@@ -17,6 +17,9 @@ import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import type { EchoeCards } from '../db/schema/echoe-cards.js';
 import type { EchoeNotes } from '../db/schema/echoe-notes.js';
+// Temporary placeholder UID for pre-refactor compatibility (will be removed in US-006)
+const TEMP_UID = 'SYSTEM';
+
 import type {
   EchoeDeckWithCountsDto,
   CreateEchoeDeckDto,
@@ -342,6 +345,7 @@ export class EchoeDeckService {
 
     const newDeck: NewEchoeDecks = {
       id: id,
+      uid: TEMP_UID,
       name: dto.name,
       conf: dto.conf || 1,
       extendNew: 20,
@@ -753,6 +757,7 @@ export class EchoeDeckService {
 
     const newDeck: NewEchoeDecks = {
       id: id,
+      uid: TEMP_UID,
       name: dto.name,
       conf: 1,
       extendNew: 20,

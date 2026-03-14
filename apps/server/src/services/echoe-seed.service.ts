@@ -21,6 +21,9 @@ const SECOND_MS = 1000;
 const LEGACY_DAY_DUE_MAX = 10_000_000;
 const LEGACY_SECOND_DUE_MAX = 100_000_000_000;
 
+// Temporary placeholder UID for global seed data (will be replaced by per-user workspace in US-010)
+const SEED_UID = 'SYSTEM';
+
 // Default note type IDs (must match across seeds for compatibility)
 const NOTE_TYPE_BASIC = 1;
 const NOTE_TYPE_BASIC_REVERSED = 2;
@@ -70,6 +73,7 @@ function createNoteType(id: number, name: string, fields: string, templates: Ret
   const now = Math.floor(Date.now() / 1000);
   return {
     id,
+    uid: SEED_UID,
     name,
     mod: now,
     usn: -1,
@@ -141,6 +145,7 @@ function createDefaultDeckConfig() {
   const now = Math.floor(Date.now() / 1000);
   return {
     id: DEFAULT_DECK_CONFIG_ID,
+    uid: SEED_UID,
     name: 'Default',
     replayq: 1,
     timer: 0,
@@ -196,6 +201,7 @@ function createDefaultDeck() {
   const now = Math.floor(Date.now() / 1000);
   return {
     id: DEFAULT_DECK_ID,
+    uid: SEED_UID,
     name: 'Default',
     conf: DEFAULT_DECK_CONFIG_ID,
     extendNew: 20,
@@ -337,6 +343,7 @@ export class EchoeSeedService {
     const now = Math.floor(Date.now() / 1000);
     const colData: typeof echoeCol.$inferInsert = {
       id: now,
+      uid: SEED_UID,
       crt: Math.floor(Date.now() / 1000),
       mod: now,
       scm: now,
@@ -368,7 +375,7 @@ export class EchoeSeedService {
     const marker = await db
       .select({ key: echoeConfig.key })
       .from(echoeConfig)
-      .where(eq(echoeConfig.key, DUE_MS_REPAIR_KEY))
+      .where(and(eq(echoeConfig.uid, SEED_UID), eq(echoeConfig.key, DUE_MS_REPAIR_KEY)))
       .limit(1);
 
     if (marker.length > 0) {
@@ -483,7 +490,7 @@ export class EchoeSeedService {
 
     await db
       .insert(echoeConfig)
-      .values({ key: DUE_MS_REPAIR_KEY, value: markerValue })
+      .values({ uid: SEED_UID, key: DUE_MS_REPAIR_KEY, value: markerValue })
       .onDuplicateKeyUpdate({ set: { value: markerValue } });
 
     logger.info('Legacy due timestamp repair completed', {

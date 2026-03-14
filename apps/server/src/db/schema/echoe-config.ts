@@ -12,9 +12,13 @@ import {
 export const echoeConfig = mysqlTable(
   'echoe_config',
   {
-    key: varchar('key', { length: 191 }).primaryKey(), // Config key
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
+    key: varchar('key', { length: 191 }).notNull(), // Config key
     value: text('value').notNull().$type<string>(), // Config value (JSON)
-  }
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.uid, table.key] }),
+  })
 );
 
 export type EchoeConfig = typeof echoeConfig.$inferSelect;

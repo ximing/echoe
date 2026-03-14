@@ -6,6 +6,7 @@ import {
   text,
   tinyint,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -16,6 +17,7 @@ export const echoeDecks = mysqlTable(
   'echoe_decks',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Deck ID (Unix timestamp in ms)
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Deck name (supports '::' for sub-decks)
     conf: bigint('conf', { mode: 'number' }).notNull().default(1), // Deck config ID
     extendNew: int('extend_new').notNull().default(20), // Extend new cards limit
@@ -31,6 +33,7 @@ export const echoeDecks = mysqlTable(
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
+    uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
   })
 );
 

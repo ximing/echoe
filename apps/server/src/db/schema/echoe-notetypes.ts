@@ -5,6 +5,7 @@ import {
   varchar,
   text,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -15,6 +16,7 @@ export const echoeNotetypes = mysqlTable(
   'echoe_notetypes',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Note type ID
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Note type name
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
@@ -31,6 +33,7 @@ export const echoeNotetypes = mysqlTable(
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
+    uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
   })
 );
 

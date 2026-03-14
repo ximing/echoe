@@ -5,6 +5,7 @@ import {
   varchar,
   text,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -17,6 +18,7 @@ export const echoeTemplates = mysqlTable(
   'echoe_templates',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Template ID
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     ntid: bigint('ntid', { mode: 'number' }).notNull(), // Note type ID
     name: varchar('name', { length: 191 }).notNull(), // Template name
     ord: int('ord').notNull(), // Template ordinal (0-based)
@@ -32,6 +34,7 @@ export const echoeTemplates = mysqlTable(
     ntidIdx: index('ntid_idx').on(table.ntid),
     ordIdx: index('ord_idx').on(table.ord),
     usnIdx: index('usn_idx').on(table.usn),
+    uidNtidOrdUnique: unique('uid_ntid_ord_unique').on(table.uid, table.ntid, table.ord),
   })
 );
 
