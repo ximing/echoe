@@ -18,6 +18,8 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+import { info, error } from '../utils/logger.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '../..');
@@ -25,18 +27,18 @@ const rootDir = join(__dirname, '../..');
 const command = process.argv[2];
 
 if (!command || !['generate', 'migrate', 'migrate-data'].includes(command)) {
-  console.error('Usage: node docker-migrate.js <generate|migrate|migrate-data>');
-  console.error('');
-  console.error('Commands:');
-  console.error('  generate      - Generate new Drizzle migration files');
-  console.error('  migrate       - Run pending Drizzle migrations');
-  console.error('  migrate-data  - Migrate data from LanceDB to MySQL (one-time)');
+  error('Usage: node docker-migrate.js <generate|migrate|migrate-data>');
+  error('');
+  error('Commands:');
+  error('  generate      - Generate new Drizzle migration files');
+  error('  migrate       - Run pending Drizzle migrations');
+  error('  migrate-data  - Migrate data from LanceDB to MySQL (one-time)');
   process.exit(1);
 }
 
 function runCommand(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    console.log(`Running: ${cmd} ${args.join(' ')}`);
+    info(`Running: ${cmd} ${args.join(' ')}`);
 
     const proc = spawn(cmd, args, {
       cwd: rootDir,
@@ -62,26 +64,26 @@ async function main() {
   try {
     switch (command) {
       case 'generate':
-        console.log('📦 Generating Drizzle migration files...');
+        info('Generating Drizzle migration files...');
         await runCommand('pnpm', ['drizzle-kit', 'generate']);
-        console.log('✅ Migration files generated successfully');
+        info('Migration files generated successfully');
         break;
 
       case 'migrate':
-        console.log('🔄 Running Drizzle migrations...');
+        info('Running Drizzle migrations...');
         await runCommand('node', ['--loader', 'ts-node/esm', './src/db/migrate.ts']);
-        console.log('✅ Migrations completed successfully');
+        info('Migrations completed successfully');
         break;
 
       case 'migrate-data':
-        console.log('📊 Migrating data from LanceDB to MySQL...');
-        console.log('⚠️  This is a one-time operation. Make sure you have backups!');
+        info('Migrating data from LanceDB to MySQL...');
+        info('This is a one-time operation. Make sure you have backups!');
         await runCommand('tsx', ['src/scripts/migrate-lancedb-to-mysql.ts']);
-        console.log('✅ Data migration completed successfully');
+        info('Data migration completed successfully');
         break;
     }
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
+  } catch (err) {
+    error('Migration failed:', err);
     process.exit(1);
   }
 }
