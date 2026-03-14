@@ -306,3 +306,43 @@
   - Typecheck passes with no errors - API client now matches backend string ID contracts
   - Type errors in web services (US-022) and pages (US-023) are expected and will be resolved next
 ---
+## 2026-03-15 - US-022
+- Refactored web service layer to use string business IDs throughout
+- Files changed: 
+  - echoe-deck.service.ts: Updated expandedDecks to Set<string>, method signatures (updateDeckData, deleteDeckData, toggleExpanded, isExpanded) to accept string IDs, localStorage parsing to filter string IDs, collectDeckIds to return Set<string>
+  - echoe-note.service.ts: Updated currentCard interface fields (cardId, noteId, did) to string, method signatures (loadNote, loadCard, updateExistingNote, deleteExistingNote, getNoteTypeById, getDeckById) to accept string IDs
+  - echoe-study.service.ts: Updated UndoEntry.cardId to string, deckId field to string | undefined, loadQueue signature to accept string | undefined
+  - echoe-stats.service.ts: Updated selectedDeckId to string | undefined, setDeckId signature to accept string | undefined
+  - echoe-csv-import.service.ts: Updated selectedNotetypeId and selectedDeckId to string | null, setNotetypeId and setDeckId signatures to accept string
+- **Learnings for future iterations:**
+  - Web service refactor pattern: Change all ID-related state fields from number to string types
+  - Set<number> → Set<string> for ID collections (e.g., expandedDecks)
+  - Method signatures: Change id: number parameters to id: string for all business ID operations
+  - Optional ID fields: Use string | undefined or string | null consistently with backend contracts
+  - localStorage parsing: Update validation logic from Number.isInteger() to string validation (trim, non-empty checks)
+  - Interface updates: currentCard interface fields must match DTO types (cardId, noteId, did all string)
+  - UndoEntry interface: cardId field must be string to match API contracts
+  - Typecheck passes cleanly - no type errors in web services after refactoring
+  - Dashboard and settings services had no ID state requiring updates
+  - Type errors in pages (US-023) are expected and will be resolved next
+---
+## 2026-03-15 - US-023
+- Refactored all cards pages to use string business IDs for routing and actions
+- Files changed: 
+  - card-editor.tsx: Removed parseInt for noteId/cardId route params, handlers now accept string IDs
+  - study.tsx: Removed parseInt for deckId route param
+  - browser.tsx: Changed selectedCards from Set<number> to Set<string>, deckFilter to string | undefined
+  - stats.tsx: Removed local selectedDeckId state, now uses statsService.selectedDeckId directly
+  - duplicates.tsx: Changed selectedNoteTypeId to string, selectedToKeep Record values to string
+  - deck-config.tsx: Replaced Number() validation with string trim check for deckId
+  - csv-import.tsx: Removed Number() conversions for deckId and notetypeId
+- **Learnings for future iterations:**
+  - Frontend page refactor pattern: Remove parseInt/Number conversions for business ID route params
+  - Selection state: Use Set<string> instead of Set<number> for ID collections
+  - Route param validation: For string IDs, use trim() and empty string checks instead of Number.isInteger()
+  - Service state: Prefer using service-managed state directly over duplicating it in component state
+  - Event handlers: Change select onChange handlers from Number(e.target.value) to e.target.value directly
+  - All 7 cards pages now consistently use string IDs for routing, selection, and API calls
+  - Typecheck and lint pass cleanly - no type errors in cards pages after refactoring
+  - Browser testing note: Manual verification in browser recommended but not blocking for this story
+---
