@@ -436,3 +436,106 @@ describe('EchoeNoteService.updateNoteType - multi-field batch add', () => {
     expect(savedFields[3].ord).toBe(3); // newOrd + 1
   });
 });
+
+describe('EchoeNoteService.bulkCardOperation - move deckId ownership validation', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+  });
+
+  /**
+   * Builds a DB mock where:
+   * - select().from().where().limit(1) → returns `deckRows` (for the ownership check)
+   * - update().set().where()           → update chain (for the card move)
+   */
+  const buildMoveMockDb = (deckRows: any[]) => {
+    const updateWhereMock = jest.fn().mockResolvedValue(undefined);
+    const setMock = jest.fn().mockReturnValue({ where: updateWhereMock });
+    const updateMock = jest.fn().mockReturnValue({ set: setMock });
+
+    const limitMock = jest.fn().mockResolvedValue(deckRows);
+    const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      update: updateMock,
+    } as any);
+
+    return { updateMock, setMock, updateWhereMock };
+  };
+
+  it('should reject move when target deckId does not belong to uid', async () => {
+    // Ownership query returns empty – deck belongs to another user
+    buildMoveMockDb([]);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await expect(
+      service.bulkCardOperation('user-A', {
+        cardIds: [101],
+        action: 'move',
+        payload: { deckId: 9999 },
+      })
+    ).rejects.toThrow('FORBIDDEN:');
+  });
+
+  it('should NOT update cards when deckId ownership check fails', async () => {
+    const { updateMock } = buildMoveMockDb([]);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await expect(
+      service.bulkCardOperation('user-A', {
+        cardIds: [101, 102],
+        action: 'move',
+        payload: { deckId: 9999 },
+      })
+    ).rejects.toThrow();
+
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('should allow move when target deckId belongs to uid', async () => {
+    const { setMock } = buildMoveMockDb([{ id: 42 }]);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    const result = await service.bulkCardOperation('user-A', {
+      cardIds: [101, 102],
+      action: 'move',
+      payload: { deckId: 42 },
+    });
+
+    expect(result).toEqual({ success: true, affected: 2 });
+    expect(setMock).toHaveBeenCalledWith(
+      expect.objectContaining({ did: 42, usn: 0 })
+    );
+  });
+
+  it('should throw when deckId is missing in move action', async () => {
+    // No DB call should be needed – early guard before the ownership check
+    mockedGetDatabase.mockReturnValue({} as any);
+
+    const service = new EchoeNoteService(
+      { forgetCards: jest.fn() } as any,
+      {} as any,
+    );
+
+    await expect(
+      service.bulkCardOperation('user-A', {
+        cardIds: [101],
+        action: 'move',
+      })
+    ).rejects.toThrow('deckId is required for move action');
+  });
+});

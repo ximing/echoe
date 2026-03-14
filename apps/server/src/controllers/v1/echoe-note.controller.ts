@@ -237,6 +237,9 @@ export class EchoeNoteController {
     } catch (error) {
       logger.error('Bulk card operation error:', error);
       if (error instanceof Error) {
+        if (error.message.startsWith('FORBIDDEN:')) {
+          return ResponseUtil.error(ErrorCode.FORBIDDEN, error.message.slice('FORBIDDEN:'.length).trim());
+        }
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, error.message);
       }
       return ResponseUtil.error(ErrorCode.DB_ERROR);

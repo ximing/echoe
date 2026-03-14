@@ -658,6 +658,19 @@ export class EchoeNoteService {
         if (!payload?.deckId) {
           throw new Error('deckId is required for move action');
         }
+        // Security: verify the target deck belongs to the current user to prevent cross-tenant card movement.
+        const targetDeck = await db
+          .select({ id: echoeDecks.id })
+          .from(echoeDecks)
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, payload.deckId)))
+          .limit(1);
+        if (targetDeck.length === 0) {
+          logger.warn('bulkCardOperation move: target deckId does not belong to uid', {
+            uid,
+            deckId: payload.deckId,
+          });
+          throw new Error('FORBIDDEN: target deck does not belong to the current user');
+        }
         await db
           .update(echoeCards)
           .set({ did: payload.deckId, mod: now, usn: 0 })
