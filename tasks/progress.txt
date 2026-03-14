@@ -180,3 +180,46 @@
   - Filtered deck search: All deck/note queries in search must include uid filtering
   - Typecheck is essential - caught missing uid parameters in cross-service calls
 ---
+## 2026-03-14 - US-007
+- Refactored echoe-note.service.ts: Added uid parameter to all 18 methods (getNotes, getNoteById, createNote, updateNote, deleteNote, getCardById, getCards, bulkCardOperation, getAllNoteTypes, createNoteType, updateNoteType, deleteNoteType, getNoteTypeById, getDeckAndSubdeckIds)
+- Refactored echoe-study.service.ts: Added uid parameter to all 7 methods (getQueue, submitReview, undo, buryCards, forgetCards, getCounts, getOptions)
+- Refactored echoe-stats.service.ts: Added uid parameter to all 6 methods (getTodayStats, getHistory, getMaturity, getForecast, getStreak, getMaturityBatch, getDeckAndSubdeckIds)
+- Refactored echoe-tag.service.ts: Added uid parameter to all 5 methods (getAllTags, searchTags, getTagUsageCount, renameTag, deleteTag, mergeTags)
+- Refactored echoe-duplicate.service.ts: Added uid parameter to 2 methods (findDuplicates, mergeDuplicates)
+- Refactored echoe-csv-import.service.ts: Added uid parameter to execute method
+- Updated all controllers to pass userDto.uid to service calls:
+  - echoe-note.controller.ts: 13 methods updated
+  - echoe-study.controller.ts: 6 methods updated
+  - echoe-stats.controller.ts: 6 methods updated
+  - echoe-tag.controller.ts: 5 methods updated
+  - echoe-duplicate.controller.ts: 2 methods updated
+  - echoe-csv-import.controller.ts: 1 method updated
+- All insert operations now write uid explicitly
+- All select, update, and delete operations include uid predicates using and(eq(table.uid, uid), ...)
+- All joins enforce same-uid associations
+- Removed TEMP_UID constants from refactored services
+- Files changed:
+  - apps/server/src/services/echoe-note.service.ts
+  - apps/server/src/services/echoe-study.service.ts
+  - apps/server/src/services/echoe-stats.service.ts
+  - apps/server/src/services/echoe-tag.service.ts
+  - apps/server/src/services/echoe-duplicate.service.ts
+  - apps/server/src/services/echoe-csv-import.service.ts
+  - apps/server/src/controllers/v1/echoe-note.controller.ts
+  - apps/server/src/controllers/v1/echoe-study.controller.ts
+  - apps/server/src/controllers/v1/echoe-stats.controller.ts
+  - apps/server/src/controllers/v1/echoe-tag.controller.ts
+  - apps/server/src/controllers/v1/echoe-duplicate.controller.ts
+  - apps/server/src/controllers/v1/echoe-csv-import.controller.ts
+- **Learnings for future iterations:**
+  - Service refactoring pattern: Add uid as first parameter to all public service methods
+  - Query filtering pattern: Use and(eq(table.uid, uid), ...) for all WHERE clauses
+  - Insert pattern: Include uid in values object for all inserts (remove TEMP_UID)
+  - Controller pattern: Pass userDto.uid to service calls (uid already validated in controller via @CurrentUser())
+  - Internal service calls: When refactoring services that call other services, pass uid through the call chain
+  - Drizzle ORM: Missing imports (and, eq) cause typecheck errors - always check imports when adding uid filtering
+  - Bulk operations: All batch queries (inArray, sql.join) must include uid filtering
+  - Cross-service dependencies: When a service calls another service's methods, ensure uid is passed correctly
+  - Test files need updating separately - production code typecheck should pass before committing
+  - Large refactorings: Systematic approach (services first, then controllers) prevents missing updates
+---
