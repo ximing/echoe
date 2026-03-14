@@ -2,6 +2,7 @@ import {
   mysqlTable,
   bigint,
   int,
+  varchar,
   index,
 } from 'drizzle-orm/mysql-core';
 
@@ -14,6 +15,7 @@ export const echoeGraves = mysqlTable(
   'echoe_graves',
   {
     id: int('id').primaryKey().autoincrement(), // Row ID
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     usn: int('usn').notNull(), // Update sequence number (sync)
     oid: bigint('oid', { mode: 'number' }).notNull(), // Original object ID (deck/note/card ID)
     type: int('type').notNull(), // Object type: 0=deck, 1=note, 2=card
@@ -22,6 +24,7 @@ export const echoeGraves = mysqlTable(
     oidIdx: index('oid_idx').on(table.oid),
     typeIdx: index('type_idx').on(table.type),
     usnIdx: index('usn_idx').on(table.usn),
+    uidOidTypeIdx: index('uid_oid_type_idx').on(table.uid, table.oid, table.type),
   })
 );
 

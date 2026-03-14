@@ -44,6 +44,9 @@ const FSRS_BOOLEAN_SCHEMA = z.boolean();
 const FSRS_STEPS_SCHEMA = z.array(z.union([z.number(), z.string()])).min(1).max(20);
 const FSRS_LEGACY_DIFFICULTY_FALLBACK = 2.5;
 
+// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
+const TEMP_UID = 'SYSTEM';
+
 @Service()
 export class EchoeStudyService {
   constructor(
@@ -295,7 +298,7 @@ export class EchoeStudyService {
     await db.insert(echoeRevlog).values({
       id: reviewId,
       cid: dto.cardId,
-      uid: uid ?? null,
+      uid: uid ?? TEMP_UID,
       usn: -1,
       ease: dto.rating,
       ivl: schedulingResult.interval,

@@ -34,6 +34,7 @@ export const echoeDeckConfig = mysqlTable(
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
+    uidNameIdx: index('uid_name_idx').on(table.uid, table.name),
   })
 );
 

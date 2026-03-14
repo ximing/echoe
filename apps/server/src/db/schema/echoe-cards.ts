@@ -17,6 +17,7 @@ export const echoeCards = mysqlTable(
   'echoe_cards',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Unique ID (Unix timestamp in ms * 1000 + random)
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     nid: bigint('nid', { mode: 'number' }).notNull(), // Note ID
     did: bigint('did', { mode: 'number' }).notNull(), // Deck ID
     ord: int('ord').notNull(), // Template ordinal (which template generates this card)
@@ -49,6 +50,10 @@ export const echoeCards = mysqlTable(
     didQueueDueIdx: index('did_queue_due_idx').on(table.did, table.queue, table.due),
     didLastReviewIdx: index('did_last_review_idx').on(table.did, table.lastReview),
     didStabilityIdx: index('did_stability_idx').on(table.did, table.stability),
+    // Multi-user isolation indexes
+    uidNidIdx: index('uid_nid_idx').on(table.uid, table.nid),
+    uidDidQueueDueIdx: index('uid_did_queue_due_idx').on(table.uid, table.did, table.queue, table.due),
+    uidLastReviewIdx: index('uid_last_review_idx').on(table.uid, table.lastReview),
   })
 );
 

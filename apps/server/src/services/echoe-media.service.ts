@@ -24,6 +24,9 @@ import type {
 // Storage path prefix for Echoe media files
 const MEDIA_STORAGE_PREFIX = 'echoe-media';
 
+// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
+const TEMP_UID = 'SYSTEM';
+
 @Service()
 export class EchoeMediaService {
   private storageAdapter: UnifiedStorageAdapter;
@@ -96,6 +99,7 @@ export class EchoeMediaService {
     // Save to database
     const db = getDatabase();
     await db.insert(echoeMedia).values({
+      uid: TEMP_UID,
       filename: storedFilename,
       originalFilename,
       size: buffer.length,

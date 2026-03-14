@@ -6,6 +6,7 @@ import {
   text,
   json,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 import type { CanonicalFields, RichTextFields } from '../../types/note-fields.js';
 
@@ -17,6 +18,7 @@ export const echoeNotes = mysqlTable(
   'echoe_notes',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Unique ID (Unix timestamp in ms * 1000 + random)
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     guid: varchar('guid', { length: 191 }).notNull(), // Globally unique ID for sync (40 char hex string)
     mid: bigint('mid', { mode: 'number' }).notNull(), // Model ID (note type ID)
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
@@ -36,6 +38,10 @@ export const echoeNotes = mysqlTable(
     midIdx: index('mid_idx').on(table.mid),
     usnIdx: index('usn_idx').on(table.usn),
     sfldIdx: index('sfld_idx').on(table.sfld),
+    uidGuidUnique: unique('uid_guid_unique').on(table.uid, table.guid),
+    uidMidIdx: index('uid_mid_idx').on(table.uid, table.mid),
+    uidSfldIdx: index('uid_sfld_idx').on(table.uid, table.sfld),
+    uidModIdx: index('uid_mod_idx').on(table.uid, table.mod),
   })
 );
 

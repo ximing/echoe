@@ -131,6 +131,9 @@ interface EchoeNotetypeRow {
   req: string;
 }
 
+// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
+const TEMP_UID = 'SYSTEM';
+
 @Service()
 export class EchoeImportService {
   constructor(@Inject(() => EchoeMediaService) private mediaService: EchoeMediaService) {}
@@ -931,6 +934,7 @@ export class EchoeImportService {
         } else {
           const newNote: NewEchoeNotes = {
             id: row.id,
+            uid: TEMP_UID,
             guid: row.guid,
             mid: row.mid,
             mod: row.mod,
@@ -1107,6 +1111,7 @@ export class EchoeImportService {
           } else {
             const newCard: NewEchoeCards = {
               id: row.id,
+              uid: TEMP_UID,
               nid: row.nid,
               did: row.did,
               ord: row.ord,
@@ -1191,6 +1196,7 @@ export class EchoeImportService {
         const newRevlog: NewEchoeRevlog = {
           id: row.id,
           cid: row.cid,
+          uid: TEMP_UID,
           usn: row.usn,
           ease: row.ease,
           ivl: row.ivl,

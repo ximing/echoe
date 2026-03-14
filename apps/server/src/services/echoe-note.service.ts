@@ -34,6 +34,9 @@ import type {
   EchoeCardQueryParams,
 } from '@echoe/dto';
 
+// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
+const TEMP_UID = 'SYSTEM';
+
 @Service()
 export class EchoeNoteService {
   /**
@@ -199,6 +202,7 @@ export class EchoeNoteService {
       // MySQL insert does not support returning(); fetch the inserted note explicitly.
       await tx.insert(echoeNotes).values({
         id: noteId,
+        uid: TEMP_UID,
         guid,
         mid: dto.notetypeId,
         mod: now,
@@ -221,6 +225,7 @@ export class EchoeNoteService {
         const cardId = Date.now() * 1000000 + template.ord * 1000 + Math.floor(Math.random() * 1000);
         await tx.insert(echoeCards).values({
           id: cardId,
+          uid: TEMP_UID,
           nid: noteId,
           did: dto.deckId,
           ord: template.ord,
@@ -348,11 +353,11 @@ export class EchoeNoteService {
 
     // Add cards to graves
     for (const card of cards) {
-      await db.insert(echoeGraves).values({ usn: 0, oid: Number(card.id), type: 2 });
+      await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: Number(card.id), type: 2 });
     }
 
     // Add note to graves
-    await db.insert(echoeGraves).values({ usn: 0, oid: id, type: 1 });
+    await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: id, type: 1 });
 
     // Delete cards
     await db.delete(echoeCards).where(eq(echoeCards.nid, id));

@@ -452,7 +452,7 @@ export class EchoeDeckService {
         // Add notes to graves
         const now = Math.floor(Date.now() / 1000);
         for (const nid of noteIds) {
-          await db.insert(echoeGraves).values({ usn: 0, oid: nid, type: 1 });
+          await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: nid, type: 1 });
         }
 
         // Delete cards
@@ -468,7 +468,7 @@ export class EchoeDeckService {
 
     // Add deck to graves
     const now = Math.floor(Date.now() / 1000);
-    await db.insert(echoeGraves).values({ usn: 0, oid: id, type: 0 });
+    await db.insert(echoeGraves).values({ uid: TEMP_UID, usn: 0, oid: id, type: 0 });
 
     // Delete deck
     await db.delete(echoeDecks).where(eq(echoeDecks.id, id));

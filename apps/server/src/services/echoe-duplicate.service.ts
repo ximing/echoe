@@ -18,6 +18,9 @@ interface NoteRecord {
   fieldsJson?: Record<string, string> | null;
 }
 
+// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
+const TEMP_UID = 'SYSTEM';
+
 @Service()
 export class EchoeDuplicateService {
   /**
@@ -213,6 +216,7 @@ export class EchoeDuplicateService {
     // Add deleted notes to graves table
     for (const deleteId of deleteIds) {
       await db.insert(echoeGraves).values({
+        uid: TEMP_UID,
         usn: -1,
         oid: deleteId,
         type: 0, // note type
@@ -222,6 +226,7 @@ export class EchoeDuplicateService {
     // Add deleted cards to graves table
     for (const card of cardsToDelete) {
       await db.insert(echoeGraves).values({
+        uid: TEMP_UID,
         usn: -1,
         oid: card.id,
         type: 1, // card type

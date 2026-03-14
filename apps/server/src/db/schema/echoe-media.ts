@@ -4,6 +4,7 @@ import {
   varchar,
   tinyint,
   index,
+  unique,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -14,6 +15,7 @@ export const echoeMedia = mysqlTable(
   'echoe_media',
   {
     id: int('id').primaryKey().autoincrement(), // Media file ID
+    uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     filename: varchar('filename', { length: 191 }).notNull(), // Stored filename
     originalFilename: varchar('original_filename', { length: 191 }).notNull(), // Original uploaded filename
     size: int('size').notNull(), // File size in bytes
@@ -25,6 +27,7 @@ export const echoeMedia = mysqlTable(
   (table) => ({
     filenameIdx: index('filename_idx').on(table.filename),
     hashIdx: index('hash_idx').on(table.hash),
+    uidFilenameUnique: unique('uid_filename_unique').on(table.uid, table.filename),
   })
 );
 
