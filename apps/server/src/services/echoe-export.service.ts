@@ -1,4 +1,3 @@
-// @ts-nocheck - Temporary: Schema changed to string IDs, service refactor in US-013+
 /**
  * Echoe Export Service
  * Handles exporting decks to .apkg files
@@ -25,7 +24,7 @@ const LIKELY_MS_TIMESTAMP_MIN = 100_000_000_000;
 
 export interface ExportOptions {
   /** Deck ID to export (if not specified, export all decks) */
-  deckId?: number;
+  deckId?: string;
   /** Whether to include scheduling data */
   includeScheduling: boolean;
   /** Export format: 'anki' (Standard Anki) or 'legacy' (Echoe format) - defaults to 'anki' */
@@ -59,7 +58,7 @@ export class EchoeExportService {
   /**
    * Export in Standard Anki format (col.json based)
    */
-  private async exportStandardAnki(uid: string, deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
+  private async exportStandardAnki(uid: string, deckId: string | undefined, includeScheduling: boolean): Promise<ExportResult> {
     // Create a temporary SQLite database
     const tempDb = new Database(':memory:');
 
@@ -127,7 +126,7 @@ export class EchoeExportService {
 
       // Generate filename
       const deckName = deckId
-        ? decksToExport.find((d: { id: number; name: string }) => d.id === deckId)?.name || 'deck'
+        ? decksToExport.find((d: { deckId: string; name: string }) => d.deckId === deckId)?.name || 'deck'
         : 'all_decks';
       const sanitizedName = deckName.replace(/[^a-zA-Z0-9_]/g, '_');
       const date = new Date().toISOString().split('T')[0];
@@ -142,7 +141,7 @@ export class EchoeExportService {
   /**
    * Export in Legacy Echoe format (collection.anki21 based)
    */
-  private async exportLegacyApkg(uid: string, deckId: number | undefined, includeScheduling: boolean): Promise<ExportResult> {
+  private async exportLegacyApkg(uid: string, deckId: string | undefined, includeScheduling: boolean): Promise<ExportResult> {
     // Create a temporary SQLite database
     const tempDb = new Database(':memory:');
 
@@ -199,7 +198,7 @@ export class EchoeExportService {
 
       // Generate filename
       const deckName = deckId
-        ? decksToExport.find((d: { id: number; name: string }) => d.id === deckId)?.name || 'deck'
+        ? decksToExport.find((d: { deckId: string; name: string }) => d.deckId === deckId)?.name || 'deck'
         : 'all_decks';
       const sanitizedName = deckName.replace(/[^a-zA-Z0-9_]/g, '_');
       const date = new Date().toISOString().split('T')[0];
@@ -214,14 +213,14 @@ export class EchoeExportService {
   /**
    * Get decks to export (including sub-decks)
    */
-  private async getDecksToExport(uid: string, deckId?: number) {
+  private async getDecksToExport(uid: string, deckId?: string) {
     const db = getDatabase();
 
     if (deckId) {
       const deck = await db
         .select()
         .from(echoeDecks)
-        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId)))
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId)))
         .limit(1);
 
       if (deck.length === 0) {
@@ -245,14 +244,14 @@ export class EchoeExportService {
   /**
    * Get all deck IDs including sub-decks
    */
-  private getAllDeckIds(decks: { id: number; name: string }[]): number[] {
-    return decks.map((d) => d.id);
+  private getAllDeckIds(decks: { deckId: string; name: string }[]): string[] {
+    return decks.map((d) => d.deckId);
   }
 
   /**
    * Get notes in the specified decks
    */
-  private async getNotesInDecks(uid: string, deckIds: number[]) {
+  private async getNotesInDecks(uid: string, deckIds: string[]) {
     if (deckIds.length === 0) return [];
 
     const db = getDatabase();
@@ -263,13 +262,13 @@ export class EchoeExportService {
       .from(echoeCards)
       .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
-    // Get unique note IDs (convert bigint to number)
-    const noteIds = [...new Set(cards.map((c: { nid: number | string | bigint }) => Number(c.nid)))] as number[];
+    // Get unique note IDs (already strings, no conversion needed)
+    const noteIds: string[] = [...new Set<string>(cards.map((c: { nid: string }) => c.nid))];
 
     if (noteIds.length === 0) return [];
 
-    // Get the notes for this user
-    const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
+    // Get the notes for this user by business ID
+    const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
 
     return notes;
   }
@@ -727,7 +726,8 @@ export class EchoeExportService {
   ): Record<string, any> {
     const now = Math.floor(Date.now() / 1000);
     const firstDeckId = Object.keys(decks)[0];
-    const currentDeckId = firstDeckId ? Number(firstDeckId) : 1;
+    // Use first deck ID or default to 1 (note: deck IDs in col.json are numeric for Anki compatibility)
+    const currentDeckId = firstDeckId ? firstDeckId : '1';
 
     return {
       id: 1,
@@ -928,15 +928,15 @@ export class EchoeExportService {
   private async exportCards(
     uid: string,
     tempDb: Database.Database,
-    notes: { id: number }[],
+    notes: { id: number; noteId: string }[],
     includeScheduling: boolean
   ): Promise<number> {
     if (notes.length === 0) return 0;
 
     const db = getDatabase();
 
-    // Get all cards for these notes in user scope
-    const noteIds = notes.map((n) => n.id);
+    // Get all cards for these notes in user scope (use business IDs)
+    const noteIds = notes.map((n) => n.noteId);
     const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
 
     const stmt = tempDb.prepare(`
@@ -1038,20 +1038,20 @@ export class EchoeExportService {
   /**
    * Export revlog entries to temp database
    */
-  private async exportRevlog(uid: string, tempDb: Database.Database, notes: { id: number }[]) {
+  private async exportRevlog(uid: string, tempDb: Database.Database, notes: { id: number; noteId: string }[]) {
     if (notes.length === 0) return;
 
     const db = getDatabase();
 
-    // Get all cards for these notes in user scope
-    const noteIds = notes.map((n) => n.id);
-    const cards = await db.select({ id: echoeCards.id }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
+    // Get all cards for these notes in user scope (use business IDs)
+    const noteIds = notes.map((n) => n.noteId);
+    const cards = await db.select({ cardId: echoeCards.cardId }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
 
     if (cards.length === 0) return;
 
-    const cardIds = cards.map((c: { id: number }) => c.id);
+    const cardIds = cards.map((c: { cardId: string }) => c.cardId);
 
-    // Get revlog entries for these cards in user scope
+    // Get revlog entries for these cards in user scope (use business IDs)
     const revlogs = await db.select().from(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
 
     const stmt = tempDb.prepare(`

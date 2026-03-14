@@ -1,4 +1,3 @@
-// @ts-nocheck - Temporary: Schema changed to string IDs, service refactor in US-013+
 /**
  * Echoe Import Service
  * Handles importing .apkg files (both Standard Anki and Echoe Legacy formats)
@@ -18,6 +17,8 @@ import { echoeNotetypes, type NewEchoeNotetypes } from '../db/schema/echoe-notet
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 
 export interface ImportResultDto {
   notesAdded: number;
@@ -432,25 +433,26 @@ export class EchoeImportService {
 
       for (const [mid, model] of Object.entries(models)) {
         try {
-          const modelId = parseInt(mid, 10);
-
-          // Check if notetype already exists in user scope
+          // Check if notetype already exists in user scope by name
           const existing = await db
-            .select({ id: echoeNotetypes.id })
+            .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, modelId)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name)))
             .limit(1);
 
           if (existing.length === 0) {
-            // Insert new notetype
+            // Generate new business ID for imported notetype
+            const noteTypeId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+
+            // Insert new notetype with generated business ID
             await db.insert(echoeNotetypes).values({
-              id: modelId,
+              noteTypeId,
               uid,
               name: model.name,
               mod: model.mod || 0,
               usn: model.usn || 0,
               sortf: model.sortf || 0,
-              did: model.did || 1,
+              did: '', // Default empty string for string business ID
               tmpls: model.tmpls || '[]',
               flds: model.flds || '[]',
               css: model.css || '',
@@ -499,27 +501,29 @@ export class EchoeImportService {
 
       for (const [did, deck] of Object.entries(decks)) {
         try {
-          const deckId = parseInt(did, 10);
-
           // Skip default deck with id=1
-          if (deckId === 1) {
+          if (did === '1') {
             continue;
           }
 
-          // Check if deck already exists in user scope
+          // Check if deck already exists in user scope by name
           const existing = await db
-            .select({ id: echoeDecks.id })
+            .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deck.name)))
             .limit(1);
 
           if (existing.length === 0) {
-            // Insert new deck
+            // Generate new business ID for imported deck
+            const deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+
+            // Insert new deck with generated business ID
+            // TODO: conf should map to deckConfigId, but for now use empty string
             await db.insert(echoeDecks).values({
-              id: deckId,
+              deckId,
               uid,
               name: deck.name,
-              conf: deck.conf || 1,
+              conf: '', // TODO: Need deck config ID mapping
               extendNew: 20,
               extendRev: 200,
               usn: deck.usn || 0,
@@ -528,7 +532,7 @@ export class EchoeImportService {
               dyn: deck.dyn || 0,
               mod: deck.mod || 0,
               desc: deck.desc || '',
-              mid: 0,
+              mid: '', // Default empty string for string business ID
             });
             added++;
           }
@@ -569,16 +573,16 @@ export class EchoeImportService {
   /**
    * Build notetype fields map from col.json models
    */
-  private buildNotetypeFieldsMapFromColJson(col: Record<string, unknown>): Map<number, string[]> {
+  private buildNotetypeFieldsMapFromColJson(col: Record<string, unknown>): Map<string, string[]> {
     try {
       const models = col.models as Record<string, { flds: unknown }> | undefined;
       if (!models || typeof models !== 'object') {
         return new Map();
       }
 
+      // Build map using string IDs (convert from numeric keys in col.json)
       const rows = Object.entries(models)
-        .map(([mid, model]) => ({ id: Number.parseInt(mid, 10), flds: model?.flds }))
-        .filter((row) => Number.isFinite(row.id));
+        .map(([mid, model]) => ({ id: mid, flds: model?.flds }));
 
       return this.buildNotetypeFieldsMapFromRows(rows);
     } catch {
@@ -769,7 +773,7 @@ export class EchoeImportService {
    * Build a map of notetype id → ordered field names by reading from the source database.
    * Anki's notetypes.flds is a JSON array of field definition objects, each with a "name" property.
    */
-  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<number, string[]> {
+  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<string, string[]> {
     try {
       const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: unknown }[];
       return this.buildNotetypeFieldsMapFromRows(rows);
@@ -861,13 +865,14 @@ export class EchoeImportService {
     return this.importMediaEntries(uid, zip, mediaFiles);
   }
 
-  private buildNotetypeFieldsMapFromRows(rows: Array<{ id: number; flds: unknown }>): Map<number, string[]> {
-    const map = new Map<number, string[]>();
+  private buildNotetypeFieldsMapFromRows(rows: Array<{ id: string | number; flds: unknown }>): Map<string, string[]> {
+    const map = new Map<string, string[]>();
 
     for (const row of rows) {
       try {
         const fieldDefs = this.parseNotetypeFieldDefs(row.flds);
-        map.set(row.id, fieldDefs.map((field) => field.name));
+        // Convert numeric IDs to strings for consistency
+        map.set(String(row.id), fieldDefs.map((field) => field.name));
       } catch {
         // Skip invalid notetype field definitions
       }
@@ -891,7 +896,7 @@ export class EchoeImportService {
   private async importNotesRows(
     uid: string,
     rows: EchoeNoteRow[],
-    notetypeFieldsMap: Map<number, string[]>,
+    notetypeFieldsMap: Map<string, string[]>,
     mediaManifest?: Map<string, string>
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     if (rows.length === 0) {
@@ -906,7 +911,8 @@ export class EchoeImportService {
 
     for (const row of rows) {
       try {
-        const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
+        // Convert numeric mid to string for map lookup
+        const notetypeFields = notetypeFieldsMap.get(String(row.mid)) ?? [];
 
         const rawValues = row.flds.split('\x1f');
         const fields: Record<string, string> = {};
@@ -942,11 +948,16 @@ export class EchoeImportService {
             .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)));
           updated++;
         } else {
+          // Generate new business IDs for imported note
+          const noteId = generateTypeId(OBJECT_TYPE.ECHOE_NOTE);
+
+          // TODO: Need proper ID mapping - for now convert numeric mid to string
+          // This is a temporary workaround until full import refactoring with ID mapping
           const newNote: NewEchoeNotes = {
-            id: row.id,
+            noteId,
             uid,
             guid: row.guid,
-            mid: row.mid,
+            mid: String(row.mid), // Temporary: convert numeric to string
             mod: row.mod,
             usn: row.usn,
             tags: row.tags || '[]',
@@ -1121,11 +1132,16 @@ export class EchoeImportService {
               .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, row.id)));
             updated++;
           } else {
+            // Generate new business ID for imported card
+            const cardId = generateTypeId(OBJECT_TYPE.ECHOE_CARD);
+
+            // TODO: Need proper ID mapping - for now convert numeric IDs to strings
+            // This is a temporary workaround until full import refactoring with ID mapping
             const newCard: NewEchoeCards = {
-              id: row.id,
+              cardId,
               uid,
-              nid: row.nid,
-              did: row.did,
+              nid: String(row.nid), // Temporary: convert numeric to string
+              did: String(row.did), // Temporary: convert numeric to string
               ord: row.ord,
               mod: row.mod,
               usn: row.usn,
@@ -1138,7 +1154,7 @@ export class EchoeImportService {
               lapses: row.lapses,
               left: row.left,
               odue: normalizedOdue,
-              odid: row.odid,
+              odid: String(row.odid || 0), // Temporary: convert numeric to string
               flags: row.flags,
               data: row.data || '{}',
               stability: fsrs.stability,
@@ -1207,9 +1223,15 @@ export class EchoeImportService {
         const preStability = row.lastIvl > 0 ? row.lastIvl : 1;
         const preLastReview = lastReview - (row.lastIvl * DAY_MS);
 
+        // Generate new business ID for imported revlog
+        const revlogId = generateTypeId(OBJECT_TYPE.ECHOE_REVLOG);
+
+        // TODO: Need proper ID mapping - for now convert numeric cid to string
+        // This is a temporary workaround until full import refactoring with ID mapping
         const newRevlog: NewEchoeRevlog = {
           id: row.id,
-          cid: row.cid,
+          revlogId,
+          cid: String(row.cid), // Temporary: convert numeric to string
           uid,
           usn: row.usn,
           ease: row.ease,
