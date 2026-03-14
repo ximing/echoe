@@ -5,6 +5,7 @@
 - Use `generateTypeId(OBJECT_TYPE.XXX)` for all new Echoe domain IDs.
 - Preserve uid-scoped query isolation in all backend read/write paths.
 - Treat migration as one-shot Big Bang change set with strict quality gates.
+- Seed data: Insert into business ID fields (deckConfigId, noteTypeId, etc.), not auto-increment id field.
 
 ## User Stories Progress
 ## User Stories Progress
@@ -251,4 +252,17 @@
   - Test failures due to missing business ID fields require immediate fix (not deferred to US-024)
   - All 176 tests pass after service refactoring
   - Controller and test type errors are expected and will be resolved in US-019, US-020, US-024
+---
+## 2026-03-15 - US-018
+- Removed all legacy numeric ID generators from apps/server/src/utils/id.ts
+- Updated echoe-seed.service.ts to use generateTypeId for all Echoe entities
+- Files changed: apps/server/src/utils/id.ts, apps/server/src/services/echoe-seed.service.ts
+- **Learnings for future iterations:**
+  - Legacy ID generators removed: generateDeckId, generateNoteId, generateCardId, generateNoteTypeId, generateRevlogId
+  - Seed service pattern: Use business ID fields (deckConfigId, deckId, noteTypeId, colId) when inserting, not auto-increment id field
+  - System seed data uses stable string business IDs (e.g., 'ed_default_system_v1') instead of numeric constants
+  - When migrating from numeric to string IDs, update both insertion fields AND query conditions to use business ID columns
+  - Empty string ('') is the correct default for varchar business ID relation fields (did, mid, conf, etc.), not 0
+  - All 176 tests pass - seed service refactoring did not break existing functionality
+  - No Date.now()-based Echoe ID generation remains in active code paths
 ---
