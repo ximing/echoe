@@ -1,5 +1,33 @@
-ALTER TABLE `echoe_col` DROP INDEX `uid_unique`;--> statement-breakpoint
-DROP INDEX `uid_id_idx` ON `echoe_revlog`;--> statement-breakpoint
+SET @echoe_col_has_uid_unique := (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'echoe_col'
+    AND INDEX_NAME = 'uid_unique'
+);--> statement-breakpoint
+SET @echoe_col_drop_uid_unique_sql := IF(
+  @echoe_col_has_uid_unique > 0,
+  'ALTER TABLE `echoe_col` DROP INDEX `uid_unique`',
+  'SELECT 1'
+);--> statement-breakpoint
+PREPARE echoe_col_drop_uid_unique_stmt FROM @echoe_col_drop_uid_unique_sql;--> statement-breakpoint
+EXECUTE echoe_col_drop_uid_unique_stmt;--> statement-breakpoint
+DEALLOCATE PREPARE echoe_col_drop_uid_unique_stmt;--> statement-breakpoint
+SET @echoe_revlog_has_uid_id_idx := (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'echoe_revlog'
+    AND INDEX_NAME = 'uid_id_idx'
+);--> statement-breakpoint
+SET @echoe_revlog_drop_uid_id_idx_sql := IF(
+  @echoe_revlog_has_uid_id_idx > 0,
+  'DROP INDEX `uid_id_idx` ON `echoe_revlog`',
+  'SELECT 1'
+);--> statement-breakpoint
+PREPARE echoe_revlog_drop_uid_id_idx_stmt FROM @echoe_revlog_drop_uid_id_idx_sql;--> statement-breakpoint
+EXECUTE echoe_revlog_drop_uid_id_idx_stmt;--> statement-breakpoint
+DEALLOCATE PREPARE echoe_revlog_drop_uid_id_idx_stmt;--> statement-breakpoint
 ALTER TABLE `echoe_col` MODIFY COLUMN `id` bigint AUTO_INCREMENT NOT NULL;--> statement-breakpoint
 ALTER TABLE `echoe_notes` MODIFY COLUMN `id` bigint AUTO_INCREMENT NOT NULL;--> statement-breakpoint
 ALTER TABLE `echoe_notes` MODIFY COLUMN `mid` varchar(191) NOT NULL;--> statement-breakpoint
