@@ -90,7 +90,7 @@ export class EchoeMediaController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const media = await this.mediaService.listMedia();
+      const media = await this.mediaService.listMedia(userDto.uid);
       return ResponseUtil.success(media);
     } catch (error) {
       logger.error('List media error:', error);
@@ -186,7 +186,7 @@ export class EchoeMediaController {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
 
-      const result: CheckUnusedMediaResultDto = await this.mediaService.checkUnusedMedia();
+      const result: CheckUnusedMediaResultDto = await this.mediaService.checkUnusedMedia(userDto.uid);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Check unused media error:', error);
@@ -209,7 +209,7 @@ export class EchoeMediaController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No filenames provided');
       }
 
-      await this.mediaService.deleteBulk(dto.filenames);
+      await this.mediaService.deleteBulk(userDto.uid, dto.filenames);
       return ResponseUtil.success({ message: 'Files deleted successfully' });
     } catch (error) {
       logger.error('Delete bulk media error:', error);

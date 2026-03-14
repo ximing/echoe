@@ -5,7 +5,7 @@
 
 import crypto from 'crypto';
 import { Service } from 'typedi';
-import { eq, inArray, like, sql } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { echoeMedia } from '../db/schema/echoe-media.js';
@@ -23,9 +23,6 @@ import type {
 
 // Storage path prefix for Echoe media files
 const MEDIA_STORAGE_PREFIX = 'echoe-media';
-
-// Temporary uid placeholder until US-004-008 refactor services to accept uid parameters
-const TEMP_UID = 'SYSTEM';
 
 @Service()
 export class EchoeMediaService {
@@ -89,8 +86,8 @@ export class EchoeMediaService {
     // Determine MIME type from extension
     const mimeType = this.getMimeType(extension);
 
-    // Upload to storage
-    const storageKey = `${MEDIA_STORAGE_PREFIX}/${storedFilename}`;
+    // Upload to storage with uid namespace: echoe-media/<uid>/<filename>
+    const storageKey = `${MEDIA_STORAGE_PREFIX}/${uid}/${storedFilename}`;
     await this.storageAdapter.uploadFile(storageKey, buffer);
 
     // Generate URL
@@ -115,13 +112,27 @@ export class EchoeMediaService {
   /**
    * Get a media file by filename
    * Returns the file buffer and content type
-   * Note: uid validation will be added in US-009 (media uid isolation)
+   * Validates that the user owns the media file
    */
   async getMedia(uid: string, filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-    const storageKey = `${MEDIA_STORAGE_PREFIX}/${filename}`;
+    const db = getDatabase();
 
     try {
-      // TODO US-009: Add uid validation to ensure user can only access their own media
+      // Validate that the media file belongs to the user
+      const mediaRecord = await db
+        .select()
+        .from(echoeMedia)
+        .where(and(eq(echoeMedia.uid, uid), eq(echoeMedia.filename, filename)))
+        .limit(1);
+
+      if (mediaRecord.length === 0) {
+        logger.warn(`Media access denied: uid=${uid}, filename=${filename}`);
+        return null;
+      }
+
+      // Use uid-namespaced storage key: echoe-media/<uid>/<filename>
+      const storageKey = `${MEDIA_STORAGE_PREFIX}/${uid}/${filename}`;
+
       const exists = await this.storageAdapter.fileExists(storageKey);
       if (!exists) {
         return null;
@@ -139,11 +150,11 @@ export class EchoeMediaService {
   }
 
   /**
-   * List all media files
+   * List all media files for the current user
    */
-  async listMedia(): Promise<EchoeMediaDto[]> {
+  async listMedia(uid: string): Promise<EchoeMediaDto[]> {
     const db = getDatabase();
-    const results = await db.select().from(echoeMedia);
+    const results = await db.select().from(echoeMedia).where(eq(echoeMedia.uid, uid));
 
     return results.map((row: {
       id: number;
@@ -167,14 +178,17 @@ export class EchoeMediaService {
   }
 
   /**
-   * Check for unused media files
+   * Check for unused media files for the current user
    * Scans all note fields for media references
    */
-  async checkUnusedMedia(): Promise<CheckUnusedMediaResultDto> {
+  async checkUnusedMedia(uid: string): Promise<CheckUnusedMediaResultDto> {
     const db = getDatabase();
 
-    // Get all notes with their field data
-    const notes = await db.select({ flds: echoeNotes.flds }).from(echoeNotes);
+    // Get all notes for the current user with their field data
+    const notes = await db
+      .select({ flds: echoeNotes.flds })
+      .from(echoeNotes)
+      .where(eq(echoeNotes.uid, uid));
 
     // Extract all media references from note fields
     const referencedFiles = new Set<string>();
@@ -201,8 +215,11 @@ export class EchoeMediaService {
       }
     }
 
-    // Get all media files from database
-    const allMedia = await db.select({ filename: echoeMedia.filename }).from(echoeMedia);
+    // Get all media files for the current user from database
+    const allMedia = await db
+      .select({ filename: echoeMedia.filename })
+      .from(echoeMedia)
+      .where(eq(echoeMedia.uid, uid));
 
     // Find files that are not referenced
     const unusedFiles = allMedia
@@ -213,14 +230,22 @@ export class EchoeMediaService {
   }
 
   /**
-   * Delete media files in bulk
+   * Delete media files in bulk for the current user
    */
-  async deleteBulk(filenames: string[]): Promise<void> {
+  async deleteBulk(uid: string, filenames: string[]): Promise<void> {
     const db = getDatabase();
 
-    // Delete from storage
-    for (const filename of filenames) {
-      const storageKey = `${MEDIA_STORAGE_PREFIX}/${filename}`;
+    // Verify all files belong to the user before deleting
+    const ownedFiles = await db
+      .select({ filename: echoeMedia.filename })
+      .from(echoeMedia)
+      .where(and(eq(echoeMedia.uid, uid), inArray(echoeMedia.filename, filenames)));
+
+    const ownedFilenames = ownedFiles.map((f: { filename: string }) => f.filename);
+
+    // Delete from storage (only files owned by the user)
+    for (const filename of ownedFilenames) {
+      const storageKey = `${MEDIA_STORAGE_PREFIX}/${uid}/${filename}`;
       try {
         const exists = await this.storageAdapter.fileExists(storageKey);
         if (exists) {
@@ -231,21 +256,25 @@ export class EchoeMediaService {
       }
     }
 
-    // Delete from database
-    await db.delete(echoeMedia).where(inArray(echoeMedia.filename, filenames));
+    // Delete from database (only files owned by the user)
+    if (ownedFilenames.length > 0) {
+      await db
+        .delete(echoeMedia)
+        .where(and(eq(echoeMedia.uid, uid), inArray(echoeMedia.filename, ownedFilenames)));
+    }
   }
 
   /**
-   * Mark media as used in cards
+   * Mark media as used in cards for the current user
    */
-  async markAsUsed(filenames: string[]): Promise<void> {
+  async markAsUsed(uid: string, filenames: string[]): Promise<void> {
     if (filenames.length === 0) return;
 
     const db = getDatabase();
     await db
       .update(echoeMedia)
       .set({ usedInCards: 1 })
-      .where(inArray(echoeMedia.filename, filenames));
+      .where(and(eq(echoeMedia.uid, uid), inArray(echoeMedia.filename, filenames)));
   }
 
   /**
