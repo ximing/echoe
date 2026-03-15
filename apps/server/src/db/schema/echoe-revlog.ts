@@ -7,6 +7,7 @@ import {
   text,
   varchar,
 } from 'drizzle-orm/mysql-core';
+import { echoeCards } from './echoe-cards.js';
 
 /**
  * Review log table - stores review history
@@ -18,7 +19,9 @@ export const echoeRevlog = mysqlTable(
   {
     id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     revlogId: varchar('revlog_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
-    cid: varchar('cid', { length: 191 }).notNull(), // Card ID - now business ID string
+    cid: varchar('cid', { length: 191 })
+      .notNull()
+      .references(() => echoeCards.cardId, { onDelete: 'cascade' }), // Card ID - now business ID string
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this review record)
     usn: int('usn').notNull(), // Update sequence number (sync)
     ease: int('ease').notNull(), // Ease factor chosen: 1 Again, 2 Hard, 3 Good, 4 Easy
