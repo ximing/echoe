@@ -478,7 +478,7 @@ export class EchoeStudyService {
       where: reviewId
         ? and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.revlogId, reviewId))
         : eq(echoeRevlog.uid, uid),
-      orderBy: [desc(echoeRevlog.revlogId)],
+      orderBy: [desc(echoeRevlog.id)],
     });
 
     if (!lastReview) {
