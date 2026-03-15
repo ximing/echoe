@@ -58,8 +58,8 @@ describe('EchoeStudyService - FSRS input building', () => {
   });
 
   const buildCard = (overrides: Record<string, unknown> = {}) => ({
-    id: 1001,
-    did: 2001,
+    cardId: 'ec_test_1001',
+    did: 'ed_test_2001',
     queue: 2,
     due: new Date('2026-03-20T00:00:00.000Z').getTime(),
     stability: 12.5,
@@ -701,8 +701,9 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
 
   const buildDbCard = (overrides: Record<string, unknown> = {}) => ({
     id: 1001,
-    nid: 2001,
-    did: 3001,
+    cardId: 'ec_test_1001',
+    nid: 'en_test_2001',
+    did: 'ed_test_3001',
     ord: 0,
     due: Date.now() - 1000,
     ivl: 0,
@@ -754,20 +755,20 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
         },
         echoeNotes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            id: 2001, noteId: 'en_test_2001', mid: 'ent_test_4001', sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
             mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
-          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, deckId: 'ed_test_3001', conf: 1, dyn: 0 }),
         },
         echoeDeckConfig: {
           findFirst: jest.fn().mockResolvedValue(null),
         },
         echoeNotetypes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 4001, type: 0,
+            id: 4001, noteTypeId: 'ent_test_4001', type: 0,
             tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
           }),
         },
@@ -813,20 +814,20 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
         },
         echoeNotes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            id: 2001, noteId: 'en_test_2001', mid: 'ent_test_4001', sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
             mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
-          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, deckId: 'ed_test_3001', conf: 1, dyn: 0 }),
         },
         echoeDeckConfig: {
           findFirst: jest.fn().mockResolvedValue(null),
         },
         echoeNotetypes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 4001, type: 0,
+            id: 4001, noteTypeId: 'ent_test_4001', type: 0,
             tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
           }),
         },
@@ -863,8 +864,9 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
 
   const buildLeechCard = (lapses: number) => ({
     id: 1001,
-    nid: 2001,
-    did: 3001,
+    cardId: 'ec_test_1001',
+    nid: 'en_test_2001',
+    did: 'ed_test_3001',
     ord: 0,
     due: Date.now() - 1000,
     ivl: 1,
@@ -883,7 +885,8 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
 
   const buildMockNote = () => ({
     id: 2001,
-    mid: 4001,
+    noteId: 'en_test_2001',
+    mid: 'ent_test_4001',
     sfld: 'Front',
     tags: '[]',
     fieldsJson: { Front: 'Question', Back: 'Answer' },

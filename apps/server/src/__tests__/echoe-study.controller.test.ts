@@ -21,7 +21,7 @@ describe('EchoeStudyController submitReview validation', () => {
   });
 
   beforeEach(() => {
-    submitReviewMock = jest.fn().mockResolvedValue({ reviewId: 1 });
+    submitReviewMock = jest.fn().mockResolvedValue({ reviewId: 'erl_test_review_001' });
     controller = new EchoeStudyController({
       submitReview: submitReviewMock,
     } as any);
@@ -33,7 +33,7 @@ describe('EchoeStudyController submitReview validation', () => {
     const response = await controller.submitReview(dto as any, mockUser);
 
     expect(response.code).toBe(ErrorCode.SUCCESS);
-    expect(response.data).toEqual({ reviewId: 1 });
+    expect(response.data).toEqual({ reviewId: 'erl_test_review_001' });
     expect(submitReviewMock).toHaveBeenCalledWith(mockUser.uid, dto);
   });
 
