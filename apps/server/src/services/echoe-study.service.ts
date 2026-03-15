@@ -1105,7 +1105,7 @@ export class EchoeStudyService {
 
     logger.warn('FSRS legacy fallback path hit', {
       event: 'fsrs_legacy_fallback',
-      cardId: card.id,
+      cardId: card.cardId,
       deckId: card.did,
       cardType: card.type,
       queue: card.queue,
@@ -1223,7 +1223,7 @@ export class EchoeStudyService {
    * 0=learning/new, 1=review, 2=relearning, 4=custom/filtered.
    */
   private resolveRevlogType(
-    card: Pick<typeof echoeCards.$inferSelect, 'id' | 'queue' | 'type'>,
+    card: Pick<typeof echoeCards.$inferSelect, 'cardId' | 'queue' | 'type'>,
     deck: Pick<typeof echoeDecks.$inferSelect, 'dyn'>
   ): number {
     if (deck.dyn === 1) {
@@ -1248,7 +1248,7 @@ export class EchoeStudyService {
     }
 
     logger.warn('Unknown pre-review state, fallback revlog.type to custom study', {
-      cardId: card.id,
+      cardId: card.cardId,
       queue: card.queue,
       type: card.type,
     });
