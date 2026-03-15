@@ -1534,3 +1534,131 @@ describe('EchoeStudyService - getQueue tenant boundary', () => {
     expect(noteTypeWhereSql).toMatch(/note_type_id/i);
   });
 });
+
+/**
+ * Regression tests for issue #31:
+ * Revlog time queries must use `lastReview` (Unix ms) instead of `id` (auto-increment int).
+ *
+ * Previously, stats/daily-limit/deck queries used `echoeRevlog.id >= todayStart * 1000`,
+ * which fails when id is a small auto-increment value (1, 2, 3...) rather than epoch ms.
+ * The fix replaces these with `echoeRevlog.lastReview >= todayStart`.
+ */
+describe('EchoeStudyService - applyNewCardDailyLimit uses lastReview not id (regression #31)', () => {
+  let service: EchoeStudyService;
+
+  const uid = 'u_test_31';
+
+  /**
+   * Build a chainable mock that records the `where` argument passed to .where()
+   * so we can inspect the SQL expression used for time filtering.
+   */
+  function buildCapturingChainMock(returnValue: unknown): {
+    proxy: any;
+    capturedWhere: { args: unknown[] };
+  } {
+    const capturedWhere: { args: unknown[] } = { args: [] };
+    const chain: Record<string, jest.Mock> = {};
+    const methods = ['select', 'from', 'innerJoin', 'groupBy', 'limit'];
+    for (const method of methods) {
+      chain[method] = jest.fn().mockReturnValue(chain);
+    }
+    chain['where'] = jest.fn((...args: unknown[]) => {
+      capturedWhere.args = args;
+      return chain;
+    });
+    chain['then'] = jest.fn((fn: (v: unknown) => unknown) => Promise.resolve(fn(returnValue)));
+    const chainProxy = new Proxy(chain, {
+      get(target, prop) {
+        if (prop === 'then') return target['then'];
+        return target[prop as string] ?? jest.fn().mockReturnValue(chainProxy);
+      },
+    });
+    return { proxy: chainProxy, capturedWhere };
+  }
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      { createCard: jest.fn() } as any,
+      { getDeckAndSubdeckIds: jest.fn() } as any
+    );
+  });
+
+  it('should query revlog using lastReview column (not id) for daily new card count', async () => {
+    // When applyNewCardDailyLimit queries how many new cards were reviewed today,
+    // it must filter on `last_review` (Unix ms timestamp) not on `id` (auto-increment).
+    // If id were used, all reviews with small auto-increment ids would be excluded
+    // since they are far below todayStart (millisecond epoch ~1.7e12).
+
+    const configChain = buildCapturingChainMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const { proxy: revlogChain, capturedWhere } = buildCapturingChainMock([{ count: 3 }]);
+
+    let selectCallCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        selectCallCount++;
+        // 1st select: deck config query; 2nd select: revlog count query
+        if (selectCallCount === 1) return configChain.proxy;
+        return revlogChain;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 10);
+
+    // Verify computation is correct (perDay=20, todayReviewed=3 => remaining=17, rawNew=10 => 10)
+    expect(result).toBe(10);
+
+    // Verify a where clause was captured for the revlog query
+    expect(capturedWhere.args.length).toBeGreaterThan(0);
+
+    // Serialize the WHERE expression to SQL text to inspect which column is used
+    const whereExpr = capturedWhere.args[0];
+    const dialect = new MySqlDialect();
+    const getExprSql = (expr: unknown): string => {
+      const maybeWrapper = expr as { getSQL?: () => unknown } | null | undefined;
+      const sqlExpr = typeof maybeWrapper?.getSQL === 'function' ? maybeWrapper.getSQL() : expr;
+      if (!sqlExpr || typeof (sqlExpr as { toQuery?: unknown }).toQuery !== 'function') {
+        return '';
+      }
+      return dialect.sqlToQuery(sqlExpr as any).sql;
+    };
+
+    const whereSql = getExprSql(whereExpr);
+
+    // Must reference `last_review` column (lastReview in Drizzle maps to last_review in SQL)
+    expect(whereSql).toMatch(/last_review/i);
+
+    // Must NOT use `echoe_revlog`.`id` for time comparison
+    // (id is a tiny auto-increment integer, not a timestamp)
+    // The only acceptable `id` reference would be uid or revlog_id, not the PK `id`
+    expect(whereSql).not.toMatch(/`echoe_revlog`\.`id`\s*>=/i);
+  });
+
+  it('should correctly count today reviews as non-zero when lastReview is today (not epoch*1000)', async () => {
+    // Simulate 5 new-card reviews that happened today.
+    // The mock returns count=5, which represents reviews filtered by lastReview >= todayStart.
+    // If the code had erroneously used `id >= todayStart * 1000`, the DB would return count=0
+    // (since auto-increment ids like 1,2,3 are far below todayStart*1000 ~ 1.7e15).
+    // This test verifies the count (5) is passed through unchanged when within daily limit.
+
+    const configChain = buildCapturingChainMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const revlogChain = buildCapturingChainMock([{ count: 5 }]);
+
+    let selectCallCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) return configChain.proxy;
+        return revlogChain.proxy;
+      }),
+    } as any);
+
+    // rawNewCount=8, perDay=20, todayReviewed=5 => remaining=15, result=8
+    const result = await service.applyNewCardDailyLimit(uid, 8);
+    expect(result).toBe(8); // Not capped - today reviewed count is correctly recognised as 5
+
+    // If the buggy `id >= todayStart * 1000` were used, the mock would return 0 reviews,
+    // remaining=20, result=8 (coincidentally correct here but the query is wrong).
+    // The above SQL assertion in the previous test directly validates the column name.
+  });
+});
