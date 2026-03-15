@@ -82,9 +82,9 @@ export class EchoeNoteService extends Service {
     try {
       const response = await getCard(cardId);
       this.currentCard = {
-        cardId: response.data.id,
-        noteId: response.data.nid,
-        did: response.data.did,
+        cardId: response.data.cardId,
+        noteId: response.data.noteId,
+        did: response.data.deckId,
         note: response.data.note,
       };
       this.currentNote = response.data.note;
@@ -175,7 +175,7 @@ export class EchoeNoteService extends Service {
    * Get deck by ID
    */
   getDeckById(id: string): EchoeDeckWithCountsDto | undefined {
-    return this.decks.find((d) => d.id === id);
+    return this.decks.find((d) => d.deckId === id || d.id === id);
   }
 
   /**

@@ -24,28 +24,32 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
     service = new EchoeDeckService();
   });
 
-  const createDeck = (overrides: Partial<EchoeDeckWithCountsDto>): EchoeDeckWithCountsDto => ({
-    id: 'ed_test_deck_001',
-    name: 'Deck',
-    conf: 'edc_test_config_001',
-    extendNew: 0,
-    extendRev: 0,
-    collapsed: false,
-    dyn: 0,
-    desc: '',
-    mid: '',
-    mod: 0,
-    newCount: 0,
-    learnCount: 0,
-    reviewCount: 0,
-    totalCount: 0,
-    matureCount: 0,
-    difficultCount: 0,
-    averageRetrievability: 0,
-    lastStudiedAt: null,
-    ...overrides,
-    children: overrides.children ?? [],
-  });
+  const createDeck = (overrides: Partial<EchoeDeckWithCountsDto>): EchoeDeckWithCountsDto => {
+    const id = overrides.id ?? overrides.deckId ?? 'ed_test_deck_001';
+    return {
+      deckId: id,
+      id,
+      name: 'Deck',
+      conf: 'edc_test_config_001',
+      extendNew: 0,
+      extendRev: 0,
+      collapsed: false,
+      dyn: 0,
+      desc: '',
+      mid: '',
+      mod: 0,
+      newCount: 0,
+      learnCount: 0,
+      reviewCount: 0,
+      totalCount: 0,
+      matureCount: 0,
+      difficultCount: 0,
+      averageRetrievability: 0,
+      lastStudiedAt: null,
+      ...overrides,
+      children: overrides.children ?? [],
+    };
+  };
 
   it('should weight parent averageRetrievability by retrievability-eligible cards', () => {
     const parent = createDeck({

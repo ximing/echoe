@@ -198,7 +198,7 @@ export class EchoeDeckService extends Service {
 
     const visit = (items: EchoeDeckWithCountsDto[]) => {
       for (const item of items) {
-        deckIds.add(item.id);
+        deckIds.add(item.deckId);
         if (item.children.length > 0) {
           visit(item.children);
         }

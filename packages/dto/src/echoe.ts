@@ -3,7 +3,13 @@
  */
 
 export interface EchoeDeckDto {
-  /** Deck ID */
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
   id: string;
   /** Deck name (supports '::' for sub-decks) */
   name: string;
@@ -315,7 +321,13 @@ export interface UpdateEchoeNoteTypeDto {
 // ===== Notes =====
 
 export interface EchoeNoteDto {
-  /** Note ID */
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
   id: string;
   /** Note GUID */
   guid: string;
@@ -369,11 +381,29 @@ export interface UpdateEchoeNoteDto {
 // ===== Cards =====
 
 export interface EchoeCardDto {
-  /** Card ID */
+  /** Card ID (semantic business ID)
+   * @since Semantic rename: use `cardId` as primary field name
+   */
+  cardId: string;
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `cardId` instead. Retained for backwards compatibility during transition.
+   */
   id: string;
-  /** Note ID */
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
   nid: string;
-  /** Deck ID */
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
   did: string;
   /** Template ordinal */
   ord: number;
@@ -412,11 +442,29 @@ export interface EchoeCardWithNoteDto extends EchoeCardDto {
 
 /** Card list item for browser - includes deck info */
 export interface EchoeCardListItemDto {
-  /** Card ID */
+  /** Card ID (semantic business ID)
+   * @since Semantic rename: use `cardId` as primary field name
+   */
+  cardId: string;
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `cardId` instead. Retained for backwards compatibility during transition.
+   */
   id: string;
-  /** Note ID */
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
   nid: string;
-  /** Deck ID */
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
   did: string;
   /** Deck name */
   deckName: string;

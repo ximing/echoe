@@ -261,6 +261,12 @@ export class EchoeStudyService {
       return {
         card: {
           ...card,
+          // Semantic business ID fields (preferred)
+          cardId: card.cardId,
+          noteId: card.nid,
+          deckId: card.did,
+          // @deprecated aliases - retained for backwards compatibility
+          id: card.cardId,
           nid: card.nid,
           did: card.did,
           due: card.due,
@@ -269,12 +275,15 @@ export class EchoeStudyService {
           left: card.left,
           note: note ? {
             ...note,
-            id: note.id,
+            // Semantic business ID fields (preferred)
+            noteId: note.noteId,
+            // @deprecated alias - retained for backwards compatibility
+            id: note.noteId,
             mid: note.mid,
             mod: note.mod,
             csum: note.csum,
-          tags: parseTags(note.tags),
-          fields: parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
+            tags: parseTags(note.tags),
+            fields: parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
           } : undefined,
         } as any,
         nextDue,
@@ -424,6 +433,12 @@ export class EchoeStudyService {
     return {
       card: {
         ...updatedCard,
+        // Semantic business ID fields (preferred)
+        cardId: updatedCard.cardId,
+        noteId: updatedCard.nid,
+        deckId: updatedCard.did,
+        // @deprecated aliases - retained for backwards compatibility
+        id: updatedCard.cardId,
         nid: updatedCard.nid,
         did: updatedCard.did,
         due: updatedCard.due,
@@ -432,7 +447,10 @@ export class EchoeStudyService {
         left: updatedCard.left,
         note: fullNote ? {
           ...fullNote,
-          id: fullNote.id,
+          // Semantic business ID fields (preferred)
+          noteId: fullNote.noteId,
+          // @deprecated alias - retained for backwards compatibility
+          id: fullNote.noteId,
           mid: fullNote.mid,
           mod: fullNote.mod,
           csum: fullNote.csum,

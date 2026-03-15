@@ -252,6 +252,9 @@ export class EchoeDuplicateService {
         : {};
 
     return {
+      // Semantic business ID fields (preferred)
+      noteId: note.noteId,
+      // @deprecated alias - retained for backwards compatibility
       id: note.noteId,
       guid: note.guid,
       mid: note.mid,

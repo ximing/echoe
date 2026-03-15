@@ -250,6 +250,11 @@ export class EchoeNoteService {
         });
 
         createdCards.push({
+          // Semantic business ID fields (preferred)
+          cardId,
+          noteId,
+          deckId: dto.deckId,
+          // @deprecated aliases - retained for backwards compatibility
           id: cardId,
           nid: noteId,
           did: dto.deckId,
@@ -539,6 +544,11 @@ export class EchoeNoteService {
         }
 
         return {
+          // Semantic business ID fields (preferred)
+          cardId: card.cardId,
+          noteId: card.nid,
+          deckId: card.did,
+          // @deprecated aliases - retained for backwards compatibility
           id: card.cardId,
           nid: card.nid,
           did: card.did,
@@ -1188,6 +1198,9 @@ export class EchoeNoteService {
         : {};
 
     return {
+      // Semantic business ID fields (preferred)
+      noteId: note.noteId,
+      // @deprecated alias - retained for backwards compatibility
       id: note.noteId,
       guid: note.guid,
       mid: note.mid,
@@ -1207,6 +1220,11 @@ export class EchoeNoteService {
    */
   private mapCardToDto(card: any): EchoeCardDto {
     return {
+      // Semantic business ID fields (preferred)
+      cardId: card.cardId,
+      noteId: card.nid,
+      deckId: card.did,
+      // @deprecated aliases - retained for backwards compatibility
       id: card.cardId,
       nid: card.nid,
       did: card.did,

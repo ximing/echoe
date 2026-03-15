@@ -143,6 +143,9 @@ export class EchoeDeckService {
       const cappedNewCount = Math.min(rawNewCount, Math.max(0, perDay - todayNewReviewed));
 
       return {
+        // Semantic business ID fields (preferred)
+        deckId: deck.deckId,
+        // @deprecated alias - retained for backwards compatibility
         id: deck.deckId,
         name: deck.name,
         conf: deck.conf,
@@ -390,6 +393,9 @@ export class EchoeDeckService {
     };
 
     return {
+      // Semantic business ID fields (preferred)
+      deckId: deck[0].deckId,
+      // @deprecated alias - retained for backwards compatibility
       id: deck[0].deckId,
       name: deck[0].name,
       conf: deck[0].conf,
@@ -460,6 +466,9 @@ export class EchoeDeckService {
     }
 
     return {
+      // Semantic business ID fields (preferred)
+      deckId: newDeck.deckId,
+      // @deprecated alias - retained for backwards compatibility
       id: newDeck.deckId,
       name: newDeck.name,
       conf: newDeck.conf || '',
@@ -976,6 +985,11 @@ export class EchoeDeckService {
         const front = fields['Front'] || fields['front'] || Object.values(fields)[0] || '';
 
         return {
+          // Semantic business ID fields (preferred)
+          cardId: card.cardId,
+          noteId: card.nid,
+          deckId: card.did,
+          // @deprecated aliases - retained for backwards compatibility
           id: card.cardId,
           nid: card.nid,
           did: card.did,
