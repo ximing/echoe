@@ -21,9 +21,7 @@ export const echoeDecks = mysqlTable(
     deckId: varchar('deck_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Deck name (supports '::' for sub-decks)
-    conf: varchar('conf', { length: 191 })
-      .notNull()
-      .references(() => echoeDeckConfig.deckConfigId, { onDelete: 'cascade' }), // Deck config ID - now business ID string
+    conf: varchar('conf', { length: 191 }).notNull(), // Deck config ID - business ID string
     extendNew: int('extend_new').notNull().default(20), // Extend new cards limit
     extendRev: int('extend_rev').notNull().default(200), // Extend review limit
     usn: int('usn').notNull(), // Update sequence number (sync)
@@ -32,8 +30,7 @@ export const echoeDecks = mysqlTable(
     dyn: tinyint('dyn').notNull().default(0), // 0 = normal deck, 1 = filtered deck
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     desc: text('desc').notNull().$type<string>(), // Deck description
-    mid: varchar('mid', { length: 191 })
-      .references(() => echoeNotetypes.noteTypeId, { onDelete: 'set null' }), // Last note type used - now business ID string
+    mid: varchar('mid', { length: 191 }), // Last note type used - business ID string (nullable)
   },
   (table) => ({
     nameIdx: index('name_idx').on(table.name),

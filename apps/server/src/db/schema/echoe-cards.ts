@@ -21,12 +21,8 @@ export const echoeCards = mysqlTable(
     id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     cardId: varchar('card_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
-    nid: varchar('nid', { length: 191 })
-      .notNull()
-      .references(() => echoeNotes.noteId, { onDelete: 'cascade' }), // Note ID - now business ID string
-    did: varchar('did', { length: 191 })
-      .notNull()
-      .references(() => echoeDecks.deckId, { onDelete: 'cascade' }), // Deck ID - now business ID string
+    nid: varchar('nid', { length: 191 }).notNull(), // Note ID - business ID string
+    did: varchar('did', { length: 191 }).notNull(), // Deck ID - business ID string
     ord: int('ord').notNull(), // Template ordinal (which template generates this card)
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
