@@ -123,3 +123,19 @@
 - echoe-csv-import.service.ts delegates to noteService.createNote() which already validates relations
 - All 186 tests pass - validation is backward compatible and catches invalid references
 ---
+## 2026-03-16 00:52 - US-008
+- Implemented note owner delete transaction with explicit cascade to revlogs
+- Updated deleteNote in echoe-note.service.ts to delete revlogs for all cards before deleting cards
+- Cascade order: revlogs -> cards -> note (all within single transaction)
+- Used inArray() to delete all revlogs for card IDs in one query
+- Updated test expectation from 2 to 3 delete calls (revlogs, cards, note)
+- Files changed: apps/server/src/services/echoe-note.service.ts, apps/server/src/__tests__/echoe-note.service.test.ts
+- Commit: 061b67b
+
+**Learnings for future iterations:**
+- Revlog cascade must happen BEFORE card deletion (delete child records first)
+- Use inArray() for bulk deletion when you have multiple IDs to delete
+- Transaction already existed - just needed to add revlog deletion step
+- Test mocks track delete call count - update expectations when adding new delete operations
+- All 186 tests pass - cascade logic is backward compatible with existing tests
+---
