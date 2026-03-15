@@ -854,15 +854,16 @@ export class EchoeNoteService {
     // If cloning from an existing note type
     if (dto.cloneFrom) {
       const sourceNotetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.cloneFrom))).limit(1);
-      if (sourceNotetype.length > 0) {
-        const source = sourceNotetype[0];
-        fields = fields || JSON.parse(source.flds as string).map((f: any) => ({ name: f.name }));
-        templates = templates || JSON.parse(source.tmpls as string).map((t: any) => ({ name: t.name, qfmt: t.qfmt, afmt: t.afmt }));
-        css = css || source.css;
-        latexPre = latexPre || source.latexPre;
-        latexPost = latexPost || source.latexPost;
-        noteType = source.type;
+      if (sourceNotetype.length === 0) {
+        throw new Error(`Invalid relation: Note type '${dto.cloneFrom}' not found for field 'cloneFrom' (source notetype)`);
       }
+      const source = sourceNotetype[0];
+      fields = fields || JSON.parse(source.flds as string).map((f: any) => ({ name: f.name }));
+      templates = templates || JSON.parse(source.tmpls as string).map((t: any) => ({ name: t.name, qfmt: t.qfmt, afmt: t.afmt }));
+      css = css || source.css;
+      latexPre = latexPre || source.latexPre;
+      latexPost = latexPost || source.latexPost;
+      noteType = source.type;
     }
 
     // Default fields if not provided
