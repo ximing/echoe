@@ -1329,11 +1329,11 @@ export class EchoeImportService {
           continue;
         }
 
-        // Check for existing revlog in user scope
+        // Check for existing revlog in user scope by source revlog ID
         const existing = await db
           .select({ revlogId: echoeRevlog.revlogId })
           .from(echoeRevlog)
-          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, row.id), eq(echoeRevlog.cid, mappedCid)))
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.sourceRevlogId, row.id), eq(echoeRevlog.cid, mappedCid)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -1349,8 +1349,8 @@ export class EchoeImportService {
         const revlogId = generateTypeId(OBJECT_TYPE.ECHOE_REVLOG);
 
         const newRevlog: NewEchoeRevlog = {
-          id: row.id,
           revlogId,
+          sourceRevlogId: row.id, // Store original Anki revlog ID
           cid: mappedCid,
           uid,
           usn: row.usn,

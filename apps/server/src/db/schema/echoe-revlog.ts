@@ -19,6 +19,7 @@ export const echoeRevlog = mysqlTable(
   {
     id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     revlogId: varchar('revlog_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
+    sourceRevlogId: bigint('source_revlog_id', { mode: 'number' }), // Original source revlog ID (Anki timestamp-based ID)
     cid: varchar('cid', { length: 191 })
       .notNull()
       .references(() => echoeCards.cardId, { onDelete: 'cascade' }), // Card ID - now business ID string
@@ -53,6 +54,7 @@ export const echoeRevlog = mysqlTable(
     uidIdx: index('uid_idx').on(table.uid),
     uidRevlogIdIdx: index('uid_revlog_id_idx').on(table.uid, table.revlogId),
     uidCidIdx: index('uid_cid_idx').on(table.uid, table.cid),
+    uidSourceRevlogIdIdx: index('uid_source_revlog_id_idx').on(table.uid, table.sourceRevlogId),
   })
 );
 
