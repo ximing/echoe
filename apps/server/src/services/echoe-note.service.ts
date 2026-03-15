@@ -367,11 +367,11 @@ export class EchoeNoteService {
     return withTransaction(async (tx) => {
       // Add cards to graves
       for (const card of cards) {
-        await tx.insert(echoeGraves).values({ uid, usn: 0, oid: card.cardId, type: 2 });
+        await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: card.cardId, type: 2 });
       }
 
       // Add note to graves
-      await tx.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 1 });
+      await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 1 });
 
       // Delete cards
       await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));

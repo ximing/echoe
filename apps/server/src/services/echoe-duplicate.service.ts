@@ -202,6 +202,8 @@ export class EchoeDuplicateService {
     const { echoeCards } = await import('../db/schema/echoe-cards.js');
     const { echoeGraves } = await import('../db/schema/echoe-graves.js');
     const { logger } = await import('../utils/logger.js');
+    const { generateTypeId } = await import('../utils/id.js');
+    const { OBJECT_TYPE } = await import('../models/constant/type.js');
     const { and, eq, inArray } = await import('drizzle-orm');
 
     const db = getDatabase();
@@ -216,6 +218,7 @@ export class EchoeDuplicateService {
     // Add deleted notes to graves table
     for (const deleteId of deleteIds) {
       await db.insert(echoeGraves).values({
+        graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE),
         uid,
         usn: -1,
         oid: deleteId,
@@ -226,6 +229,7 @@ export class EchoeDuplicateService {
     // Add deleted cards to graves table
     for (const card of cardsToDelete) {
       await db.insert(echoeGraves).values({
+        graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE),
         uid,
         usn: -1,
         oid: card.cardId,

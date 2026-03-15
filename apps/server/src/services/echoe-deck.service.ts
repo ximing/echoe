@@ -560,7 +560,7 @@ export class EchoeDeckService {
         if (noteIds.length > 0) {
           // Add notes to graves
           for (const nid of noteIds) {
-            await tx.insert(echoeGraves).values({ uid, usn: 0, oid: nid, type: 1 });
+            await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: nid, type: 1 });
           }
 
           // Delete cards
@@ -575,7 +575,7 @@ export class EchoeDeckService {
       }
 
       // Add deck to graves
-      await tx.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 0 });
+      await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 0 });
 
       // Delete deck
       await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
