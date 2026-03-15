@@ -46,7 +46,7 @@ type ExportNoteRow = {
   tags: string;
   flds: string;
   sfld: string;
-  csum: number;
+  csum: string;
   flags: number;
   data: string;
 };
@@ -1021,7 +1021,7 @@ export class EchoeExportService {
         note.tags || '[]',
         note.flds,
         note.sfld,
-        note.csum,
+        parseInt(note.csum, 10) || 0,
         note.flags || 0,
         note.data || '{}'
       );

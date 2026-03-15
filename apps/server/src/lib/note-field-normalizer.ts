@@ -37,18 +37,18 @@ export interface NormalizerOutput {
   flds: string;
   /** Sort field: plain text of the first field */
   sfld: string;
-  /** Anki-compatible checksum: parseInt(sha1(sfld).slice(0, 8), 16) */
-  csum: number;
+  /** Anki-compatible checksum: parseInt(sha1(sfld).slice(0, 8), 16).toString() */
+  csum: string;
 }
 
 /**
  * Computes an Anki-compatible checksum for the given sort field value.
  * @param sfld - The sort field plain-text string
- * @returns parseInt(sha1(sfld).slice(0, 8), 16)
+ * @returns parseInt(sha1(sfld).slice(0, 8), 16).toString()
  */
-function computeCsum(sfld: string): number {
+function computeCsum(sfld: string): string {
   const hash = createHash('sha1').update(sfld, 'utf8').digest('hex');
-  return parseInt(hash.slice(0, 8), 16);
+  return parseInt(hash.slice(0, 8), 16).toString();
 }
 
 /**

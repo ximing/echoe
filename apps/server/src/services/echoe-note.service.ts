@@ -1208,7 +1208,7 @@ export class EchoeNoteService {
       tags: safeJsonParse<string[]>(note.tags, []),
       fields,
       sfld: note.sfld,
-      csum: Number(note.csum),
+      csum: String(note.csum),
       flags: note.flags,
       data: note.data,
       richTextFields: note.richTextFields ?? undefined,

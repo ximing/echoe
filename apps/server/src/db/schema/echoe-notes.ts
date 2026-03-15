@@ -27,7 +27,7 @@ export const echoeNotes = mysqlTable(
     tags: text('tags').notNull().$type<string>(), // JSON array of tags
     flds: text('flds').notNull(), // Field values (joined by \x1f)
     sfld: varchar('sfld', { length: 191 }).notNull(), // Sort field (first field, cleaned)
-    csum: bigint('csum', { mode: 'number' }).notNull(), // Checksum of sort field (for duplicates)
+    csum: varchar('csum', { length: 191 }).notNull(), // Checksum of sort field (for duplicates)
     flags: int('flags').notNull().default(0), // Flags (1 = marked)
     data: text('data').notNull().$type<string>(), // Extra data field (JSON)
     richTextFields: json('rich_text_fields').$type<RichTextFields>(), // Rich text JSON for fields (keyed by field name → ProseMirror doc)

@@ -194,7 +194,7 @@ function createExportFixtureData(): ExportFixtureData {
         tags: '[]',
         flds: 'Front\x1fBack',
         sfld: 'Front',
-        csum: 123456,
+        csum: '123456',
         flags: 0,
         data: '{}',
       },

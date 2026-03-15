@@ -756,7 +756,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
-            mod: 0, csum: 0,
+            mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
@@ -815,7 +815,7 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
-            mod: 0, csum: 0,
+            mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
@@ -888,7 +888,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     tags: '[]',
     fieldsJson: { Front: 'Question', Back: 'Answer' },
     mod: 0,
-    csum: 0,
+    csum: '0',
   });
 
   const buildRelearningResult = () => ({

@@ -13,7 +13,7 @@ interface NoteRecord {
   tags: string;
   flds: string;
   sfld: string;
-  csum: number;
+  csum: string;
   flags: number;
   data: string;
   fieldsJson?: Record<string, string> | null;
@@ -266,7 +266,7 @@ export class EchoeDuplicateService {
       tags: note.tags ? JSON.parse(note.tags) : [],
       fields,
       sfld: note.sfld,
-      csum: Number(note.csum),
+      csum: String(note.csum),
       flags: note.flags,
       data: note.data,
     };

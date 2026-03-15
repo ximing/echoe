@@ -71,6 +71,13 @@
       "when": 1773506001295,
       "tag": "0009_silly_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1773561509542,
+      "tag": "0010_normal_barracuda",
+      "breakpoints": true
     }
   ]
 }

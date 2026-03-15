@@ -342,7 +342,7 @@ export interface EchoeNoteDto {
   /** Sort field */
   sfld: string;
   /** Checksum */
-  csum: number;
+  csum: string;
   /** Flags */
   flags: number;
   /** Data */
