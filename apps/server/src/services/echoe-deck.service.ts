@@ -259,7 +259,7 @@ export class EchoeDeckService {
 
     // First pass: create map
     for (const deck of decks) {
-      deckMap.set(deck.id, { ...deck, children: [] });
+      deckMap.set(deck.deckId, { ...deck, children: [] });
     }
 
     // Second pass: build hierarchy
@@ -268,16 +268,16 @@ export class EchoeDeckService {
         const parentName = deck.name.substring(0, deck.name.lastIndexOf('::'));
         const parent = decks.find((d) => d.name === parentName);
         if (parent) {
-          const parentDeck = deckMap.get(parent.id);
+          const parentDeck = deckMap.get(parent.deckId);
           if (parentDeck) {
-            parentDeck.children.push(deckMap.get(deck.id)!);
+            parentDeck.children.push(deckMap.get(deck.deckId)!);
           }
         } else {
           // Parent doesn't exist, treat as root
-          rootDecks.push(deckMap.get(deck.id)!);
+          rootDecks.push(deckMap.get(deck.deckId)!);
         }
       } else {
-        rootDecks.push(deckMap.get(deck.id)!);
+        rootDecks.push(deckMap.get(deck.deckId)!);
       }
     }
 
@@ -308,7 +308,7 @@ export class EchoeDeckService {
     let totalTotalCount = deck.totalCount;
     let totalMatureCount = deck.matureCount;
     let totalDifficultCount = deck.difficultCount;
-    let totalRetrievabilityEligibleCount = directRetrievabilityEligibleCountMap.get(deck.id) || 0;
+    let totalRetrievabilityEligibleCount = directRetrievabilityEligibleCountMap.get(deck.deckId) || 0;
     let totalRetrievabilitySum = deck.averageRetrievability * totalRetrievabilityEligibleCount;
     let maxLastStudiedAt = deck.lastStudiedAt;
 
