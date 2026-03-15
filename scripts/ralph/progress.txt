@@ -73,3 +73,35 @@
 - UpdateEchoeDeckDto only allows updating name and desc - conf and mid are immutable after creation
 - All 186 tests pass without modification - the validation is backward compatible
 ---
+## 2026-03-16 00:40 - US-005
+- Implemented config-domain relation validation for notetype cloneFrom field
+- Added validation in createNoteType to check cloneFrom (source notetype) exists within the same uid
+- Error format: "Invalid relation: Note type '{id}' not found for field 'cloneFrom' (source notetype)"
+- Template ntid validation is implicitly satisfied (templates always created with valid notetype ID)
+- Template did and notetype did are not user-settable via current DTOs (always set to empty string)
+- Files changed: apps/server/src/services/echoe-note.service.ts
+- Commit: 6f86b26
+
+**Learnings for future iterations:**
+- Templates and notetypes are managed in echoe-note.service.ts, not echoe-config.service.ts
+- Template ntid is always set to the notetype being created/updated, so it's implicitly valid
+- Template did and notetype did fields exist in schema but are not exposed via DTOs (always empty string)
+- The PRD's "config-domain" refers to configuration tables (notetypes, templates, deck_config), not the service name
+- All 186 tests pass without modification - the validation is backward compatible
+---
+## 2026-03-16 00:45 - US-006
+- Implemented study service relation validation for card ID (cid) field
+- Updated error messages in submitReview and getOptions to be explicit about relation field context
+- Error format: "Invalid relation: Card '{id}' not found for field 'cid' (cardId)"
+- Updated controllers to return PARAMS_ERROR (4xx) instead of NOT_FOUND for invalid relations
+- Files changed: apps/server/src/services/echoe-study.service.ts, apps/server/src/controllers/v1/echoe-study.controller.ts
+- Commit: a423895
+
+**Learnings for future iterations:**
+- Study service already validates card IDs in submitReview, buryCards, and forgetCards methods
+- All card operations query with both uid and cardId, ensuring same-uid scope validation
+- Revlog creation happens inside submitReview after card validation, so cid is always valid
+- buryCards and forgetCards silently skip non-existent cards (no error thrown)
+- Controller error handling pattern: catch "not found" errors and return PARAMS_ERROR with message
+- All 186 tests pass without modification - the validation logic was already correct
+---

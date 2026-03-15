@@ -230,9 +230,17 @@ function createImportDbMock(uid: string): { db: unknown; rows: ImportedRows } {
 
   const db = {
     select: jest.fn().mockImplementation(() => ({
-      from: jest.fn().mockImplementation(() => ({
-        where: jest.fn().mockImplementation(() => ({
-          limit: jest.fn().mockResolvedValue([]),
+      from: jest.fn().mockImplementation((table: unknown) => ({
+        where: jest.fn().mockImplementation((condition: unknown) => ({
+          limit: jest.fn().mockImplementation(() => {
+            // Return inserted rows for validation queries
+            const store = resolveStore(rows, table);
+            if (store && store.length > 0) {
+              // Return the first matching row (simplified - real DB would filter by condition)
+              return Promise.resolve([store[store.length - 1]]);
+            }
+            return Promise.resolve([]);
+          }),
         })),
       })),
     })),

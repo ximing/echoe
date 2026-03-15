@@ -799,6 +799,25 @@ export class EchoeImportService {
           if (!deckId) {
             deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
 
+            // Resolve and validate mid (notetype) relation
+            const mappedMid = referenceMap.midToNoteTypeId.get(sourceMid);
+            let validatedMid: string | null = null;
+
+            if (mappedMid) {
+              // Validate that the mapped notetype exists in the database within the same uid
+              const notetypeExists = await db
+                .select({ noteTypeId: echoeNotetypes.noteTypeId })
+                .from(echoeNotetypes)
+                .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid)))
+                .limit(1);
+
+              if (notetypeExists.length > 0) {
+                validatedMid = mappedMid;
+              } else {
+                errors.push(`Invalid relation: Note type '${mappedMid}' not found for field 'mid' (notetypeId) in deck ${row.name} - setting to null`);
+              }
+            }
+
             await db.insert(echoeDecks).values({
               deckId,
               uid,
@@ -812,7 +831,7 @@ export class EchoeImportService {
               dyn: row.dyn || 0,
               mod: row.mod,
               desc: row.desc || '',
-              mid: referenceMap.midToNoteTypeId.get(sourceMid) ?? null,
+              mid: validatedMid,
             });
             added++;
           }
@@ -985,6 +1004,19 @@ export class EchoeImportService {
         if (!mappedMid) {
           skipped++;
           errors.push(`Skipped note ${row.guid}: missing notetype mapping for source mid ${sourceMid}`);
+          continue;
+        }
+
+        // Validate that the mapped notetype exists in the database within the same uid
+        const notetypeExists = await db
+          .select({ noteTypeId: echoeNotetypes.noteTypeId })
+          .from(echoeNotetypes)
+          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid)))
+          .limit(1);
+
+        if (notetypeExists.length === 0) {
+          skipped++;
+          errors.push(`Invalid relation: Note type '${mappedMid}' not found for field 'mid' (notetypeId) in note ${row.guid}`);
           continue;
         }
 
@@ -1192,6 +1224,30 @@ export class EchoeImportService {
             continue;
           }
 
+          // Validate that the mapped note exists in the database within the same uid
+          const noteExists = await db
+            .select({ noteId: echoeNotes.noteId })
+            .from(echoeNotes)
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, mappedNid)))
+            .limit(1);
+
+          if (noteExists.length === 0) {
+            errors.push(`Invalid relation: Note '${mappedNid}' not found for field 'nid' (noteId) in card ${row.id}`);
+            continue;
+          }
+
+          // Validate that the mapped deck exists in the database within the same uid
+          const deckExists = await db
+            .select({ deckId: echoeDecks.deckId })
+            .from(echoeDecks)
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, mappedDid)))
+            .limit(1);
+
+          if (deckExists.length === 0) {
+            errors.push(`Invalid relation: Deck '${mappedDid}' not found for field 'did' (deckId) in card ${row.id}`);
+            continue;
+          }
+
           const existing = await db
             .select({ cardId: echoeCards.cardId })
             .from(echoeCards)
@@ -1326,6 +1382,18 @@ export class EchoeImportService {
         const sourceCid = this.getSourceIdKey(row.cid);
         const mappedCid = referenceMap.cidToCardId.get(sourceCid);
         if (!mappedCid) {
+          continue;
+        }
+
+        // Validate that the mapped card exists in the database within the same uid
+        const cardExists = await db
+          .select({ cardId: echoeCards.cardId })
+          .from(echoeCards)
+          .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, mappedCid)))
+          .limit(1);
+
+        if (cardExists.length === 0) {
+          // Skip silently - revlogs for non-existent cards are expected when cards fail to import
           continue;
         }
 
