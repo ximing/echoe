@@ -31,8 +31,6 @@ export const echoeTemplates = mysqlTable(
     bqfmt: text('bqfmt').notNull().$type<string>(), // Browser question format
     bafmt: text('bafmt').notNull().$type<string>(), // Browser answer format
     did: varchar('did', { length: 191 })
-      .notNull()
-      .default('')
       .references(() => echoeDecks.deckId, { onDelete: 'set null' }), // Override deck ID - now business ID string
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)

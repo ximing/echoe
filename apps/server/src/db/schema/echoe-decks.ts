@@ -33,8 +33,6 @@ export const echoeDecks = mysqlTable(
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     desc: text('desc').notNull().$type<string>(), // Deck description
     mid: varchar('mid', { length: 191 })
-      .notNull()
-      .default('')
       .references(() => echoeNotetypes.noteTypeId, { onDelete: 'set null' }), // Last note type used - now business ID string
   },
   (table) => ({
