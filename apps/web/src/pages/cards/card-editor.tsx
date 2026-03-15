@@ -475,16 +475,11 @@ const [tags, setTags] = useState<string[]>([]);
           <RichTextEditor
             content={richTextFields[field.name] || fields[field.name] || ''}
             onChange={(_html, json) => {
-              // Only store rich text JSON, not HTML in fields
-              // Fields will contain empty string for rich text fields
               setRichTextFields((prev) => ({
                 ...prev,
                 [field.name]: json,
               }));
-              // Also update fields with empty string to maintain the field exists
-              if (!fields[field.name]) {
-                handleFieldChange(field.name, '');
-              }
+              // Fields are already initialized - no need to maintain field existence here
             }}
             minHeight="120px"
           />
