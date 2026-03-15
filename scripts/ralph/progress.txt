@@ -60,3 +60,16 @@
 - The mid field is immutable in notes (not in UpdateEchoeNoteDto), so update validation is defensive only
 - All tests pass without changes - the validation logic was already correct
 ---
+## 2026-03-16 00:05 - US-004
+- Implemented deck service relation validation for conf (deckConfigId) field during creation
+- Added validation in createDeck to check conf exists in echoeDeckConfig table within the same uid
+- Error format: "Invalid relation: Deck config '{id}' not found for field 'conf' (deckConfigId)"
+- mid field is not in CreateEchoeDeckDto or UpdateEchoeDeckDto - it's set to null during creation and updated internally
+- Files changed: apps/server/src/services/echoe-deck.service.ts
+
+**Learnings for future iterations:**
+- Deck conf field is optional in CreateEchoeDeckDto but defaults to empty string in the schema
+- Deck mid field is nullable and not user-settable via DTOs - only updated internally by the system
+- UpdateEchoeDeckDto only allows updating name and desc - conf and mid are immutable after creation
+- All 186 tests pass without modification - the validation is backward compatible
+---
