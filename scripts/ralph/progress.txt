@@ -1,0 +1,15 @@
+## 2026-03-15 19:00 - US-001
+- Removed all .references() calls from Echoe schema files (echoe-notes.ts, echoe-cards.ts, echoe-revlog.ts, echoe-decks.ts, echoe-templates.ts)
+- Relation columns remain as varchar(191) business ID fields
+- All indexes preserved for relation lookups
+- Files changed: 5 schema files in apps/server/src/db/schema/
+- Commit: c6ecc4f
+
+**Learnings for future iterations:**
+- The project uses Drizzle ORM with `.references()` for foreign key definitions
+- All Echoe relation fields use varchar(191) for business IDs (not numeric auto-increment IDs)
+- Indexes are defined separately in the table's second parameter (index definitions)
+- Removing `.references()` doesn't remove the column or indexes - only the FK constraint
+- Typecheck must pass before committing (run `cd apps/server && pnpm typecheck`)
+- Schema files are in apps/server/src/db/schema/ and must be exported from schema/index.ts
+---
