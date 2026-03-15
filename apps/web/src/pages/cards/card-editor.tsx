@@ -340,7 +340,7 @@ const [tags, setTags] = useState<string[]>([]);
           richTextFields: completeRichTextFields,
         });
         if (success) {
-          toastService.success('Note updated');
+          toastService.success('Card updated');
           navigate('/cards');
         } else {
           toastService.error(noteService.error || 'Failed to update note');
@@ -355,7 +355,7 @@ const [tags, setTags] = useState<string[]>([]);
           richTextFields: completeRichTextFields,
         });
         if (result) {
-          toastService.success('Note created');
+          toastService.success('Card created');
           navigate('/cards');
         } else {
           toastService.error(noteService.error || 'Failed to create note');
