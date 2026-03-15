@@ -89,7 +89,7 @@ const [tags, setTags] = useState<string[]>([]);
 
       // Try to find deck from card
       if (cardId && noteService.currentCard) {
-        const deck = deckService.decks.find((d) => d.id === noteService.currentCard?.did);
+        const deck = deckService.decks.find((d) => d.deckId === noteService.currentCard?.did);
         if (deck) {
           setSelectedDeck(deck);
         }
@@ -146,7 +146,7 @@ const [tags, setTags] = useState<string[]>([]);
 
   // Handle deck change
   const handleDeckChange = (deckId: string) => {
-    const deck = deckService.decks.find((d) => d.id === deckId);
+    const deck = deckService.decks.find((d) => d.deckId === deckId);
     if (deck) {
       setSelectedDeck(deck);
     }
@@ -329,7 +329,7 @@ const [tags, setTags] = useState<string[]>([]);
         // Create new note
         const result = await noteService.createNewNote({
           notetypeId: selectedNotetype.id,
-          deckId: selectedDeck.id,
+          deckId: selectedDeck.deckId,
           fields,
           tags,
           richTextFields: completeRichTextFields,
@@ -551,13 +551,13 @@ const [tags, setTags] = useState<string[]>([]);
                 Deck
               </label>
               <select
-                value={selectedDeck?.id || ''}
+                value={selectedDeck?.deckId || ''}
                 onChange={(e) => handleDeckChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="">Select deck</option>
                 {deckService.getRootDecks().map((deck) => (
-                  <option key={deck.id} value={deck.id}>
+                  <option key={deck.deckId} value={deck.deckId}>
                     {deck.name.split('::').pop()}
                   </option>
                 ))}
