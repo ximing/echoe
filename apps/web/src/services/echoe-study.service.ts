@@ -27,7 +27,7 @@ export interface SessionStats {
 export interface UndoEntry {
   cardId: string;
   previousState: StudyQueueItemDto;
-  reviewId?: number;
+  reviewId?: string;
 }
 
 /**
