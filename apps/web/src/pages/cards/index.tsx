@@ -768,7 +768,7 @@ const DeleteDeckDialog = view(
 );
 
 interface CustomStudyDialogProps {
-  deckId: number;
+  deckId: string;
   deckName: string;
   onClose: () => void;
 }

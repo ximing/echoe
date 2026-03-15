@@ -26,7 +26,7 @@ function parseDeckName(name: string): { label: string; depth: number } {
   return { label: parts[parts.length - 1], depth: parts.length - 1 };
 }
 
-function MaturityBar({ deckId, maturityBatch }: { deckId: number; maturityBatch: MaturityBatchDeck[] }) {
+function MaturityBar({ deckId, maturityBatch }: { deckId: string; maturityBatch: MaturityBatchDeck[] }) {
   const data = maturityBatch.find((d) => d.deckId === deckId);
   if (!data) return <div className="h-1.5 rounded-full bg-gray-100 dark:bg-dark-700 w-full" />;
 
@@ -52,7 +52,7 @@ function DeckCard({
 }: {
   deck: EchoeDeckWithCountsDto;
   maturityBatch: MaturityBatchDeck[];
-  onStudy: (deckId: number) => void;
+  onStudy: (deckId: string) => void;
 }) {
   const { label, depth } = parseDeckName(deck.name);
   const dueCount = deck.newCount + deck.learnCount + deck.reviewCount;
