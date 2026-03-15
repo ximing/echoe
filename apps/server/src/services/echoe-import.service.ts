@@ -1053,6 +1053,16 @@ export class EchoeImportService {
     };
   }
 
+  private async isCardNoteBindingAllowed(uid: string, noteId: string): Promise<boolean> {
+    const db = getDatabase();
+    const noteOwner = await db.query.echoeNotes.findFirst({
+      columns: { uid: true },
+      where: eq(echoeNotes.noteId, noteId),
+    });
+
+    return !noteOwner || noteOwner.uid === uid;
+  }
+
   private async importCardsRows(
     uid: string,
     sourceDb: Database.Database,
@@ -1103,12 +1113,19 @@ export class EchoeImportService {
 
           const normalizedDue = this.normalizeDueToMilliseconds(row.due, row.queue, row.type);
           const normalizedOdue = this.normalizeDueToMilliseconds(row.odue, row.type, row.type);
+          const boundNoteId = String(row.nid);
+
+          const isBindingAllowed = await this.isCardNoteBindingAllowed(uid, boundNoteId);
+          if (!isBindingAllowed) {
+            errors.push(`Skipped card ${row.id}: note ${boundNoteId} belongs to another user`);
+            continue;
+          }
 
           if (existing.length > 0) {
             await db
               .update(echoeCards)
               .set({
-                nid: row.nid,
+                nid: boundNoteId,
                 did: row.did,
                 ord: row.ord,
                 mod: row.mod,
@@ -1140,7 +1157,7 @@ export class EchoeImportService {
             const newCard: NewEchoeCards = {
               cardId,
               uid,
-              nid: String(row.nid), // Temporary: convert numeric to string
+              nid: boundNoteId, // Temporary: convert numeric to string
               did: String(row.did), // Temporary: convert numeric to string
               ord: row.ord,
               mod: row.mod,

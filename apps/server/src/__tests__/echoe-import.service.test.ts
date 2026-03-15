@@ -9,11 +9,15 @@ jest.mock('../services/echoe-media.service.js', () => ({
 }));
 
 import { EchoeImportService } from '../services/echoe-import.service.js';
+import { getDatabase } from '../db/connection.js';
+
+const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
 describe('EchoeImportService - FSRS difficulty backfill', () => {
   let service: EchoeImportService;
 
   beforeEach(() => {
+    mockedGetDatabase.mockReset();
     service = new EchoeImportService({} as any);
   });
 
@@ -64,5 +68,52 @@ describe('EchoeImportService - FSRS difficulty backfill', () => {
 
     expect((service as any).resolveRevlogDifficulty(0, fallback)).toBe(2.5);
     expect((service as any).resolveRevlogDifficulty(3000, fallback)).toBe(3);
+  });
+});
+
+describe('EchoeImportService - tenant boundary for card-note binding', () => {
+  let service: EchoeImportService;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeImportService({} as any);
+  });
+
+  it('should reject binding card to note owned by another uid', async () => {
+    const noteFindFirstMock = jest.fn().mockResolvedValue({ uid: 'user-b' });
+
+    mockedGetDatabase.mockReturnValue({
+      query: {
+        echoeNotes: {
+          findFirst: noteFindFirstMock,
+        },
+      },
+    } as any);
+
+    const allowed = await (service as any).isCardNoteBindingAllowed('user-a', 'en_shared_1');
+
+    expect(allowed).toBe(false);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should allow binding card when note is missing or belongs to same uid', async () => {
+    const noteFindFirstMock = jest.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ uid: 'user-a' });
+
+    mockedGetDatabase.mockReturnValue({
+      query: {
+        echoeNotes: {
+          findFirst: noteFindFirstMock,
+        },
+      },
+    } as any);
+
+    const allowedWhenMissing = await (service as any).isCardNoteBindingAllowed('user-a', 'en_missing_1');
+    const allowedWhenOwned = await (service as any).isCardNoteBindingAllowed('user-a', 'en_owned_1');
+
+    expect(allowedWhenMissing).toBe(true);
+    expect(allowedWhenOwned).toBe(true);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(2);
   });
 });

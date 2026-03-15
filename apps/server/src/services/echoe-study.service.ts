@@ -123,14 +123,20 @@ export class EchoeStudyService {
     const result: StudyQueueItemDto[] = [];
     for (const card of cards) {
       const note = await db.query.echoeNotes.findFirst({
-        where: eq(echoeNotes.noteId, card.nid),
+        where: and(
+          eq(echoeNotes.uid, uid),
+          eq(echoeNotes.noteId, card.nid)
+        ),
       });
 
       if (!note) continue;
 
       // Get note type to access templates
       const noteType = await db.query.echoeNotetypes.findFirst({
-        where: eq(echoeNotetypes.noteTypeId, note.mid),
+        where: and(
+          eq(echoeNotetypes.uid, uid),
+          eq(echoeNotetypes.noteTypeId, note.mid)
+        ),
       });
 
       if (!noteType) continue;

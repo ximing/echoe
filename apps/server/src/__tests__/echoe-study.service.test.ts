@@ -1403,3 +1403,134 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
     expect(result).toHaveProperty('totalCount');
   });
 });
+
+describe('EchoeStudyService - getQueue tenant boundary', () => {
+  let service: EchoeStudyService;
+
+  const extractWhereSqlText = (expr: unknown): string => {
+    const maybeWrapper = expr as { getSQL?: () => unknown } | null | undefined;
+    const sqlExpr = typeof maybeWrapper?.getSQL === 'function' ? maybeWrapper.getSQL() : expr;
+
+    if (!sqlExpr || typeof (sqlExpr as { toQuery?: unknown }).toQuery !== 'function') {
+      return '';
+    }
+
+    return new MySqlDialect().sqlToQuery(sqlExpr as any).sql;
+  };
+
+  const buildDueCard = (overrides: Record<string, unknown> = {}) => ({
+    cardId: 'ec_queue_1',
+    nid: 'en_shared',
+    did: 'ed_default',
+    ord: 0,
+    type: 2,
+    queue: 2,
+    due: Date.now() - 1000,
+    ivl: 3,
+    factor: 2500,
+    reps: 5,
+    lapses: 0,
+    left: 0,
+    stability: 2.3,
+    lastReview: Date.now() - 10_000,
+    ...overrides,
+  });
+
+  const createSelectChain = (cards: Array<Record<string, unknown>>) => {
+    const limitMock = jest.fn().mockResolvedValue(cards);
+    const orderByMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const whereMock = jest.fn().mockReturnValue({ orderBy: orderByMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    return { selectMock };
+  };
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should filter note lookup by uid and block cross-tenant note content leak', async () => {
+    const queueCards = [buildDueCard()];
+    const { selectMock } = createSelectChain(queueCards);
+
+    const noteFindFirstMock = jest.fn(async ({ where }: { where: unknown }) => {
+      const whereSql = extractWhereSqlText(where);
+      if (/echoe_notes.*uid/i.test(whereSql)) {
+        return null;
+      }
+
+      return {
+        noteId: 'en_shared',
+        mid: 'ent_shared',
+        fieldsJson: { Front: 'other-user-secret' },
+        sfld: 'other-user-secret',
+        tags: '[]',
+      };
+    });
+
+    const noteTypeFindFirstMock = jest.fn().mockResolvedValue({
+      noteTypeId: 'ent_shared',
+      type: 0,
+      tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Front}}' }]),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      query: {
+        echoeNotes: { findFirst: noteFindFirstMock },
+        echoeNotetypes: { findFirst: noteTypeFindFirstMock },
+      },
+    } as any);
+
+    const result = await service.getQueue('user-a', { limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
+    expect(noteTypeFindFirstMock).not.toHaveBeenCalled();
+
+    const noteWhereSql = extractWhereSqlText(noteFindFirstMock.mock.calls[0]?.[0]?.where);
+    expect(noteWhereSql).toMatch(/echoe_notes.*uid/i);
+    expect(noteWhereSql).toMatch(/note_id/i);
+  });
+
+  it('should filter notetype lookup by uid when rendering queue cards', async () => {
+    const queueCards = [buildDueCard({ nid: 'en_owned_1' })];
+    const { selectMock } = createSelectChain(queueCards);
+
+    const noteFindFirstMock = jest.fn().mockResolvedValue({
+      noteId: 'en_owned_1',
+      mid: 'ent_shared',
+      fieldsJson: { Front: 'safe-content' },
+      sfld: 'safe-content',
+      tags: '[]',
+    });
+
+    const noteTypeFindFirstMock = jest.fn().mockResolvedValue(null);
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      query: {
+        echoeNotes: { findFirst: noteFindFirstMock },
+        echoeNotetypes: { findFirst: noteTypeFindFirstMock },
+      },
+    } as any);
+
+    const result = await service.getQueue('user-a', { limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(noteTypeFindFirstMock).toHaveBeenCalledTimes(1);
+
+    const noteTypeWhereSql = extractWhereSqlText(noteTypeFindFirstMock.mock.calls[0]?.[0]?.where);
+    expect(noteTypeWhereSql).toMatch(/echoe_notetypes.*uid/i);
+    expect(noteTypeWhereSql).toMatch(/note_type_id/i);
+  });
+});
