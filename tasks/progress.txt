@@ -346,3 +346,33 @@
   - Typecheck and lint pass cleanly - no type errors in cards pages after refactoring
   - Browser testing note: Manual verification in browser recommended but not blocking for this story
 ---
+## 2026-03-15 - US-024
+- Updated test data and assertions in backend service tests to use string business IDs
+- Files changed: 
+  - echoe-deck.service.test.ts: Fixed 11 type errors (deck IDs, deckConfig IDs in test data and assertions)
+  - echoe-note.service.test.ts: Fixed 34 type errors (cardIds arrays, noteType IDs, note IDs, deck IDs in payloads and method calls)
+  - echoe-study.service.test.ts: Fixed 12 type errors (cardIds in forgetCards, submitReview cardId, getQueue/getCounts deckId parameters)
+- **Learnings for future iterations:**
+  - Test data type errors after schema/DTO changes require updating test fixtures to match new types
+  - Pattern for test ID updates: cardIds arrays need string[] not number[], method parameters need string IDs
+  - Test assertions on database writes (e.g., grave oid field) must match the new string ID types
+  - All 176 tests pass after ID type updates - runtime behavior unaffected by type-only changes
+  - Typecheck must pass cleanly before committing - no type errors allowed in test files
+  - Test file patterns: Use prefixed string IDs (ec_*, ed_*, en_*, ent_*) matching production ID format
+---
+## 2026-03-15 - US-025
+- Ran all mandatory quality gate commands successfully
+- Files changed: packages/dto/package.json (added --passWithNoTests flag)
+- Quality gate results:
+  - pnpm --filter @echoe/server test: ✅ 176 tests passed
+  - pnpm --filter @echoe/dto test: ✅ exit code 0 (no tests, passWithNoTests flag added)
+  - pnpm lint: ✅ exit code 0 (0 errors, 1137 warnings - warnings are acceptable)
+  - pnpm --filter @echoe/server typecheck: ✅ exit code 0
+  - pnpm --filter @echoe/web typecheck: ✅ exit code 0
+  - pnpm --filter @echoe/dto typecheck: ✅ exit code 0
+- **Learnings for future iterations:**
+  - DTO package is type-only with no tests - use --passWithNoTests flag for jest
+  - Lint warnings (1137) are acceptable - only errors block quality gates
+  - All quality gates must pass before marking migration complete
+  - Quality gate pattern: test → lint → typecheck for each package
+---
