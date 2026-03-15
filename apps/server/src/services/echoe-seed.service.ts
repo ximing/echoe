@@ -214,7 +214,7 @@ function createDefaultDeck() {
     dyn: 0,
     mod: now,
     desc: '',
-    mid: '',
+    mid: null,
   };
 }
 
@@ -472,7 +472,7 @@ export class EchoeSeedService {
       dyn: 0,
       mod: now,
       desc: '',
-      mid: '',
+      mid: null,
     };
     await db.insert(echoeDecks).values(deckData);
     logger.debug(`Created default deck for uid=${uid}`);

@@ -154,7 +154,7 @@ export class EchoeDeckService {
         collapsed: deck.collapsed === 1,
         dyn: deck.dyn,
         desc: deck.desc || '',
-        mid: deck.mid,
+        mid: deck.mid ?? '',
         mod: deck.mod,
         newCount: cappedNewCount,
         learnCount: counts.learnCount,
@@ -404,7 +404,7 @@ export class EchoeDeckService {
       collapsed: deck[0].collapsed === 1,
       dyn: deck[0].dyn,
       desc: deck[0].desc || '',
-      mid: deck[0].mid,
+      mid: deck[0].mid ?? '',
       mod: deck[0].mod,
       newCount: Number(count.newCount) || 0,
       learnCount: Number(count.learnCount) || 0,
@@ -455,7 +455,7 @@ export class EchoeDeckService {
       dyn,
       mod: now,
       desc,
-      mid: '',
+      mid: null,
     };
 
     await db.insert(echoeDecks).values(newDeck);
@@ -876,7 +876,7 @@ export class EchoeDeckService {
       dyn: 1, // 1 = filtered deck
       mod: now,
       desc: `Search: ${dto.searchQuery}`,
-      mid: '',
+      mid: null,
     };
 
     await db.insert(echoeDecks).values(newDeck);

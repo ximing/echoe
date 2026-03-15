@@ -571,7 +571,7 @@ export class EchoeImportService {
               dyn: deck.dyn || 0,
               mod: deck.mod || 0,
               desc: deck.desc || '',
-              mid: '',
+              mid: null,
             });
             added++;
           }
@@ -812,7 +812,7 @@ export class EchoeImportService {
               dyn: row.dyn || 0,
               mod: row.mod,
               desc: row.desc || '',
-              mid: referenceMap.midToNoteTypeId.get(sourceMid) ?? '',
+              mid: referenceMap.midToNoteTypeId.get(sourceMid) ?? null,
             });
             added++;
           }

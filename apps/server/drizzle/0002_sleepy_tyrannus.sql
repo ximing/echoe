@@ -1,1 +1,0 @@
-ALTER TABLE `echoe_notes` ADD `fields_json` json DEFAULT ('{}') NOT NULL;
