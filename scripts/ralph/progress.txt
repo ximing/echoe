@@ -1,3 +1,10 @@
+## Codebase Patterns
+- Always run `pnpm build` before `pnpm migrate:generate` - drizzle-kit reads from dist/ not src/
+- For idempotent MySQL migrations, use information_schema.TABLE_CONSTRAINTS to check existence
+- Drizzle migrations are in apps/server/drizzle/ with meta files in drizzle/meta/
+- All Echoe relation fields use varchar(191) for business IDs (not numeric IDs)
+- Typecheck must pass before committing: `pnpm typecheck`
+
 ## 2026-03-15 19:00 - US-001
 - Removed all .references() calls from Echoe schema files (echoe-notes.ts, echoe-cards.ts, echoe-revlog.ts, echoe-decks.ts, echoe-templates.ts)
 - Relation columns remain as varchar(191) business ID fields
@@ -12,4 +19,44 @@
 - Removing `.references()` doesn't remove the column or indexes - only the FK constraint
 - Typecheck must pass before committing (run `cd apps/server && pnpm typecheck`)
 - Schema files are in apps/server/src/db/schema/ and must be exported from schema/index.ts
+---
+## 2026-03-15 23:56 - US-002
+- Created idempotent migration 0001_drop_echoe_foreign_keys.sql
+- Migration uses information_schema.TABLE_CONSTRAINTS to check FK existence before dropping
+- Covers all 8 Echoe foreign key relations:
+  1. echoe_notes.mid → echoe_notetypes.note_type_id
+  2. echoe_cards.nid → echoe_notes.note_id
+  3. echoe_cards.did → echoe_decks.deck_id
+  4. echoe_revlog.cid → echoe_cards.card_id
+  5. echoe_decks.conf → echoe_deck_config.deck_config_id
+  6. echoe_decks.mid → echoe_notetypes.note_type_id
+  7. echoe_templates.ntid → echoe_notetypes.note_type_id
+  8. echoe_templates.did → echoe_decks.deck_id
+- Uses prepared statements with IF() for idempotency
+- Updated drizzle meta files (_journal.json and 0001_snapshot.json)
+- Files changed: apps/server/drizzle/0001_drop_echoe_foreign_keys.sql, drizzle/meta/_journal.json, drizzle/meta/0001_snapshot.json
+- Commit: 39fa3c3
+
+**Learnings for future iterations:**
+- Drizzle migrations are stored in apps/server/drizzle/ directory (not project root)
+- Drizzle meta files need to be updated when manually creating migrations
+- For idempotent FK drops, use information_schema.TABLE_CONSTRAINTS to check existence
+- MySQL prepared statements with IF() allow conditional DDL execution
+- The snapshot JSON needs foreignKeys sections emptied for affected tables
+- Always run `pnpm build` before `pnpm migrate:generate` as drizzle-kit reads from dist/
+---
+## 2026-03-16 00:00 - US-003
+- Implemented note service relation validation for mid (notetypeId) field
+- Updated error messages in createNote and updateNote to be explicit about relation field context
+- Error format: "Invalid relation: Note type '{id}' not found for field 'mid' (notetypeId)"
+- Controller catches these errors and returns PARAMS_ERROR (4xx) with the error message
+- Files changed: apps/server/src/services/echoe-note.service.ts
+- Commit: a978fd5
+
+**Learnings for future iterations:**
+- The codebase uses Error throwing in services, caught by controllers that return ResponseUtil.error()
+- Error messages with "not found" are caught by controllers and returned as PARAMS_ERROR (4xx)
+- Relation validation is already present in createNote - just needed more explicit error messages
+- The mid field is immutable in notes (not in UpdateEchoeNoteDto), so update validation is defensive only
+- All tests pass without changes - the validation logic was already correct
 ---

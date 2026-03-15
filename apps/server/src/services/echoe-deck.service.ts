@@ -437,6 +437,18 @@ export class EchoeDeckService {
       }
     }
 
+    // Validate conf (deck config) exists within the same uid
+    if (dto.conf) {
+      const deckConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .limit(1);
+      if (deckConfig.length === 0) {
+        throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
+      }
+    }
+
     // Determine if this is a filtered deck
     const isFiltered = dto.dyn === true;
     const dyn = isFiltered ? 1 : 0;
