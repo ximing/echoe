@@ -155,6 +155,3 @@ export class EchoeStatsService extends Service {
     return Math.max(...this.forecast.map((d) => d.dueCount));
   }
 }
-
-// Export singleton instance
-export const echoeStatsService = new EchoeStatsService();

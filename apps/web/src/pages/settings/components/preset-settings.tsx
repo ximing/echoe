@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { view } from '@rabjs/react';
-import { echoeSettingsService } from '../../../services/echoe-settings.service';
+import { view, useService } from '@rabjs/react';
+import { EchoeSettingsService } from '../../../services/echoe-settings.service';
 import { toast } from '../../../services/toast.service';
 import { X } from 'lucide-react';
 
 export const PresetSettings = view(() => {
+  const echoeSettingsService = useService(EchoeSettingsService);
   const [presetName, setPresetName] = useState('');
   const [showPresetDialog, setShowPresetDialog] = useState(false);
 
@@ -15,6 +16,7 @@ export const PresetSettings = view(() => {
   useEffect(() => {
     echoeSettingsService.loadSettings();
     echoeSettingsService.loadPresets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSavePreset = async () => {

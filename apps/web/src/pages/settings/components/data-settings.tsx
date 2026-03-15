@@ -1,8 +1,10 @@
-import { view } from '@rabjs/react';
-import { echoeSettingsService } from '../../../services/echoe-settings.service';
+import { view, useService } from '@rabjs/react';
+import { EchoeSettingsService } from '../../../services/echoe-settings.service';
 import { toast } from '../../../services/toast.service';
 
 export const DataSettings = view(() => {
+  const echoeSettingsService = useService(EchoeSettingsService);
+
   const handleExport = async () => {
     const blob = await echoeSettingsService.exportAll(true);
     if (blob) {

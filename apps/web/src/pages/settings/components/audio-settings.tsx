@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { view } from '@rabjs/react';
-import { echoeSettingsService } from '../../../services/echoe-settings.service';
+import { view, useService } from '@rabjs/react';
+import { EchoeSettingsService } from '../../../services/echoe-settings.service';
 import { toast } from '../../../services/toast.service';
 
 export const AudioSettings = view(() => {
+  const echoeSettingsService = useService(EchoeSettingsService);
   const [isSaving, setIsSaving] = useState(false);
 
   const settings = echoeSettingsService.settings;
@@ -11,6 +12,7 @@ export const AudioSettings = view(() => {
 
   useEffect(() => {
     echoeSettingsService.loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSettingChange = async (key: string, value: unknown) => {

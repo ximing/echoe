@@ -141,6 +141,3 @@ export class EchoeCsvImportService extends Service {
     this.hasHeader = true;
   }
 }
-
-// Export singleton instance
-export const echoeCsvImportService = new EchoeCsvImportService();
