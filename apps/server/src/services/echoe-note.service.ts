@@ -567,7 +567,7 @@ export class EchoeNoteService {
           mid: note?.mid || '',
           notetypeName: notetype?.name || 'Unknown',
           notetypeType: notetype?.type || 0,
-          addedAt: Number(card.id),
+          addedAt: card.mod * 1000,
           mod: note?.mod || card.mod,
         };
       })

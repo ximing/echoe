@@ -1007,7 +1007,7 @@ export class EchoeDeckService {
           tags: noteData?.tags || [],
           mid: noteData?.mid || '',
           notetypeName: noteType[0]?.name || 'Unknown',
-          addedAt: Number(noteData?.id) ? Math.floor(Number(noteData.id) / 1000) : 0,
+          addedAt: card.mod * 1000,
           mod: card.mod,
           notetypeType: noteType[0]?.type || 0,
         };
