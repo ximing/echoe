@@ -177,7 +177,7 @@ export class EchoeDeckService {
     const db = getDatabase();
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const todayStartRevlogId = today.getTime() * 1000;
+    const todayStart = today.getTime();
 
     const rows = await db
       .select({
@@ -191,7 +191,7 @@ export class EchoeDeckService {
           eq(echoeRevlog.uid, uid),
           eq(echoeCards.uid, uid),
           eq(echoeRevlog.type, 0),
-          sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+          sql`${echoeRevlog.lastReview} >= ${todayStart}`
         )
       )
       .groupBy(echoeCards.did);

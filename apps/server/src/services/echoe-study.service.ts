@@ -827,10 +827,10 @@ export class EchoeStudyService {
     // Get perDay from deck config
     const perDay = await this.getNewCardPerDay(uid, deckIds);
 
-    // Count today's new card reviews (revlog type=0, revlog id encodes ms * 1000)
+    // Count today's new card reviews (revlog type=0, revlog lastReview >= todayStart)
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const todayStartRevlogId = today.getTime() * 1000;
+    const todayStart = today.getTime();
 
     let todayNewReviewed: number;
     if (deckIds && deckIds.length > 0) {
@@ -844,7 +844,7 @@ export class EchoeStudyService {
             eq(echoeRevlog.uid, uid),
             eq(echoeCards.uid, uid),
             eq(echoeRevlog.type, 0),
-            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`,
+            sql`${echoeRevlog.lastReview} >= ${todayStart}`,
             sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`
           )
         );
@@ -858,7 +858,7 @@ export class EchoeStudyService {
           and(
             eq(echoeRevlog.uid, uid),
             eq(echoeRevlog.type, 0),
-            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+            sql`${echoeRevlog.lastReview} >= ${todayStart}`
           )
         );
       todayNewReviewed = Number(result[0]?.count || 0);
