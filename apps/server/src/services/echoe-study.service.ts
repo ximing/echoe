@@ -202,7 +202,7 @@ export class EchoeStudyService {
     });
 
     if (!card) {
-      throw new Error('Card not found');
+      throw new Error(`Invalid relation: Card '${dto.cardId}' not found for field 'cid' (cardId)`);
     }
 
     // Get the note
@@ -961,7 +961,7 @@ export class EchoeStudyService {
     });
 
     if (!card) {
-      throw new Error('Card not found');
+      throw new Error(`Invalid relation: Card '${cardId}' not found for field 'cid' (cardId)`);
     }
 
     // Get the deck

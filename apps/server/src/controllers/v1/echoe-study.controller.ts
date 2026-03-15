@@ -85,7 +85,7 @@ export class EchoeStudyController {
     } catch (error) {
       logger.error('Submit review error:', error);
       if (error instanceof Error && error.message.includes('not found')) {
-        return ResponseUtil.error(ErrorCode.NOT_FOUND);
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, error.message);
       }
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
@@ -198,7 +198,7 @@ export class EchoeStudyController {
     } catch (error) {
       logger.error('Get options error:', error);
       if (error instanceof Error && error.message.includes('not found')) {
-        return ResponseUtil.error(ErrorCode.NOT_FOUND);
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, error.message);
       }
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
