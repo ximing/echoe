@@ -38,7 +38,6 @@ export const echoeTemplates = mysqlTable(
     usn: int('usn').notNull(), // Update sequence number (sync)
   },
   (table) => ({
-    templateIdIdx: index('template_id_idx').on(table.templateId),
     ntidIdx: index('ntid_idx').on(table.ntid),
     ordIdx: index('ord_idx').on(table.ord),
     usnIdx: index('usn_idx').on(table.usn),

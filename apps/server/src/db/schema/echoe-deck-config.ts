@@ -31,12 +31,10 @@ export const echoeDeckConfig = mysqlTable(
     lapseConfig: text('lapse_config').notNull().$type<string>(), // JSON for lapse settings
   },
   (table) => ({
-    deckConfigIdIdx: index('deck_config_id_idx').on(table.deckConfigId),
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidDeckConfigIdIdx: index('uid_deck_config_id_idx').on(table.uid, table.deckConfigId),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
-    uidNameIdx: index('uid_name_idx').on(table.uid, table.name),
   })
 );
 

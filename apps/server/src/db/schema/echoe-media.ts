@@ -26,7 +26,6 @@ export const echoeMedia = mysqlTable(
     usedInCards: tinyint('used_in_cards').notNull().default(0), // Whether file is referenced in any card
   },
   (table) => ({
-    mediaIdIdx: index('media_id_idx').on(table.mediaId),
     filenameIdx: index('filename_idx').on(table.filename),
     hashIdx: index('hash_idx').on(table.hash),
     uidMediaIdIdx: index('uid_media_id_idx').on(table.uid, table.mediaId),

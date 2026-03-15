@@ -33,7 +33,6 @@ export const echoeCol = mysqlTable(
     tags: text('tags').notNull().$type<string>(), // JSON object with tags
   },
   (table) => ({
-    colIdIdx: index('col_id_idx').on(table.colId),
     usnIdx: index('usn_idx').on(table.usn),
     uidColIdIdx: index('uid_col_id_idx').on(table.uid, table.colId),
   })

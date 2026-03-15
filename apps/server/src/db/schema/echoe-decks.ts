@@ -38,7 +38,6 @@ export const echoeDecks = mysqlTable(
       .references(() => echoeNotetypes.noteTypeId, { onDelete: 'set null' }), // Last note type used - now business ID string
   },
   (table) => ({
-    deckIdIdx: index('deck_id_idx').on(table.deckId),
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidDeckIdIdx: index('uid_deck_id_idx').on(table.uid, table.deckId),

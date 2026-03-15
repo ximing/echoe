@@ -22,7 +22,6 @@ export const echoeGraves = mysqlTable(
     type: int('type').notNull(), // Object type: 0=deck, 1=note, 2=card
   },
   (table) => ({
-    graveIdIdx: index('grave_id_idx').on(table.graveId),
     oidIdx: index('oid_idx').on(table.oid),
     typeIdx: index('type_idx').on(table.type),
     usnIdx: index('usn_idx').on(table.usn),

@@ -37,7 +37,6 @@ export const echoeNotes = mysqlTable(
     fieldsJson: json('fields_json').$type<CanonicalFields>().notNull().default({}), // Primary structured field storage (field name → plain text value)
   },
   (table) => ({
-    noteIdIdx: index('note_id_idx').on(table.noteId),
     guidIdx: index('guid_idx').on(table.guid),
     midIdx: index('mid_idx').on(table.mid),
     usnIdx: index('usn_idx').on(table.usn),

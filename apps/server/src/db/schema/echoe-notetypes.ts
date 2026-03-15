@@ -31,7 +31,6 @@ export const echoeNotetypes = mysqlTable(
     req: text('req').notNull().$type<string>(), // JSON array of which fields are required
   },
   (table) => ({
-    noteTypeIdIdx: index('note_type_id_idx').on(table.noteTypeId),
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidNoteTypeIdIdx: index('uid_note_type_id_idx').on(table.uid, table.noteTypeId),

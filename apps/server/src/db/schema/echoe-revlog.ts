@@ -48,7 +48,6 @@ export const echoeRevlog = mysqlTable(
     preLastReview: bigint('pre_last_review', { mode: 'number' }).notNull().default(0), // Last review before review
   },
   (table) => ({
-    revlogIdIdx: index('revlog_id_idx').on(table.revlogId),
     cidIdx: index('cid_idx').on(table.cid),
     usnIdx: index('usn_idx').on(table.usn),
     uidIdx: index('uid_idx').on(table.uid),

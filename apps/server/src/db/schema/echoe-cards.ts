@@ -48,7 +48,6 @@ export const echoeCards = mysqlTable(
     lastReview: bigint('last_review', { mode: 'number' }).notNull().default(0), // Last review timestamp (Unix ms)
   },
   (table) => ({
-    cardIdIdx: index('card_id_idx').on(table.cardId),
     nidIdx: index('nid_idx').on(table.nid),
     didIdx: index('did_idx').on(table.did),
     usnIdx: index('usn_idx').on(table.usn),
