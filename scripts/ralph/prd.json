@@ -1,0 +1,213 @@
+{
+  "project": "Echoe",
+  "branchName": "ralph/remove-foreign-keys-business-id-big-bang",
+  "description": "移除 Echoe MySQL 外键约束，改为业务 ID + Service 事务维护关系完整性，一次性切换完成，不做数据迁移与兼容分支。",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Remove Drizzle references in Echoe schema",
+      "description": "As a backend developer, I want all Echoe schema relations represented by fields and indexes instead of .references() so schema no longer defines database foreign keys.",
+      "acceptanceCriteria": [
+        "Remove all .references() usage from apps/server/src/db/schema/echoe-notes.ts, echoe-cards.ts, echoe-revlog.ts, echoe-decks.ts, and echoe-templates.ts",
+        "Keep relation columns as varchar(191) business ID fields and preserve required indexes for relation lookups",
+        "grep '\\.references\\(' apps/server/src/db/schema returns no Echoe relation references",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add idempotent foreign-key drop migration",
+      "description": "As a release engineer, I want one migration that removes all existing Echoe foreign keys safely so runtime DB structure matches schema definitions.",
+      "acceptanceCriteria": [
+        "Create migration logic that discovers target FK constraints via information_schema and drops only existing constraints",
+        "Cover all 8 FK relations listed in PRD section 4.1",
+        "Repeated migration execution is idempotent and does not fail when constraints are already absent",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Note service relation validation",
+      "description": "As a backend developer, I want note write paths to validate related business IDs so note create/update rejects invalid mid references.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-note.service.ts, create/update note paths validate mid existence within the same uid",
+        "Invalid relation returns explicit 4xx business error with relation field context",
+        "No numeric ID casting is introduced for relation validation",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Implement Deck service relation validation",
+      "description": "As a backend developer, I want deck write paths to validate conf and mid references so deck create/update enforces same-uid relation integrity.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-deck.service.ts, create/update deck validates conf and optional mid within the same uid",
+        "Update behavior follows PRD FR-2 matrix and returns 4xx for invalid relations",
+        "Deck relation checks execute without compatibility branch or dual-write logic",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Implement Config service relation validation",
+      "description": "As a backend developer, I want config-domain writes to validate template/notetype/deck-config relations so config service enforces FR-2 integrity rules.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-config.service.ts, template create/update validates ntid and optional did with uid scope",
+        "Deck-config and notetype related write paths validate required upstream objects with uid scope",
+        "Relation validation failures return explicit 4xx errors",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement Study service relation validation",
+      "description": "As a backend developer, I want study-domain writes to validate card/revlog relations so cid and dependent IDs are always checked within uid scope.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-study.service.ts, revlog creation validates cid existence in same uid",
+        "Any study write path that accepts relation IDs validates against business ID columns without cross-tenant leakage",
+        "Invalid relations return explicit 4xx business errors",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Align import services with relation validation",
+      "description": "As a backend developer, I want import pipelines to follow the same relation-validation rules so imported data does not bypass FR-2 checks.",
+      "acceptanceCriteria": [
+        "Update apps/server/src/services/echoe-import.service.ts and echoe-csv-import.service.ts write paths to enforce same-uid relation checks",
+        "Imported card/note/template/deck records fail fast with explicit errors when upstream objects are missing",
+        "No compatibility branch or data backfill logic is introduced in import flow",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Implement Note owner delete transaction",
+      "description": "As a backend developer, I want note deletion to be a single transaction so note -> card -> revlog cascade is explicit and rollback-safe.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-note.service.ts, delete note runs as one transaction with uid-scoped conditions",
+        "Deleting a note removes dependent cards and revlogs according to PRD FR-3",
+        "Any step failure triggers full rollback",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Implement Deck owner delete transaction",
+      "description": "As a backend developer, I want deck deletion to run with explicit cascade semantics so cards are deleted and template did is set null in one transaction.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-deck.service.ts, delete deck runs in one transaction with uid-scoped conditions",
+        "Deleting a deck deletes related cards and sets templates.did to null",
+        "Any step failure triggers full rollback",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Implement Card owner delete transaction",
+      "description": "As a backend developer, I want card deletion in study domain to explicitly delete revlogs so card -> revlog cascade no longer depends on DB foreign keys.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-study.service.ts, deleting card triggers uid-scoped revlog cleanup within one transaction",
+        "Card delete flow follows FR-3 mapping for revlog cascade",
+        "Any step failure triggers full rollback",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement Config owner delete transactions",
+      "description": "As a backend developer, I want notetype and deck-config deletions owned by config service so cascades and set-null rules are explicit and transaction-safe.",
+      "acceptanceCriteria": [
+        "In apps/server/src/services/echoe-config.service.ts, delete notetype performs: delete notes, delete templates, set decks.mid null (uid scoped)",
+        "In apps/server/src/services/echoe-config.service.ts, delete deck_config deletes related decks and triggers downstream cascades",
+        "Both delete flows run in one transaction and rollback on failure",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Add structured logging for relation operations",
+      "description": "As an operator, I want structured logs for relation validation and cascade execution so failures and affected rows are observable in production.",
+      "acceptanceCriteria": [
+        "Use @echoe/logger in relation validation and delete-cascade flows (no console logging)",
+        "Logs include at least event, uid, rootObject, targetField, targetId, affectedRows, result, and durationMs",
+        "Logging is added to note/deck/study/config service relation-critical paths",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Add regression tests for FR-2 and FR-3",
+      "description": "As a backend maintainer, I want automated tests for relation validation and cascade semantics so foreign-key removal is protected by regression coverage.",
+      "acceptanceCriteria": [
+        "Add/extend tests covering FR-2 create/update validation matrix and immutable-field behavior",
+        "Add/extend tests covering FR-3 cascade semantics, set-null behavior, and transaction rollback",
+        "Include cross-tenant negative cases to prove uid isolation",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Run quality gates and verify FK-free schema",
+      "description": "As a release engineer, I want final quality and schema verification completed so the Big Bang rollout can ship without compatibility or data-migration tasks.",
+      "acceptanceCriteria": [
+        "Run and pass backend quality gates required by PRD (tests, lint, typecheck)",
+        "Verify target Echoe tables report zero FOREIGN KEY constraints after migration",
+        "Confirm rollout does not add data migration/backfill scripts or compatibility branches",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

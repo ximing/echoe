@@ -122,10 +122,10 @@ pnpm dev:env                  # Start dev environment containers
 5. Migrations run automatically on next server start
 
 **Important Constraints**:
-- VARCHAR primary/foreign keys: max 191 chars (MySQL utf8mb4 index limit)
+- Foreign keys are prohibited at database level; use indexed relation ID fields and enforce integrity in application logic
+- VARCHAR primary keys and relation ID fields: max 191 chars (MySQL utf8mb4 index limit)
 - Timestamps: use `timestamp('created_at', { mode: 'date', fsp: 3 })` for millisecond precision
 - JSON columns: use `.$type<TypeName>()` for type safety
-- Foreign keys: use `.references()` with `onDelete: 'cascade'` or `onDelete: 'set null'`
 
 **Drizzle Config Gotcha**: `drizzle.config.ts` must:
 - Use environment variables directly (NOT imported from config.ts)

@@ -11,6 +11,12 @@ export default {
       "version": "1.0.0",
       "path": ".catpaw/skills/anthropics.skill-creator",
       "category": "skills"
+    },
+    {
+      "name": "@vercel/agent-browser",
+      "version": "1.0.0",
+      "path": ".catpaw/skills/vercel.agent-browser",
+      "category": "skills"
     }
   ]
 }
