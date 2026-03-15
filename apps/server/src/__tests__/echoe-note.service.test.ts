@@ -904,7 +904,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     expect(noteGraves).toHaveLength(1);
     expect(noteGraves[0].oid).toBe('en_010');
 
-    // Two delete calls: cards then note
-    expect(txDeleteCalls).toHaveLength(2);
+    // Three delete calls: revlogs, cards, then note (FR-3 cascade)
+    expect(txDeleteCalls).toHaveLength(3);
   });
 });

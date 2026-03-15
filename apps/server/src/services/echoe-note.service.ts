@@ -364,7 +364,14 @@ export class EchoeNoteService {
     const now = Math.floor(Date.now() / 1000);
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
+    // Cascade: note -> cards -> revlogs (FR-3)
     return withTransaction(async (tx) => {
+      // Delete revlogs for all cards (cascade from cards)
+      if (cards.length > 0) {
+        const cardIds = cards.map((c: EchoeCards) => c.cardId);
+        await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
+      }
+
       // Add cards to graves
       for (const card of cards) {
         await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: card.cardId, type: 2 });

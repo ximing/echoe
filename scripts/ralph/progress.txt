@@ -105,3 +105,21 @@
 - Controller error handling pattern: catch "not found" errors and return PARAMS_ERROR with message
 - All 186 tests pass without modification - the validation logic was already correct
 ---
+## 2026-03-16 00:48 - US-007
+- Implemented relation validation in import services for same-uid integrity checks
+- Added validation in importNotesRows: validates mid (notetype) exists in database within uid scope before importing
+- Added validation in importCardsRows: validates both nid (note) and did (deck) exist in database within uid scope
+- Added validation in importRevlogRows: validates cid (card) exists in database within uid scope (skips silently if not)
+- Added validation in importDecks: validates mid (notetype) exists when deck references a notetype, sets to null with error if invalid
+- Updated test mock createImportDbMock to return inserted rows for validation queries
+- CSV import service already uses noteService.createNote() which has built-in validation, so no changes needed
+- Files changed: apps/server/src/services/echoe-import.service.ts, apps/server/src/__tests__/echoe-import.service.test.ts
+
+**Learnings for future iterations:**
+- Import service uses referenceMap to track source ID → business ID mappings during import
+- Import order is: notetypes → decks → notes → cards → revlogs (each depends on previous)
+- Validation must query the database, not just check referenceMap, because upstream imports can fail
+- Test mocks need to return inserted data for validation queries to work correctly
+- echoe-csv-import.service.ts delegates to noteService.createNote() which already validates relations
+- All 186 tests pass - validation is backward compatible and catches invalid references
+---
