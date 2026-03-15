@@ -25,9 +25,9 @@ export interface SessionStats {
 }
 
 export interface UndoEntry {
-  cardId: number;
+  cardId: string;
   previousState: StudyQueueItemDto;
-  reviewId?: number;
+  reviewId?: string;
 }
 
 /**
@@ -72,7 +72,7 @@ export class EchoeStudyService extends Service {
   lastReviewWasLeech = false;
 
   // Current deck ID (if studying specific deck)
-  deckId?: number;
+  deckId?: string;
 
   // Audio settings
   autoplay: string = 'never';
@@ -81,7 +81,7 @@ export class EchoeStudyService extends Service {
   /**
    * Load study queue
    */
-  async loadQueue(deckId?: number): Promise<void> {
+  async loadQueue(deckId?: string): Promise<void> {
     this.isLoading = true;
     this.error = null;
     this.deckId = deckId;

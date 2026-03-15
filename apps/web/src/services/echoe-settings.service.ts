@@ -155,6 +155,3 @@ export class EchoeSettingsService extends Service {
     }
   }
 }
-
-// Export singleton instance
-export const echoeSettingsService = new EchoeSettingsService();

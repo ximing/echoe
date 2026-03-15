@@ -58,13 +58,13 @@ export type RichTextFields = Record<string, ProseMirrorJsonDoc>;
  * Used when the system needs to expose data in Anki's legacy format.
  * - flds: field values joined by the \x1f separator
  * - sfld: the sort field (first field, plain text, truncated to 191 chars)
- * - csum: Anki-compatible checksum of sfld (parseInt(sha1(sfld).slice(0, 8), 16))
+ * - csum: Anki-compatible checksum of sfld (parseInt(sha1(sfld).slice(0, 8), 16).toString())
  */
 export interface NoteCompatibilityProjection {
   /** Field values joined by \x1f (unit separator) delimiter */
   flds: string;
   /** Sort field: plain text of the first field, max 191 characters */
   sfld: string;
-  /** Checksum: parseInt(sha1(sfld).slice(0, 8), 16) for duplicate detection */
-  csum: number;
+  /** Checksum: parseInt(sha1(sfld).slice(0, 8), 16).toString() for duplicate detection */
+  csum: string;
 }

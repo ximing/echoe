@@ -24,39 +24,43 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
     service = new EchoeDeckService();
   });
 
-  const createDeck = (overrides: Partial<EchoeDeckWithCountsDto>): EchoeDeckWithCountsDto => ({
-    id: 1,
-    name: 'Deck',
-    conf: 1,
-    extendNew: 0,
-    extendRev: 0,
-    collapsed: false,
-    dyn: 0,
-    desc: '',
-    mid: 0,
-    mod: 0,
-    newCount: 0,
-    learnCount: 0,
-    reviewCount: 0,
-    totalCount: 0,
-    matureCount: 0,
-    difficultCount: 0,
-    averageRetrievability: 0,
-    lastStudiedAt: null,
-    ...overrides,
-    children: overrides.children ?? [],
-  });
+  const createDeck = (overrides: Partial<EchoeDeckWithCountsDto>): EchoeDeckWithCountsDto => {
+    const id = overrides.id ?? overrides.deckId ?? 'ed_test_deck_001';
+    return {
+      deckId: id,
+      id,
+      name: 'Deck',
+      conf: 'edc_test_config_001',
+      extendNew: 0,
+      extendRev: 0,
+      collapsed: false,
+      dyn: 0,
+      desc: '',
+      mid: '',
+      mod: 0,
+      newCount: 0,
+      learnCount: 0,
+      reviewCount: 0,
+      totalCount: 0,
+      matureCount: 0,
+      difficultCount: 0,
+      averageRetrievability: 0,
+      lastStudiedAt: null,
+      ...overrides,
+      children: overrides.children ?? [],
+    };
+  };
 
   it('should weight parent averageRetrievability by retrievability-eligible cards', () => {
     const parent = createDeck({
-      id: 1,
+      id: 'ed_parent',
       name: 'Parent',
       totalCount: 10,
       averageRetrievability: 0.9,
       lastStudiedAt: 100,
     });
     const child = createDeck({
-      id: 2,
+      id: 'ed_child',
       name: 'Parent::Child',
       totalCount: 10,
       averageRetrievability: 0.5,
@@ -65,9 +69,9 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
 
     const result = (service as any).buildDeckHierarchy(
       [parent, child],
-      new Map<number, number>([
-        [1, 2],
-        [2, 10],
+      new Map<string, number>([
+        ['ed_parent', 2],
+        ['ed_child', 10],
       ])
     ) as EchoeDeckWithCountsDto[];
 
@@ -79,13 +83,13 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
 
   it('should keep averageRetrievability at 0 when subtree has no eligible cards', () => {
     const parent = createDeck({
-      id: 1,
+      id: 'ed_parent',
       name: 'Parent',
       totalCount: 5,
       averageRetrievability: 0.7,
     });
     const child = createDeck({
-      id: 2,
+      id: 'ed_child',
       name: 'Parent::Child',
       totalCount: 6,
       averageRetrievability: 0.4,
@@ -93,9 +97,9 @@ describe('EchoeDeckService - averageRetrievability aggregation', () => {
 
     const result = (service as any).buildDeckHierarchy(
       [parent, child],
-      new Map<number, number>([
-        [1, 0],
-        [2, 0],
+      new Map<string, number>([
+        ['ed_parent', 0],
+        ['ed_child', 0],
       ])
     ) as EchoeDeckWithCountsDto[];
 
@@ -138,34 +142,34 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     buildDeleteDeckDbMock([]);
 
     const svc = new EchoeDeckService();
-    const result = await svc.deleteDeck('uid-d', 1);
+    const result = await svc.deleteDeck('uid-d', 'ed_nonexistent');
 
     expect(result).toBe(false);
     expect(mockedWithTransaction).not.toHaveBeenCalled();
   });
 
   it('should call withTransaction when deck exists (deleteCards=false)', async () => {
-    buildDeleteDeckDbMock([{ id: 1, name: 'TestDeck' }]);
+    buildDeleteDeckDbMock([{ id: 'ed_test', name: 'TestDeck' }]);
 
     const svc = new EchoeDeckService();
-    const result = await svc.deleteDeck('uid-d', 1, false);
+    const result = await svc.deleteDeck('uid-d', 'ed_test', false);
 
     expect(result).toBe(true);
     expect(mockedWithTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('should roll back all DB mutations when an error occurs inside the transaction', async () => {
-    buildDeleteDeckDbMock([{ id: 1, name: 'TestDeck' }]);
+    buildDeleteDeckDbMock([{ id: 'ed_test', name: 'TestDeck' }]);
 
     // Simulate transaction failure
     mockedWithTransaction.mockRejectedValue(new Error('TX failure'));
 
     const svc = new EchoeDeckService();
-    await expect(svc.deleteDeck('uid-d', 1)).rejects.toThrow('TX failure');
+    await expect(svc.deleteDeck('uid-d', 'ed_test')).rejects.toThrow('TX failure');
   });
 
   it('should insert deck grave and delete deck inside transaction (deleteCards=false)', async () => {
-    buildDeleteDeckDbMock([{ id: 50, name: 'MyDeck' }]);
+    buildDeleteDeckDbMock([{ id: 'ed_mydeck', name: 'MyDeck' }]);
 
     const txInsertValues: any[] = [];
     const txDeleteCalls: number[] = [];
@@ -190,12 +194,12 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     });
 
     const svc = new EchoeDeckService();
-    await svc.deleteDeck('uid-d', 50, false);
+    await svc.deleteDeck('uid-d', 'ed_mydeck', false);
 
     // 1 grave insert (type=0 for deck)
     expect(txInsertValues).toHaveLength(1);
     expect(txInsertValues[0].type).toBe(0);
-    expect(txInsertValues[0].oid).toBe(50);
+    expect(txInsertValues[0].oid).toBe('ed_mydeck');
 
     // 1 delete call (deck itself)
     expect(txDeleteCalls).toHaveLength(1);

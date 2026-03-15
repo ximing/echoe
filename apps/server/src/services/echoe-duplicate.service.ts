@@ -5,14 +5,15 @@ import type { EchoeNoteDto, FindDuplicatesDto, DuplicateGroupDto, MergeDuplicate
 
 interface NoteRecord {
   id: number;
+  noteId: string;
   guid: string;
-  mid: number;
+  mid: string;
   mod: number;
   usn: number;
   tags: string;
   flds: string;
   sfld: string;
-  csum: number;
+  csum: string;
   flags: number;
   data: string;
   fieldsJson?: Record<string, string> | null;
@@ -110,20 +111,20 @@ export class EchoeDuplicateService {
       return this.findExactDuplicates(notes, fieldName);
     }
 
-    const processed = new Set<number>();
+    const processed = new Set<string>();
     const duplicates: DuplicateGroupDto[] = [];
 
     for (let i = 0; i < notes.length; i++) {
-      if (processed.has(notes[i].id)) continue;
+      if (processed.has(notes[i].noteId)) continue;
 
       const currentValue = this.getFieldValue(notes[i], fieldName);
       if (!currentValue) continue;
 
       const group: NoteRecord[] = [notes[i]];
-      processed.add(notes[i].id);
+      processed.add(notes[i].noteId);
 
       for (let j = i + 1; j < notes.length; j++) {
-        if (processed.has(notes[j].id)) continue;
+        if (processed.has(notes[j].noteId)) continue;
 
         const compareValue = this.getFieldValue(notes[j], fieldName);
         if (!compareValue) continue;
@@ -131,7 +132,7 @@ export class EchoeDuplicateService {
         const similarity = this.levenshteinSimilarity(currentValue, compareValue);
         if (similarity >= threshold) {
           group.push(notes[j]);
-          processed.add(notes[j].id);
+          processed.add(notes[j].noteId);
         }
       }
 
@@ -169,7 +170,7 @@ export class EchoeDuplicateService {
     }
 
     // Get field definitions from notetypes to find field index
-    const notetypes = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, notetypeId)));
+    const notetypes = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, notetypeId)));
 
     if (notetypes.length === 0) {
       return [];
@@ -201,6 +202,8 @@ export class EchoeDuplicateService {
     const { echoeCards } = await import('../db/schema/echoe-cards.js');
     const { echoeGraves } = await import('../db/schema/echoe-graves.js');
     const { logger } = await import('../utils/logger.js');
+    const { generateTypeId } = await import('../utils/id.js');
+    const { OBJECT_TYPE } = await import('../models/constant/type.js');
     const { and, eq, inArray } = await import('drizzle-orm');
 
     const db = getDatabase();
@@ -215,6 +218,7 @@ export class EchoeDuplicateService {
     // Add deleted notes to graves table
     for (const deleteId of deleteIds) {
       await db.insert(echoeGraves).values({
+        graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE),
         uid,
         usn: -1,
         oid: deleteId,
@@ -225,9 +229,10 @@ export class EchoeDuplicateService {
     // Add deleted cards to graves table
     for (const card of cardsToDelete) {
       await db.insert(echoeGraves).values({
+        graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE),
         uid,
         usn: -1,
-        oid: card.id,
+        oid: card.cardId,
         type: 1, // card type
       });
     }
@@ -236,7 +241,7 @@ export class EchoeDuplicateService {
     await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, deleteIds)));
 
     // Delete notes
-    await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, deleteIds)));
+    await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, deleteIds)));
 
     logger.info(`Merged duplicates: kept note ${keepId}, deleted ${deleteIds.length} notes`);
   }
@@ -251,14 +256,17 @@ export class EchoeDuplicateService {
         : {};
 
     return {
-      id: Number(note.id),
+      // Semantic business ID fields (preferred)
+      noteId: note.noteId,
+      // @deprecated alias - retained for backwards compatibility
+      id: note.noteId,
       guid: note.guid,
-      mid: Number(note.mid),
+      mid: note.mid,
       mod: note.mod,
       tags: note.tags ? JSON.parse(note.tags) : [],
       fields,
       sfld: note.sfld,
-      csum: Number(note.csum),
+      csum: String(note.csum),
       flags: note.flags,
       data: note.data,
     };

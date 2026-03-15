@@ -31,7 +31,6 @@ const StatsPageContent = view(() => {
 
   // State
   const [decks, setDecks] = useState<EchoeDeckWithCountsDto[]>([]);
-  const [selectedDeckId, setSelectedDeckId] = useState<number | undefined>(undefined);
   const [historyDays, setHistoryDays] = useState(30);
   const [forecastDays, setForecastDays] = useState(14);
 
@@ -44,9 +43,9 @@ const StatsPageContent = view(() => {
 
   // Reload stats when deck or time range changes
   useEffect(() => {
-    statsService.setDeckId(selectedDeckId);
+    statsService.setDeckId(statsService.selectedDeckId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDeckId]);
+  }, [statsService.selectedDeckId]);
 
   const loadDecks = async () => {
     try {
@@ -150,8 +149,8 @@ const StatsPageContent = view(() => {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <select
-            value={selectedDeckId || ''}
-            onChange={(e) => setSelectedDeckId(e.target.value ? Number(e.target.value) : undefined)}
+            value={statsService.selectedDeckId || ''}
+            onChange={(e) => statsService.setDeckId(e.target.value || undefined)}
             className="px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-700 rounded-md bg-white dark:bg-dark-900 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All Decks</option>

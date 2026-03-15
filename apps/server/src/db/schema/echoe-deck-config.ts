@@ -1,6 +1,5 @@
 import {
   mysqlTable,
-  bigint,
   int,
   varchar,
   tinyint,
@@ -16,7 +15,8 @@ import {
 export const echoeDeckConfig = mysqlTable(
   'echoe_deck_config',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull(), // Config ID
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    deckConfigId: varchar('deck_config_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Config name
     replayq: tinyint('replayq').notNull().default(1), // Replay queue on answer
@@ -33,8 +33,8 @@ export const echoeDeckConfig = mysqlTable(
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
+    uidDeckConfigIdIdx: index('uid_deck_config_id_idx').on(table.uid, table.deckConfigId),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
-    uidNameIdx: index('uid_name_idx').on(table.uid, table.name),
   })
 );
 

@@ -46,7 +46,7 @@ export class EchoeDeckController {
    * Get a single deck by ID
    */
   @Get('/:id')
-  async getDeckById(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getDeckById(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -94,7 +94,7 @@ export class EchoeDeckController {
    * Update a deck (rename and/or update description)
    */
   @Put('/:id')
-  async updateDeck(@Param('id') id: number, @Body() dto: UpdateEchoeDeckDto, @CurrentUser() userDto?: UserInfoDto) {
+  async updateDeck(@Param('id') id: string, @Body() dto: UpdateEchoeDeckDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -119,7 +119,7 @@ export class EchoeDeckController {
    * Delete a deck
    */
   @Delete('/:id')
-  async deleteDeck(@Param('id') id: number, @QueryParam('deleteCards') deleteCards: string = 'false', @CurrentUser() userDto?: UserInfoDto) {
+  async deleteDeck(@Param('id') id: string, @QueryParam('deleteCards') deleteCards: string = 'false', @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -142,7 +142,7 @@ export class EchoeDeckController {
    * Get deck configuration
    */
   @Get('/:id/config')
-  async getDeckConfig(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getDeckConfig(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -164,7 +164,7 @@ export class EchoeDeckController {
    * Update deck configuration
    */
   @Put('/:id/config')
-  async updateDeckConfig(@Param('id') id: number, @Body() dto: UpdateEchoeDeckConfigDto, @CurrentUser() userDto?: UserInfoDto) {
+  async updateDeckConfig(@Param('id') id: string, @Body() dto: UpdateEchoeDeckConfigDto, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -209,7 +209,7 @@ export class EchoeDeckController {
    * Rebuild a filtered deck
    */
   @Post('/:id/rebuild')
-  async rebuildFilteredDeck(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async rebuildFilteredDeck(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -231,7 +231,7 @@ export class EchoeDeckController {
    * Empty a filtered deck (return cards to original decks)
    */
   @Post('/:id/empty')
-  async emptyFilteredDeck(@Param('id') id: number, @CurrentUser() userDto?: UserInfoDto) {
+  async emptyFilteredDeck(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);

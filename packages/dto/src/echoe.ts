@@ -3,12 +3,18 @@
  */
 
 export interface EchoeDeckDto {
-  /** Deck ID */
-  id: number;
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
+  id: string;
   /** Deck name (supports '::' for sub-decks) */
   name: string;
   /** Deck config ID */
-  conf: number;
+  conf: string;
   /** Extend new cards limit */
   extendNew: number;
   /** Extend review limit */
@@ -20,7 +26,7 @@ export interface EchoeDeckDto {
   /** Deck description */
   desc: string;
   /** Last note type used */
-  mid: number;
+  mid: string;
   /** Last modified time (Unix timestamp in seconds) */
   mod: number;
 }
@@ -51,8 +57,8 @@ export interface CreateEchoeDeckDto {
   name: string;
   /** Optional deck description */
   desc?: string;
-  /** Optional deck config ID (defaults to 1) */
-  conf?: number;
+  /** Optional deck config ID (defaults to default config) */
+  conf?: string;
   /** Whether this is a filtered deck (dyn=1) */
   dyn?: boolean;
   /** Search query for filtered deck */
@@ -84,7 +90,7 @@ export interface UpdateEchoeDeckDto {
 
 export interface EchoeDeckConfigDto {
   /** Config ID */
-  id: number;
+  id: string;
   /** Config name */
   name: string;
   /** Replay queue on answer */
@@ -188,7 +194,7 @@ export interface UpdateEchoeDeckConfigDto {
 
 export interface EchoeNoteTypeDto {
   /** Note type ID */
-  id: number;
+  id: string;
   /** Note type name */
   name: string;
   /** Last modified time */
@@ -196,7 +202,7 @@ export interface EchoeNoteTypeDto {
   /** Sort field index */
   sortf: number;
   /** Last deck used */
-  did: number;
+  did: string;
   /** Templates (JSON array) */
   tmpls: EchoeTemplateDto[];
   /** Fields (JSON array) */
@@ -214,12 +220,12 @@ export interface EchoeNoteTypeDto {
   /** Number of notes using this note type */
   noteCount?: number;
   /** Clone from note type ID (used when creating by cloning) */
-  cloneFrom?: number;
+  cloneFrom?: string;
 }
 
 export interface EchoeTemplateDto {
   /** Template ID */
-  id: number;
+  id: string;
   /** Template name */
   name: string;
   /** Ordinal */
@@ -233,7 +239,7 @@ export interface EchoeTemplateDto {
   /** Back answer format */
   bafmt: string;
   /** Target deck ID */
-  did: number;
+  did: string;
 }
 
 export interface EchoeFieldDto {
@@ -261,7 +267,7 @@ export interface CreateEchoeNoteTypeDto {
   /** Note type name */
   name: string;
   /** Clone from note type ID */
-  cloneFrom?: number;
+  cloneFrom?: string;
   /** CSS */
   css?: string;
   /** LaTeX pre */
@@ -315,12 +321,18 @@ export interface UpdateEchoeNoteTypeDto {
 // ===== Notes =====
 
 export interface EchoeNoteDto {
-  /** Note ID */
-  id: number;
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
+  id: string;
   /** Note GUID */
   guid: string;
   /** Note type ID */
-  mid: number;
+  mid: string;
   /** Last modified time */
   mod: number;
   /** Tags (JSON array) */
@@ -330,7 +342,7 @@ export interface EchoeNoteDto {
   /** Sort field */
   sfld: string;
   /** Checksum */
-  csum: number;
+  csum: string;
   /** Flags */
   flags: number;
   /** Data */
@@ -346,9 +358,9 @@ export interface EchoeNoteWithCardsDto extends EchoeNoteDto {
 
 export interface CreateEchoeNoteDto {
   /** Note type ID */
-  notetypeId: number;
+  notetypeId: string;
   /** Deck ID */
-  deckId: number;
+  deckId: string;
   /** Field values */
   fields: Record<string, string>;
   /** Tags */
@@ -369,12 +381,30 @@ export interface UpdateEchoeNoteDto {
 // ===== Cards =====
 
 export interface EchoeCardDto {
-  /** Card ID */
-  id: number;
-  /** Note ID */
-  nid: number;
-  /** Deck ID */
-  did: number;
+  /** Card ID (semantic business ID)
+   * @since Semantic rename: use `cardId` as primary field name
+   */
+  cardId: string;
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `cardId` instead. Retained for backwards compatibility during transition.
+   */
+  id: string;
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
+  nid: string;
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
+  did: string;
   /** Template ordinal */
   ord: number;
   /** Last modified time */
@@ -412,12 +442,30 @@ export interface EchoeCardWithNoteDto extends EchoeCardDto {
 
 /** Card list item for browser - includes deck info */
 export interface EchoeCardListItemDto {
-  /** Card ID */
-  id: number;
-  /** Note ID */
-  nid: number;
-  /** Deck ID */
-  did: number;
+  /** Card ID (semantic business ID)
+   * @since Semantic rename: use `cardId` as primary field name
+   */
+  cardId: string;
+  /** Note ID (semantic business ID)
+   * @since Semantic rename: use `noteId` as primary field name
+   */
+  noteId: string;
+  /** Deck ID (semantic business ID)
+   * @since Semantic rename: use `deckId` as primary field name
+   */
+  deckId: string;
+  /**
+   * @deprecated Use `cardId` instead. Retained for backwards compatibility during transition.
+   */
+  id: string;
+  /**
+   * @deprecated Use `noteId` instead. Retained for backwards compatibility during transition.
+   */
+  nid: string;
+  /**
+   * @deprecated Use `deckId` instead. Retained for backwards compatibility during transition.
+   */
+  did: string;
   /** Deck name */
   deckName: string;
   /** Template ordinal */
@@ -443,7 +491,7 @@ export interface EchoeCardListItemDto {
   /** Note tags */
   tags: string[];
   /** Note type ID */
-  mid: number;
+  mid: string;
   /** Note type name */
   notetypeName: string;
   /** Added date (Unix timestamp in seconds) */
@@ -457,7 +505,7 @@ export interface EchoeCardListItemDto {
 /** Query params for card list */
 export interface EchoeCardQueryParams {
   /** Filter by deck ID */
-  deckId?: number;
+  deckId?: string;
   /** Search query */
   q?: string;
   /** Filter by status: new, learn, review, suspended, buried, leech */
@@ -486,12 +534,12 @@ export type BulkCardAction =
 
 export interface BulkCardOperationDto {
   /** Card IDs */
-  cardIds: number[];
+  cardIds: string[];
   /** Action to perform */
   action: BulkCardAction;
-  /** Optional payload (for move: { deckId: number }, for addTag/removeTag: { tag: string }) */
+  /** Optional payload (for move: { deckId: string }, for addTag/removeTag: { tag: string }) */
   payload?: {
-    deckId?: number;
+    deckId?: string;
     tag?: string;
   };
 }
@@ -500,7 +548,7 @@ export interface BulkCardOperationDto {
 
 export interface EchoeNoteQueryParams {
   /** Filter by deck ID */
-  deckId?: number;
+  deckId?: string;
   /** Filter by tags (comma-separated) */
   tags?: string;
   /** Search query */
@@ -517,7 +565,7 @@ export interface EchoeNoteQueryParams {
 
 export interface StudyQueueParams {
   /** Deck ID to get queue from */
-  deckId?: number;
+  deckId?: string;
   /** Limit number of cards to return */
   limit?: number;
   /** Number of days to look ahead for review cards */
@@ -528,11 +576,11 @@ export interface StudyQueueParams {
 
 export interface StudyQueueItemDto {
   /** Card ID */
-  cardId: number;
+  cardId: string;
   /** Note ID */
-  noteId: number;
+  noteId: string;
   /** Deck ID */
-  deckId: number;
+  deckId: string;
   /** Card type (0=new, 1=learning, 2=review, 3=relearning) */
   cardType: number;
   /** Queue type */
@@ -550,7 +598,7 @@ export interface StudyQueueItemDto {
   /** Remaining steps */
   left: number;
   /** Note type ID */
-  notetypeId: number;
+  notetypeId: string;
   /** Front content (rendered) */
   front: string;
   /** Back content (rendered) */
@@ -572,13 +620,13 @@ export interface StudyQueueItemDto {
 
 export interface ReviewSubmissionDto {
   /** Card ID being reviewed */
-  cardId: number;
+  cardId: string;
   /** Rating: 1=Again, 2=Hard, 3=Good, 4=Easy */
   rating: 1 | 2 | 3 | 4;
   /** Time taken in milliseconds */
   timeTaken: number;
   /** Review ID being reviewed (for undo) */
-  reviewId?: number;
+  reviewId?: string;
   /** Preview mode - do not update card state or write revlog */
   preview?: boolean;
 }
@@ -597,7 +645,7 @@ export interface ReviewResultDto {
   /** Whether card was detected as a leech */
   isLeech?: boolean;
   /** Revlog ID created for this review; used for precise undo */
-  reviewId?: number;
+  reviewId?: string;
 }
 
 export interface StudyCountsDto {
@@ -628,7 +676,7 @@ export interface RatingOptionDto {
 
 export interface StudyOptionsDto {
   /** Card ID */
-  cardId: number;
+  cardId: string;
   /** All rating options */
   options: RatingOptionDto[];
   /**
@@ -649,21 +697,21 @@ export interface UndoResultDto {
 
 export interface BuryCardsDto {
   /** Card IDs to bury */
-  cardIds: number[];
+  cardIds: string[];
   /** Bury mode: 'card' for single card (queue=-2), 'note' for all siblings (queue=-3) */
   mode?: 'card' | 'note';
 }
 
 export interface ForgetCardsDto {
   /** Card IDs to reset */
-  cardIds: number[];
+  cardIds: string[];
 }
 
 // ===== Media =====
 
 export interface EchoeMediaDto {
   /** Media file ID */
-  id: number;
+  id: string;
   /** Stored filename */
   filename: string;
   /** Original uploaded filename */
@@ -911,9 +959,9 @@ export interface CsvExecuteDto {
   /** Column mapping: columnIndex -> field name (Front, Back, Tags) or Ignore */
   columnMapping: Record<number, string>;
   /** Note type ID to use for imported notes */
-  notetypeId: number;
+  notetypeId: string;
   /** Deck ID to import notes into */
-  deckId: number;
+  deckId: string;
   /** Whether the CSV/TSV has a header row */
   hasHeader: boolean;
 }
@@ -933,7 +981,7 @@ export interface CsvImportResultDto {
 
 export interface FindDuplicatesDto {
   /** Note type ID to search within */
-  notetypeId: number;
+  notetypeId: string;
   /** Field name to check for duplicates (e.g., "Front") */
   fieldName: string;
   /** Similarity threshold (0-1, default 1.0 for exact match) */
@@ -947,7 +995,7 @@ export interface DuplicateGroupDto {
 
 export interface MergeDuplicatesDto {
   /** Note ID to keep */
-  keepId: number;
+  keepId: string;
   /** Note IDs to delete */
-  deleteIds: number[];
+  deleteIds: string[];
 }

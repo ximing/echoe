@@ -261,14 +261,11 @@ const StudyPageContent = view(() => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [timer, setTimer] = useState('00:00');
 
-  // Parse deck ID
-  const parsedDeckId = deckId ? parseInt(deckId, 10) : undefined;
-
   // Load queue on mount
   useEffect(() => {
-    studyService.loadQueue(parsedDeckId);
+    studyService.loadQueue(deckId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsedDeckId]);
+  }, [deckId]);
 
   // Timer interval
   useEffect(() => {

@@ -12,10 +12,11 @@ import {
   echoeConfig,
 } from '../db/schema/index.js';
 import { logger } from '../utils/logger.js';
-import { generateDeckId, generateNoteTypeId } from '../utils/id.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 
-const DEFAULT_DECK_ID = 1;
-const DEFAULT_DECK_CONFIG_ID = 1;
+const DEFAULT_DECK_ID = 'ed_default_system_v1';
+const DEFAULT_DECK_CONFIG_ID = 'edc_default_system_v1';
 const DUE_MS_REPAIR_KEY = 'migration_due_ms_v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SECOND_MS = 1000;
@@ -25,12 +26,12 @@ const LEGACY_SECOND_DUE_MAX = 100_000_000_000;
 // Temporary placeholder UID for global seed data (will be replaced by per-user workspace in US-010)
 const SEED_UID = 'SYSTEM';
 
-// Default note type IDs (must match across seeds for compatibility)
-const NOTE_TYPE_BASIC = 1;
-const NOTE_TYPE_BASIC_REVERSED = 2;
-const NOTE_TYPE_BASIC_OPTIONAL_REVERSED = 3;
-const NOTE_TYPE_BASIC_TYPE_IN_ANSWER = 4;
-const NOTE_TYPE_CLOZE = 5;
+// Default note type business IDs (stable across seeds for compatibility)
+const NOTE_TYPE_BASIC = 'ent_basic_system_v1';
+const NOTE_TYPE_BASIC_REVERSED = 'ent_basic_reversed_v1';
+const NOTE_TYPE_BASIC_OPTIONAL_REVERSED = 'ent_basic_optional_v1';
+const NOTE_TYPE_BASIC_TYPE_IN_ANSWER = 'ent_basic_typein_v1';
+const NOTE_TYPE_CLOZE = 'ent_cloze_system_v1';
 
 // Default field definitions
 const BASIC_FIELDS = JSON.stringify([
@@ -70,16 +71,16 @@ function createBasicTemplate(name: string, qfmt: string, afmt: string, ord: numb
 }
 
 // Note type definitions matching Anki 2.1 default structure
-function createNoteType(id: number, name: string, fields: string, templates: ReturnType<typeof createBasicTemplate>[], type: number = 0) {
+function createNoteType(noteTypeId: string, name: string, fields: string, templates: ReturnType<typeof createBasicTemplate>[], type: number = 0) {
   const now = Math.floor(Date.now() / 1000);
   return {
-    id,
+    noteTypeId,
     uid: SEED_UID,
     name,
     mod: now,
     usn: -1,
     sortf: 0,
-    did: 0,
+    did: '',
     tmpls: JSON.stringify(templates),
     flds: fields,
     css: DEFAULT_CSS,
@@ -145,7 +146,7 @@ const NOTE_TYPES = [
 function createDefaultDeckConfig() {
   const now = Math.floor(Date.now() / 1000);
   return {
-    id: DEFAULT_DECK_CONFIG_ID,
+    deckConfigId: DEFAULT_DECK_CONFIG_ID,
     uid: SEED_UID,
     name: 'Default',
     replayq: 1,
@@ -201,7 +202,7 @@ function createDefaultDeckConfig() {
 function createDefaultDeck() {
   const now = Math.floor(Date.now() / 1000);
   return {
-    id: DEFAULT_DECK_ID,
+    deckId: DEFAULT_DECK_ID,
     uid: SEED_UID,
     name: 'Default',
     conf: DEFAULT_DECK_CONFIG_ID,
@@ -213,7 +214,7 @@ function createDefaultDeck() {
     dyn: 0,
     mod: now,
     desc: '',
-    mid: 0,
+    mid: '',
   };
 }
 
@@ -319,14 +320,14 @@ export class EchoeSeedService {
     logger.info('Seeding Echoe default data...');
 
     // Seed deck config first (default deck references it)
-    const existingConfig = await db.select().from(echoeDeckConfig).where(eq(echoeDeckConfig.id, DEFAULT_DECK_CONFIG_ID));
+    const existingConfig = await db.select().from(echoeDeckConfig).where(eq(echoeDeckConfig.deckConfigId, DEFAULT_DECK_CONFIG_ID));
     if (existingConfig.length === 0) {
       await db.insert(echoeDeckConfig).values(createDefaultDeckConfig());
       logger.info('Seeded default deck config');
     }
 
     // Seed default deck
-    const existingDeck = await db.select().from(echoeDecks).where(eq(echoeDecks.id, DEFAULT_DECK_ID));
+    const existingDeck = await db.select().from(echoeDecks).where(eq(echoeDecks.deckId, DEFAULT_DECK_ID));
     if (existingDeck.length === 0) {
       await db.insert(echoeDecks).values(createDefaultDeck());
       logger.info('Seeded default deck');
@@ -334,7 +335,7 @@ export class EchoeSeedService {
 
     // Seed note types
     for (const noteType of NOTE_TYPES) {
-      const existing = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.id, noteType.id));
+      const existing = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.noteTypeId, noteType.noteTypeId));
       if (existing.length === 0) {
         await db.insert(echoeNotetypes).values(noteType);
         logger.info(`Seeded note type: ${noteType.name}`);
@@ -344,7 +345,7 @@ export class EchoeSeedService {
     // Seed collection
     const now = Math.floor(Date.now() / 1000);
     const colData: typeof echoeCol.$inferInsert = {
-      id: now,
+      colId: generateTypeId(OBJECT_TYPE.ECHOE_COL),
       uid: SEED_UID,
       crt: Math.floor(Date.now() / 1000),
       mod: now,
@@ -393,18 +394,18 @@ export class EchoeSeedService {
 
     const now = Math.floor(Date.now() / 1000);
 
-    // Generate unique IDs for user's resources using centralized ID generators
-    const deckConfigId = generateDeckId();
-    const deckId = generateDeckId();
-    const noteTypeBasicId = generateNoteTypeId();
-    const noteTypeBasicReversedId = generateNoteTypeId();
-    const noteTypeBasicOptionalReversedId = generateNoteTypeId();
-    const noteTypeBasicTypeInAnswerId = generateNoteTypeId();
-    const noteTypeClozeId = generateNoteTypeId();
+    // Generate unique business IDs for user's resources using generateTypeId
+    const deckConfigId = generateTypeId(OBJECT_TYPE.ECHOE_DECK_CONFIG);
+    const deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+    const noteTypeBasicId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+    const noteTypeBasicReversedId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+    const noteTypeBasicOptionalReversedId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+    const noteTypeBasicTypeInAnswerId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+    const noteTypeClozeId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
 
     // 1. Create default deck config
     const deckConfigData = {
-      id: deckConfigId,
+      deckConfigId,
       uid,
       name: 'Default',
       replayq: 1,
@@ -459,7 +460,7 @@ export class EchoeSeedService {
 
     // 2. Create default deck
     const deckData = {
-      id: deckId,
+      deckId,
       uid,
       name: 'Default',
       conf: deckConfigId,
@@ -471,7 +472,7 @@ export class EchoeSeedService {
       dyn: 0,
       mod: now,
       desc: '',
-      mid: 0,
+      mid: '',
     };
     await db.insert(echoeDecks).values(deckData);
     logger.debug(`Created default deck for uid=${uid}`);
@@ -480,13 +481,13 @@ export class EchoeSeedService {
     const noteTypesData = [
       // Basic
       {
-        id: noteTypeBasicId,
+        noteTypeId: noteTypeBasicId,
         uid,
         name: 'Basic',
         mod: now,
         usn: -1,
         sortf: 0,
-        did: 0,
+        did: '',
         tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0)]),
         flds: BASIC_FIELDS,
         css: DEFAULT_CSS,
@@ -497,13 +498,13 @@ export class EchoeSeedService {
       },
       // Basic (Reversed)
       {
-        id: noteTypeBasicReversedId,
+        noteTypeId: noteTypeBasicReversedId,
         uid,
         name: 'Basic (Reversed)',
         mod: now,
         usn: -1,
         sortf: 0,
-        did: 0,
+        did: '',
         tmpls: JSON.stringify([
           createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0),
           createBasicTemplate('Card 2', '{{Back}}', '{{FrontSide}}<hr id="answer">{{Front}}', 1),
@@ -517,13 +518,13 @@ export class EchoeSeedService {
       },
       // Basic (Optional Reversed)
       {
-        id: noteTypeBasicOptionalReversedId,
+        noteTypeId: noteTypeBasicOptionalReversedId,
         uid,
         name: 'Basic (Optional Reversed)',
         mod: now,
         usn: -1,
         sortf: 0,
-        did: 0,
+        did: '',
         tmpls: JSON.stringify([
           createBasicTemplate('Card 1', '{{Front}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0),
           createBasicTemplate('Card 2', '{{#Add Reverse}}{{Back}}{{/Add Reverse}}', '{{FrontSide}}<hr id="answer">{{Front}}', 1),
@@ -541,13 +542,13 @@ export class EchoeSeedService {
       },
       // Basic (Type in the answer)
       {
-        id: noteTypeBasicTypeInAnswerId,
+        noteTypeId: noteTypeBasicTypeInAnswerId,
         uid,
         name: 'Basic (Type in the answer)',
         mod: now,
         usn: -1,
         sortf: 0,
-        did: 0,
+        did: '',
         tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{Front}}<br>{{type:Back}}', '{{FrontSide}}<hr id="answer">{{Back}}', 0)]),
         flds: BASIC_FIELDS,
         css: DEFAULT_CSS,
@@ -558,13 +559,13 @@ export class EchoeSeedService {
       },
       // Cloze
       {
-        id: noteTypeClozeId,
+        noteTypeId: noteTypeClozeId,
         uid,
         name: 'Cloze',
         mod: now,
         usn: -1,
         sortf: 0,
-        did: 0,
+        did: '',
         tmpls: JSON.stringify([createBasicTemplate('Card 1', '{{cloze:Text}}', '{{cloze:Text}}<br>{{Extra}}', 0)]),
         flds: CLOZE_FIELDS,
         css: DEFAULT_CSS,
@@ -582,7 +583,7 @@ export class EchoeSeedService {
 
     // 4. Create collection
     const colData: typeof echoeCol.$inferInsert = {
-      id: generateDeckId(),
+      colId: generateTypeId(OBJECT_TYPE.ECHOE_COL),
       uid,
       crt: now,
       mod: now,

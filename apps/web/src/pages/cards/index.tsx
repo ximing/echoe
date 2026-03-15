@@ -82,7 +82,7 @@ const CardsPageContent = view(() => {
   // Handle configure
   const handleConfigure = () => {
     if (!contextMenu) return;
-    navigate(`/cards/decks/${contextMenu.deck.id}/config`);
+    navigate(`/cards/decks/${contextMenu.deck.deckId}/config`);
     setContextMenu(null);
   };
 
@@ -108,7 +108,7 @@ const CardsPageContent = view(() => {
     const deck = contextMenu.deck;
     setContextMenu(null);
     try {
-      await echoeApi.rebuildFilteredDeck(deck.id);
+      await echoeApi.rebuildFilteredDeck(deck.deckId);
       toastService.success('Filtered deck rebuilt');
       deckService.loadDecks();
     } catch {
@@ -122,7 +122,7 @@ const CardsPageContent = view(() => {
     const deck = contextMenu.deck;
     setContextMenu(null);
     try {
-      await echoeApi.emptyFilteredDeck(deck.id);
+      await echoeApi.emptyFilteredDeck(deck.deckId);
       toastService.success('Filtered deck emptied');
       deckService.loadDecks();
     } catch {
@@ -145,7 +145,7 @@ const CardsPageContent = view(() => {
   // Handle update deck
   const handleUpdateDeck = async (name: string) => {
     if (!selectedDeck) return;
-    const success = await deckService.updateDeckData(selectedDeck.id, { name });
+    const success = await deckService.updateDeckData(selectedDeck.deckId, { name });
     if (success) {
       toastService.success('Deck updated');
       setIsCreateDialogOpen(false);
@@ -158,7 +158,7 @@ const CardsPageContent = view(() => {
   // Handle delete deck
   const handleDeleteDeck = async () => {
     if (!selectedDeck) return;
-    const success = await deckService.deleteDeckData(selectedDeck.id, deleteCards);
+    const success = await deckService.deleteDeckData(selectedDeck.deckId, deleteCards);
     if (success) {
       toastService.success('Deck deleted');
       setIsDeleteDialogOpen(false);
@@ -244,7 +244,7 @@ const getFilteredAndSortedDecks = (
 const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckService) => {
   const children = deck.children;
   const hasChildren = children.length > 0;
-  const isExpanded = deckService.isExpanded(deck.id);
+  const isExpanded = deckService.isExpanded(deck.deckId);
 
   // Get display name (after last ::)
   const displayName = deck.name.split('::').pop() || deck.name;
@@ -254,11 +254,11 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
   const masteryPercent = getMasteryPercentage(deck);
 
   return (
-    <div key={deck.id} className="flex flex-col">
+    <div key={deck.deckId} className="flex flex-col">
       {/* Deck Card */}
       <div
         className="bg-white dark:bg-dark-800 rounded-xl border border-gray-200 dark:border-dark-700 p-4 hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer group"
-        onClick={() => navigate(`/cards/study/${deck.id}`)}
+        onClick={() => navigate(`/cards/study/${deck.deckId}`)}
         onContextMenu={(e) => {
           e.preventDefault();
           // Trigger context menu via service
@@ -290,7 +290,7 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                deckService.toggleExpanded(deck.id);
+                deckService.toggleExpanded(deck.deckId);
               }}
               className="p-1 hover:bg-gray-200 dark:hover:bg-dark-700 rounded transition-colors"
             >
@@ -595,7 +595,7 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
       {/* Custom Study Dialog */}
       {isCustomStudyOpen && selectedDeck && (
         <CustomStudyDialog
-          deckId={selectedDeck.id}
+          deckId={selectedDeck.deckId}
           deckName={selectedDeck.name.split('::').pop() || selectedDeck.name}
           onClose={() => {
             setIsCustomStudyOpen(false);
@@ -768,7 +768,7 @@ const DeleteDeckDialog = view(
 );
 
 interface CustomStudyDialogProps {
-  deckId: number;
+  deckId: string;
   deckName: string;
   onClose: () => void;
 }

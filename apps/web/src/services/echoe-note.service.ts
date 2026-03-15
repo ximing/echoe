@@ -18,7 +18,7 @@ export class EchoeNoteService extends Service {
   notes: EchoeNoteDto[] = [];
   decks: EchoeDeckWithCountsDto[] = [];
   currentNote: EchoeNoteDto | null = null;
-  currentCard: { cardId: number; noteId: number; did: number; note: EchoeNoteDto } | null = null;
+  currentCard: { cardId: string; noteId: string; did: string; note: EchoeNoteDto } | null = null;
   isLoading = false;
   error: string | null = null;
 
@@ -55,7 +55,7 @@ export class EchoeNoteService extends Service {
   /**
    * Load a note by ID for editing
    */
-  async loadNote(noteId: number): Promise<boolean> {
+  async loadNote(noteId: string): Promise<boolean> {
     this.isLoading = true;
     this.error = null;
 
@@ -75,16 +75,16 @@ export class EchoeNoteService extends Service {
   /**
    * Load a card by ID for editing
    */
-  async loadCard(cardId: number): Promise<boolean> {
+  async loadCard(cardId: string): Promise<boolean> {
     this.isLoading = true;
     this.error = null;
 
     try {
       const response = await getCard(cardId);
       this.currentCard = {
-        cardId: response.data.id,
-        noteId: response.data.nid,
-        did: response.data.did,
+        cardId: response.data.cardId,
+        noteId: response.data.noteId,
+        did: response.data.deckId,
         note: response.data.note,
       };
       this.currentNote = response.data.note;
@@ -120,7 +120,7 @@ export class EchoeNoteService extends Service {
   /**
    * Update a note
    */
-  async updateExistingNote(noteId: number, data: UpdateEchoeNoteDto): Promise<boolean> {
+  async updateExistingNote(noteId: string, data: UpdateEchoeNoteDto): Promise<boolean> {
     this.isLoading = true;
     this.error = null;
 
@@ -140,7 +140,7 @@ export class EchoeNoteService extends Service {
   /**
    * Delete a note
    */
-  async deleteExistingNote(noteId: number): Promise<boolean> {
+  async deleteExistingNote(noteId: string): Promise<boolean> {
     try {
       await deleteNote(noteId);
       return true;
@@ -167,15 +167,15 @@ export class EchoeNoteService extends Service {
   /**
    * Get note type by ID
    */
-  getNoteTypeById(id: number): EchoeNoteTypeDto | undefined {
+  getNoteTypeById(id: string): EchoeNoteTypeDto | undefined {
     return this.noteTypes.find((nt) => nt.id === id);
   }
 
   /**
    * Get deck by ID
    */
-  getDeckById(id: number): EchoeDeckWithCountsDto | undefined {
-    return this.decks.find((d) => d.id === id);
+  getDeckById(id: string): EchoeDeckWithCountsDto | undefined {
+    return this.decks.find((d) => d.deckId === id || d.id === id);
   }
 
   /**

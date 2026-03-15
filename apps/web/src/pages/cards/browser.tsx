@@ -42,7 +42,7 @@ const CardBrowserPageContent = view(() => {
   const [cards, setCards] = useState<EchoeCardListItemDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const [selectedCard, setSelectedCard] = useState<CardDetail | null>(null);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
 
@@ -51,7 +51,7 @@ const CardBrowserPageContent = view(() => {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('added');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [deckFilter, setDeckFilter] = useState<number | undefined>(undefined);
+  const [deckFilter, setDeckFilter] = useState<string | undefined>(undefined);
 
   // Data
   const [decks, setDecks] = useState<EchoeDeckWithCountsDto[]>([]);
@@ -120,11 +120,11 @@ const CardBrowserPageContent = view(() => {
     if (selectedCards.size === cards.length) {
       setSelectedCards(new Set());
     } else {
-      setSelectedCards(new Set(cards.map((c) => c.id)));
+      setSelectedCards(new Set(cards.map((c) => c.cardId)));
     }
   };
 
-  const toggleSelectCard = (cardId: number) => {
+  const toggleSelectCard = (cardId: string) => {
     const newSelected = new Set(selectedCards);
     if (newSelected.has(cardId)) {
       newSelected.delete(cardId);
@@ -144,7 +144,7 @@ const CardBrowserPageContent = view(() => {
       // Delete notes (cards will be deleted automatically)
       // Since we don't have a bulk delete for notes, we need to delete cards first
       for (const cardId of selectedCards) {
-        const card = cards.find((c) => c.id === cardId);
+        const card = cards.find((c) => c.cardId === cardId);
         if (card) {
           // TODO: Delete via API
         }
@@ -322,14 +322,14 @@ const CardBrowserPageContent = view(() => {
           <select
             value={deckFilter || ''}
             onChange={(e) => {
-              setDeckFilter(e.target.value ? Number(e.target.value) : undefined);
+              setDeckFilter(e.target.value || undefined);
               setPage(1);
             }}
             className="px-3 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All Decks</option>
             {decks.map((deck) => (
-              <option key={deck.id} value={deck.id}>
+              <option key={deck.deckId} value={deck.deckId}>
                 {deck.name}
               </option>
             ))}
@@ -460,10 +460,10 @@ const CardBrowserPageContent = view(() => {
                 const status = getStatusBadge(card);
                 return (
                   <tr
-                    key={card.id}
+                    key={card.cardId}
                     className={`hover:bg-gray-50 dark:hover:bg-dark-800 cursor-pointer ${
-                      selectedCards.has(card.id) ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                    } ${selectedCard?.card.id === card.id ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
+                      selectedCards.has(card.cardId) ? 'bg-primary-50 dark:bg-primary-900/20' : ''
+                    } ${selectedCard?.card.cardId === card.cardId ? 'bg-primary-100 dark:bg-primary-900/30' : ''}`}
                     onClick={() => {
                       setSelectedCard({
                         card,
@@ -476,8 +476,8 @@ const CardBrowserPageContent = view(() => {
                     <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        checked={selectedCards.has(card.id)}
-                        onChange={() => toggleSelectCard(card.id)}
+                        checked={selectedCards.has(card.cardId)}
+                        onChange={() => toggleSelectCard(card.cardId)}
                         className="rounded border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700"
                       />
                     </td>
@@ -558,11 +558,11 @@ const CardBrowserPageContent = view(() => {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Card ID:</span>
-                  <span className="text-gray-900 dark:text-white">{selectedCard.card.id}</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.cardId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Note ID:</span>
-                  <span className="text-gray-900 dark:text-white">{selectedCard.card.nid}</span>
+                  <span className="text-gray-900 dark:text-white">{selectedCard.card.noteId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Deck:</span>
@@ -637,14 +637,14 @@ const CardBrowserPageContent = view(() => {
           {/* Actions */}
           <div className="border-t border-gray-200 dark:border-dark-700 p-4 space-y-2">
             <button
-              onClick={() => navigate(`/cards/cards/${selectedCard.card.nid}/edit`)}
+              onClick={() => navigate(`/cards/cards/${selectedCard.card.noteId}/edit`)}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600"
             >
               <Edit className="w-4 h-4" />
               Edit Note
             </button>
             <button
-              onClick={() => navigate(`/cards/study?deckId=${selectedCard.card.did}`)}
+              onClick={() => navigate(`/cards/study?deckId=${selectedCard.card.deckId}`)}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-dark-600"
             >
               <Play className="w-4 h-4" />

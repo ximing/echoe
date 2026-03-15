@@ -20,7 +20,7 @@ export class EchoeStatsService {
   /**
    * Get today's study statistics
    */
-  async getTodayStats(uid: string, deckId?: number): Promise<StudyTodayStatsDto> {
+  async getTodayStats(uid: string, deckId?: string): Promise<StudyTodayStatsDto> {
     const db = getDatabase();
 
     // Get start of today (midnight UTC)
@@ -47,12 +47,12 @@ export class EchoeStatsService {
           cid: echoeRevlog.cid,
         })
         .from(echoeRevlog)
-        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
             eq(echoeRevlog.uid, uid),
             eq(echoeCards.uid, uid),
-            gte(echoeRevlog.id, todayStart * 1000),
+            gte(echoeRevlog.lastReview, todayStart),
             cardFilter
           )
         );
@@ -64,7 +64,7 @@ export class EchoeStatsService {
           cid: echoeRevlog.cid,
         })
         .from(echoeRevlog)
-        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, todayStart * 1000)));
+        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.lastReview, todayStart)));
     }
 
     const reviews = await query;
@@ -105,7 +105,7 @@ export class EchoeStatsService {
   /**
    * Get study history for the last N days
    */
-  async getHistory(uid: string, deckId?: number, days: number = 30): Promise<StudyHistoryDayDto[]> {
+  async getHistory(uid: string, deckId?: string, days: number = 30): Promise<StudyHistoryDayDto[]> {
     const db = getDatabase();
 
     // Get start date
@@ -119,29 +119,29 @@ export class EchoeStatsService {
       const deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       query = db
         .select({
-          id: echoeRevlog.id,
+          lastReview: echoeRevlog.lastReview,
           ease: echoeRevlog.ease,
           time: echoeRevlog.time,
         })
         .from(echoeRevlog)
-        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
             eq(echoeRevlog.uid, uid),
             eq(echoeCards.uid, uid),
-            gte(echoeRevlog.id, startTimestamp * 1000),
+            gte(echoeRevlog.lastReview, startTimestamp),
             inArray(echoeCards.did, deckIds)
           )
         );
     } else {
       query = db
         .select({
-          id: echoeRevlog.id,
+          lastReview: echoeRevlog.lastReview,
           ease: echoeRevlog.ease,
           time: echoeRevlog.time,
         })
         .from(echoeRevlog)
-        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, startTimestamp * 1000)));
+        .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.lastReview, startTimestamp)));
     }
 
     const reviews = await query;
@@ -159,7 +159,7 @@ export class EchoeStatsService {
 
     // Aggregate reviews
     for (const review of reviews) {
-      const date = new Date(Number(review.id) / 1000);
+      const date = new Date(Number(review.lastReview));
       const dateStr = date.toISOString().split('T')[0];
       const day = dayMap.get(dateStr);
       if (day) {
@@ -174,7 +174,7 @@ export class EchoeStatsService {
   /**
    * Get card maturity distribution using FSRS stability
    */
-  async getMaturity(uid: string, deckId?: number): Promise<CardMaturityDto> {
+  async getMaturity(uid: string, deckId?: string): Promise<CardMaturityDto> {
     const db = getDatabase();
 
     let query;
@@ -228,7 +228,7 @@ export class EchoeStatsService {
   /**
    * Get forecast of due cards for the next N days
    */
-  async getForecast(uid: string, deckId?: number, days: number = 30): Promise<ForecastDayDto[]> {
+  async getForecast(uid: string, deckId?: string, days: number = 30): Promise<ForecastDayDto[]> {
     const db = getDatabase();
 
     const today = new Date();
@@ -324,14 +324,14 @@ export class EchoeStatsService {
 
     // Query all review log IDs (bigint, Unix ms × 1000) from the past year
     const reviews = await db
-      .select({ id: echoeRevlog.id })
+      .select({ lastReview: echoeRevlog.lastReview })
       .from(echoeRevlog)
-      .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.id, startTimestamp * 1000)));
+      .where(and(eq(echoeRevlog.uid, uid), gte(echoeRevlog.lastReview, startTimestamp)));
 
     // Build a set of UTC date strings that have reviews
     const daysWithReviews = new Set<string>();
     for (const review of reviews) {
-      const date = new Date(Number(review.id) / 1000);
+      const date = new Date(Number(review.lastReview));
       daysWithReviews.add(date.toISOString().split('T')[0]);
     }
 
@@ -365,7 +365,7 @@ export class EchoeStatsService {
    */
   async getMaturityBatch(uid: string): Promise<{
     decks: Array<{
-      deckId: number;
+      deckId: string;
       new: number;
       learning: number;
       young: number;
@@ -384,7 +384,7 @@ export class EchoeStatsService {
       .where(eq(echoeCards.uid, uid));
 
     const deckMap = new Map<
-      number,
+      string,
       { new: number; learning: number; young: number; mature: number }
     >();
 

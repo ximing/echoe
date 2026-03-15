@@ -12,7 +12,8 @@ import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
 import { logger } from '../utils/logger.js';
 import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
-import { generateDeckId } from '../utils/id.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 import { DEFAULT_FSRS_DTO_CONFIG } from './fsrs-default-config.js';
 import { parseStepToMinutes } from '../utils/fsrs-steps.js';
 
@@ -90,9 +91,9 @@ export class EchoeDeckService {
     const perDayByConfId = await this.getPerDayByConfId(uid, decks);
 
     // Create maps for quick lookup
-    const countsMap = new Map<number, { newCount: number; learnCount: number; reviewCount: number }>();
+    const countsMap = new Map<string, { newCount: number; learnCount: number; reviewCount: number }>();
     for (const card of cardsWithCounts) {
-      countsMap.set(Number(card.did), {
+      countsMap.set(card.did, {
         newCount: Number(card.newCount) || 0,
         learnCount: Number(card.learnCount) || 0,
         reviewCount: Number(card.reviewCount) || 0,
@@ -100,7 +101,7 @@ export class EchoeDeckService {
     }
 
     const fsrsMap = new Map<
-      number,
+      string,
       {
         totalCount: number;
         matureCount: number;
@@ -109,9 +110,9 @@ export class EchoeDeckService {
         lastStudiedAt: number | null;
       }
     >();
-    const retrievabilityEligibleCountMap = new Map<number, number>();
+    const retrievabilityEligibleCountMap = new Map<string, number>();
     for (const card of cardsWithFsrsStats) {
-      const did = Number(card.did);
+      const did = card.did;
       const retrievabilityEligibleCount = Number(card.retrievabilityEligibleCount) || 0;
       fsrsMap.set(did, {
         totalCount: Number(card.totalCount) || 0,
@@ -126,8 +127,8 @@ export class EchoeDeckService {
     // Convert to DTOs with counts
     const DEFAULT_PER_DAY = 20;
     const decksWithCounts: EchoeDeckWithCountsDto[] = decks.map((deck: EchoeDecks) => {
-      const counts = countsMap.get(Number(deck.id)) || { newCount: 0, learnCount: 0, reviewCount: 0 };
-      const fsrs = fsrsMap.get(Number(deck.id)) || {
+      const counts = countsMap.get(deck.deckId) || { newCount: 0, learnCount: 0, reviewCount: 0 };
+      const fsrs = fsrsMap.get(deck.deckId) || {
         totalCount: 0,
         matureCount: 0,
         difficultCount: 0,
@@ -137,20 +138,23 @@ export class EchoeDeckService {
 
       // Apply daily new card limit: newCount = min(rawNewCount, max(0, perDay - todayNewReviewed))
       const rawNewCount = counts.newCount;
-      const perDay = perDayByConfId.get(Number(deck.conf)) ?? DEFAULT_PER_DAY;
-      const todayNewReviewed = todayNewReviewedByDeck.get(Number(deck.id)) ?? 0;
+      const perDay = perDayByConfId.get(deck.conf) ?? DEFAULT_PER_DAY;
+      const todayNewReviewed = todayNewReviewedByDeck.get(deck.deckId) ?? 0;
       const cappedNewCount = Math.min(rawNewCount, Math.max(0, perDay - todayNewReviewed));
 
       return {
-        id: Number(deck.id),
+        // Semantic business ID fields (preferred)
+        deckId: deck.deckId,
+        // @deprecated alias - retained for backwards compatibility
+        id: deck.deckId,
         name: deck.name,
-        conf: Number(deck.conf),
+        conf: deck.conf,
         extendNew: deck.extendNew,
         extendRev: deck.extendRev,
         collapsed: deck.collapsed === 1,
         dyn: deck.dyn,
         desc: deck.desc || '',
-        mid: Number(deck.mid),
+        mid: deck.mid,
         mod: deck.mod,
         newCount: cappedNewCount,
         learnCount: counts.learnCount,
@@ -172,11 +176,11 @@ export class EchoeDeckService {
    * Batch-query today's new-card reviewed count grouped by deck.
    * Returns a Map<deckId, count>.
    */
-  private async getTodayNewReviewedCountByDeck(uid: string): Promise<Map<number, number>> {
+  private async getTodayNewReviewedCountByDeck(uid: string): Promise<Map<string, number>> {
     const db = getDatabase();
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const todayStartRevlogId = today.getTime() * 1000;
+    const todayStart = today.getTime();
 
     const rows = await db
       .select({
@@ -184,20 +188,20 @@ export class EchoeDeckService {
         count: sql<number>`count(*)`,
       })
       .from(echoeRevlog)
-      .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+      .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
       .where(
         and(
           eq(echoeRevlog.uid, uid),
           eq(echoeCards.uid, uid),
           eq(echoeRevlog.type, 0),
-          sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+          sql`${echoeRevlog.lastReview} >= ${todayStart}`
         )
       )
       .groupBy(echoeCards.did);
 
-    const result = new Map<number, number>();
+    const result = new Map<string, number>();
     for (const row of rows) {
-      result.set(Number(row.did), Number(row.count) || 0);
+      result.set(row.did, Number(row.count) || 0);
     }
     return result;
   }
@@ -205,24 +209,24 @@ export class EchoeDeckService {
   /**
    * Batch-fetch perDay value from deck configs, keyed by config ID.
    */
-  private async getPerDayByConfId(uid: string, decks: EchoeDecks[]): Promise<Map<number, number>> {
+  private async getPerDayByConfId(uid: string, decks: EchoeDecks[]): Promise<Map<string, number>> {
     const DEFAULT_PER_DAY = 20;
     if (decks.length === 0) {
       return new Map();
     }
 
-    const confIds = [...new Set(decks.map((d: EchoeDecks) => Number(d.conf)))];
+    const confIds = [...new Set(decks.map((d: EchoeDecks) => d.conf))];
     const db = getDatabase();
 
     const configs = await db
-      .select({ id: echoeDeckConfig.id, newConfig: echoeDeckConfig.newConfig })
+      .select({ deckConfigId: echoeDeckConfig.deckConfigId, newConfig: echoeDeckConfig.newConfig })
       .from(echoeDeckConfig)
-      .where(and(eq(echoeDeckConfig.uid, uid), inArray(echoeDeckConfig.id, confIds)));
+      .where(and(eq(echoeDeckConfig.uid, uid), inArray(echoeDeckConfig.deckConfigId, confIds)));
 
-    const result = new Map<number, number>();
+    const result = new Map<string, number>();
     for (const config of configs) {
       const perDay = this.parsePerDayFromNewConfig(config.newConfig, DEFAULT_PER_DAY);
-      result.set(Number(config.id), perDay);
+      result.set(config.deckConfigId, perDay);
     }
     return result;
   }
@@ -248,14 +252,14 @@ export class EchoeDeckService {
    */
   private buildDeckHierarchy(
     decks: EchoeDeckWithCountsDto[],
-    directRetrievabilityEligibleCountMap: Map<number, number>
+    directRetrievabilityEligibleCountMap: Map<string, number>
   ): EchoeDeckWithCountsDto[] {
-    const deckMap = new Map<number, EchoeDeckWithCountsDto>();
+    const deckMap = new Map<string, EchoeDeckWithCountsDto>();
     const rootDecks: EchoeDeckWithCountsDto[] = [];
 
     // First pass: create map
     for (const deck of decks) {
-      deckMap.set(deck.id, { ...deck, children: [] });
+      deckMap.set(deck.deckId, { ...deck, children: [] });
     }
 
     // Second pass: build hierarchy
@@ -264,16 +268,16 @@ export class EchoeDeckService {
         const parentName = deck.name.substring(0, deck.name.lastIndexOf('::'));
         const parent = decks.find((d) => d.name === parentName);
         if (parent) {
-          const parentDeck = deckMap.get(parent.id);
+          const parentDeck = deckMap.get(parent.deckId);
           if (parentDeck) {
-            parentDeck.children.push(deckMap.get(deck.id)!);
+            parentDeck.children.push(deckMap.get(deck.deckId)!);
           }
         } else {
           // Parent doesn't exist, treat as root
-          rootDecks.push(deckMap.get(deck.id)!);
+          rootDecks.push(deckMap.get(deck.deckId)!);
         }
       } else {
-        rootDecks.push(deckMap.get(deck.id)!);
+        rootDecks.push(deckMap.get(deck.deckId)!);
       }
     }
 
@@ -296,7 +300,7 @@ export class EchoeDeckService {
    */
   private aggregateChildStats(
     deck: EchoeDeckWithCountsDto,
-    directRetrievabilityEligibleCountMap: Map<number, number>
+    directRetrievabilityEligibleCountMap: Map<string, number>
   ): number {
     let totalNewCount = deck.newCount;
     let totalLearnCount = deck.learnCount;
@@ -304,7 +308,7 @@ export class EchoeDeckService {
     let totalTotalCount = deck.totalCount;
     let totalMatureCount = deck.matureCount;
     let totalDifficultCount = deck.difficultCount;
-    let totalRetrievabilityEligibleCount = directRetrievabilityEligibleCountMap.get(deck.id) || 0;
+    let totalRetrievabilityEligibleCount = directRetrievabilityEligibleCountMap.get(deck.deckId) || 0;
     let totalRetrievabilitySum = deck.averageRetrievability * totalRetrievabilityEligibleCount;
     let maxLastStudiedAt = deck.lastStudiedAt;
 
@@ -339,10 +343,10 @@ export class EchoeDeckService {
   /**
    * Get a single deck by ID
    */
-  async getDeckById(uid: string, id: number): Promise<EchoeDeckWithCountsDto | null> {
+  async getDeckById(uid: string, id: string): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
 
     if (deck.length === 0) {
       return null;
@@ -389,15 +393,18 @@ export class EchoeDeckService {
     };
 
     return {
-      id: Number(deck[0].id),
+      // Semantic business ID fields (preferred)
+      deckId: deck[0].deckId,
+      // @deprecated alias - retained for backwards compatibility
+      id: deck[0].deckId,
       name: deck[0].name,
-      conf: Number(deck[0].conf),
+      conf: deck[0].conf,
       extendNew: deck[0].extendNew,
       extendRev: deck[0].extendRev,
       collapsed: deck[0].collapsed === 1,
       dyn: deck[0].dyn,
       desc: deck[0].desc || '',
-      mid: Number(deck[0].mid),
+      mid: deck[0].mid,
       mod: deck[0].mod,
       newCount: Number(count.newCount) || 0,
       learnCount: Number(count.learnCount) || 0,
@@ -417,8 +424,8 @@ export class EchoeDeckService {
   async createDeck(uid: string, dto: CreateEchoeDeckDto): Promise<EchoeDeckWithCountsDto> {
     const db = getDatabase();
 
-    // Generate deck ID (Unix timestamp in ms)
-    const id = generateDeckId();
+    // Generate deck business ID
+    const deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
     const now = Math.floor(Date.now() / 1000);
 
     // If name contains '::', check if parent exists (not for filtered decks)
@@ -436,10 +443,10 @@ export class EchoeDeckService {
     const desc = isFiltered ? `Search: ${dto.searchQuery || ''}` : (dto.desc || '');
 
     const newDeck: NewEchoeDecks = {
-      id: id,
+      deckId: deckId,
       uid,
       name: dto.name,
-      conf: dto.conf || 1,
+      conf: dto.conf || '',
       extendNew: 20,
       extendRev: 200,
       usn: 0,
@@ -448,26 +455,29 @@ export class EchoeDeckService {
       dyn,
       mod: now,
       desc,
-      mid: 0,
+      mid: '',
     };
 
     await db.insert(echoeDecks).values(newDeck);
 
     // If this is a filtered deck and has a search query, build it
     if (isFiltered && dto.searchQuery) {
-      await this.buildFilteredDeck(uid, id, dto.searchQuery, false);
+      await this.buildFilteredDeck(uid, deckId, dto.searchQuery, false);
     }
 
     return {
-      id: newDeck.id,
+      // Semantic business ID fields (preferred)
+      deckId: newDeck.deckId,
+      // @deprecated alias - retained for backwards compatibility
+      id: newDeck.deckId,
       name: newDeck.name,
-      conf: newDeck.conf ?? 1,
+      conf: newDeck.conf || '',
       extendNew: newDeck.extendNew ?? 20,
       extendRev: newDeck.extendRev ?? 200,
       collapsed: false,
       dyn: newDeck.dyn ?? 0,
       desc: newDeck.desc || '',
-      mid: newDeck.mid ?? 0,
+      mid: newDeck.mid || '',
       mod: newDeck.mod,
       newCount: 0,
       learnCount: 0,
@@ -484,10 +494,10 @@ export class EchoeDeckService {
   /**
    * Update a deck
    */
-  async updateDeck(uid: string, id: number, dto: UpdateEchoeDeckDto): Promise<EchoeDeckWithCountsDto | null> {
+  async updateDeck(uid: string, id: string, dto: UpdateEchoeDeckDto): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
 
     if (deck.length === 0) {
       return null;
@@ -515,7 +525,7 @@ export class EchoeDeckService {
       updates.desc = dto.desc;
     }
 
-    await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
+    await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
 
     return this.getDeckById(uid, id);
   }
@@ -523,23 +533,23 @@ export class EchoeDeckService {
   /**
    * Delete a deck
    */
-  async deleteDeck(uid: string, id: number, deleteCards: boolean = false): Promise<boolean> {
+  async deleteDeck(uid: string, id: string, deleteCards: boolean = false): Promise<boolean> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
 
     if (deck.length === 0) {
       return false;
     }
 
     // Pre-fetch data needed inside the transaction to minimize read locks
-    let deckIds: number[] = [];
-    let noteIds: number[] = [];
+    let deckIds: string[] = [];
+    let noteIds: string[] = [];
 
     if (deleteCards) {
       deckIds = await this.getDeckAndSubdeckIds(uid, id);
       const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
-      noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => Number(c.nid))));
+      noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
     }
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
@@ -550,25 +560,25 @@ export class EchoeDeckService {
         if (noteIds.length > 0) {
           // Add notes to graves
           for (const nid of noteIds) {
-            await tx.insert(echoeGraves).values({ uid, usn: 0, oid: nid, type: 1 });
+            await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: nid, type: 1 });
           }
 
           // Delete cards
           await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
 
           // Delete notes
-          await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.id, noteIds)));
+          await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
         }
 
         // Delete sub-decks
-        await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.id, deckIds.slice(1))));
+        await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.deckId, deckIds.slice(1))));
       }
 
       // Add deck to graves
-      await tx.insert(echoeGraves).values({ uid, usn: 0, oid: id, type: 0 });
+      await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 0 });
 
       // Delete deck
-      await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)));
+      await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
 
       return true;
     });
@@ -577,27 +587,27 @@ export class EchoeDeckService {
   /**
    * Get deck and all sub-deck IDs
    */
-  async getDeckAndSubdeckIds(uid: string, id: number): Promise<number[]> {
+  async getDeckAndSubdeckIds(uid: string, id: string): Promise<string[]> {
     const db = getDatabase();
 
     const deck = await db
       .select({ name: echoeDecks.name })
       .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, id)))
+      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)))
       .limit(1);
 
     if (deck.length === 0) {
       return [];
     }
 
-    const result: number[] = [id];
+    const result: string[] = [id];
     const subDecks = await db
-      .select({ id: echoeDecks.id })
+      .select({ deckId: echoeDecks.deckId })
       .from(echoeDecks)
       .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deck[0].name}::%`)));
 
     for (const subDeck of subDecks) {
-      result.push(Number(subDeck.id));
+      result.push(subDeck.deckId);
     }
 
     return result;
@@ -606,16 +616,16 @@ export class EchoeDeckService {
   /**
    * Get deck config by deck ID
    */
-  async getDeckConfig(uid: string, deckId: number): Promise<EchoeDeckConfigDto | null> {
+  async getDeckConfig(uid: string, deckId: string): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -627,16 +637,16 @@ export class EchoeDeckService {
   /**
    * Update deck config
    */
-  async updateDeckConfig(uid: string, deckId: number, dto: UpdateEchoeDeckConfigDto): Promise<EchoeDeckConfigDto | null> {
+  async updateDeckConfig(uid: string, deckId: string, dto: UpdateEchoeDeckConfigDto): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -699,9 +709,9 @@ export class EchoeDeckService {
       updates.lapseConfig = JSON.stringify({ ...currentLapseConfig, ...dto.lapseConfig });
     }
 
-    await db.update(echoeDeckConfig).set(updates).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf)));
+    await db.update(echoeDeckConfig).set(updates).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf)));
 
-    const updated = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.id, deck[0].conf))).limit(1);
+    const updated = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
 
     return this.mapConfigToDto(updated[0]);
   }
@@ -722,7 +732,7 @@ export class EchoeDeckService {
     const lapseConfig = this.safeParseConfigObject(config.lapseConfig);
 
     return {
-      id: Number(config.id),
+      id: config.deckConfigId,
       name: config.name,
       replayq: config.replayq === 1,
       timer: config.timer,
@@ -849,15 +859,15 @@ export class EchoeDeckService {
   async createFilteredDeck(uid: string, dto: CreateFilteredDeckDto, buildNow: boolean = true): Promise<EchoeDeckWithCountsDto> {
     const db = getDatabase();
 
-    // Generate deck ID (Unix timestamp in ms)
-    const id = generateDeckId();
+    // Generate deck business ID
+    const deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
     const now = Math.floor(Date.now() / 1000);
 
     const newDeck: NewEchoeDecks = {
-      id: id,
+      deckId: deckId,
       uid,
       name: dto.name,
-      conf: 1,
+      conf: '',
       extendNew: 20,
       extendRev: 200,
       usn: 0,
@@ -866,26 +876,26 @@ export class EchoeDeckService {
       dyn: 1, // 1 = filtered deck
       mod: now,
       desc: `Search: ${dto.searchQuery}`,
-      mid: 0,
+      mid: '',
     };
 
     await db.insert(echoeDecks).values(newDeck);
 
     if (buildNow) {
-      await this.buildFilteredDeck(uid, id, dto.searchQuery, dto.rebuildDaily ?? false);
+      await this.buildFilteredDeck(uid, deckId, dto.searchQuery, dto.rebuildDaily ?? false);
     }
 
-    return this.getDeckById(uid, id) as Promise<EchoeDeckWithCountsDto>;
+    return this.getDeckById(uid, deckId) as Promise<EchoeDeckWithCountsDto>;
   }
 
   /**
    * Rebuild a filtered deck by running the search query
    */
-  async rebuildFilteredDeck(uid: string, deckId: number): Promise<boolean> {
+  async rebuildFilteredDeck(uid: string, deckId: string): Promise<boolean> {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -907,11 +917,11 @@ export class EchoeDeckService {
   /**
    * Empty a filtered deck - return cards to their original decks
    */
-  async emptyFilteredDeck(uid: string, deckId: number): Promise<boolean> {
+  async emptyFilteredDeck(uid: string, deckId: string): Promise<boolean> {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -921,7 +931,7 @@ export class EchoeDeckService {
     const cards = await db
       .select()
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != 0`));
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != ''`));
 
     if (cards.length === 0) {
       return true;
@@ -933,13 +943,13 @@ export class EchoeDeckService {
       await db
         .update(echoeCards)
         .set({
-          did: Number(card.odid),
-          odid: 0,
+          did: card.odid,
+          odid: '',
           odue: 0,
           mod: now,
           usn: 0,
         })
-        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, card.id)));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, card.cardId)));
     }
 
     return true;
@@ -956,15 +966,15 @@ export class EchoeDeckService {
     const sampleCards: EchoeCardListItemDto[] = await Promise.all(
       cards.map(async (card) => {
         // Get note info
-        const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid))).limit(1);
+        const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.noteId, card.nid), eq(echoeNotes.uid, uid))).limit(1);
         const noteData = note[0];
 
         // Get deck name
-        const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.id, card.did), eq(echoeDecks.uid, uid))).limit(1);
+        const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.deckId, card.did), eq(echoeDecks.uid, uid))).limit(1);
 
         // Get note type name
         const noteType = noteData?.mid
-          ? await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.id, noteData.mid), eq(echoeNotetypes.uid, uid))).limit(1)
+          ? await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.noteTypeId, noteData.mid), eq(echoeNotetypes.uid, uid))).limit(1)
           : [];
 
         // Parse fields from fieldsJson (primary source)
@@ -975,9 +985,14 @@ export class EchoeDeckService {
         const front = fields['Front'] || fields['front'] || Object.values(fields)[0] || '';
 
         return {
-          id: Number(card.id),
-          nid: Number(card.nid),
-          did: Number(card.did),
+          // Semantic business ID fields (preferred)
+          cardId: card.cardId,
+          noteId: card.nid,
+          deckId: card.did,
+          // @deprecated aliases - retained for backwards compatibility
+          id: card.cardId,
+          nid: card.nid,
+          did: card.did,
           deckName: deck[0]?.name || 'Unknown',
           ord: card.ord,
           type: card.type,
@@ -990,9 +1005,9 @@ export class EchoeDeckService {
           front,
           fields,
           tags: noteData?.tags || [],
-          mid: Number(noteData?.mid) || 0,
+          mid: noteData?.mid || '',
           notetypeName: noteType[0]?.name || 'Unknown',
-          addedAt: Number(noteData?.id) ? Math.floor(Number(noteData.id) / 1000) : 0,
+          addedAt: card.mod * 1000,
           mod: card.mod,
           notetypeType: noteType[0]?.type || 0,
         };
@@ -1008,7 +1023,7 @@ export class EchoeDeckService {
   /**
    * Build filtered deck - find cards matching search and move to filtered deck
    */
-  private async buildFilteredDeck(uid: string, deckId: number, searchQuery: string, rebuildDaily: boolean): Promise<void> {
+  private async buildFilteredDeck(uid: string, deckId: string, searchQuery: string, rebuildDaily: boolean): Promise<void> {
     const db = getDatabase();
     const now = Math.floor(Date.now() / 1000);
 
@@ -1031,7 +1046,7 @@ export class EchoeDeckService {
           mod: now,
           usn: 0,
         })
-        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, card.id)));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, card.cardId)));
     }
   }
 
@@ -1052,17 +1067,17 @@ export class EchoeDeckService {
         // Filter by deck name
         const deckName = term.substring(5).replace(/"/g, '');
         const decks = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`));
-        const deckIds = decks.map((d: Pick<EchoeDecks, 'id'>) => Number(d.id));
+        const deckIds = decks.map((d: Pick<EchoeDecks, 'deckId'>) => d.deckId);
         if (deckIds.length > 0) {
           conditions.push(inArray(echoeCards.did, deckIds));
         }
       } else if (term.startsWith('tag:')) {
         // Filter by tag
         const tag = term.substring(4).replace(/"/g, '');
-        const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`));
-        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
+        const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`));
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
-          conditions.push(inArray(echoeNotes.id, noteIds));
+          conditions.push(inArray(echoeNotes.noteId, noteIds));
         } else {
           return []; // No notes with this tag
         }
@@ -1090,12 +1105,12 @@ export class EchoeDeckService {
         // Filter by field content
         const fieldSearch = term.substring(term.indexOf(':') + 1).replace(/"/g, '');
         const notes = await db
-          .select({ id: echoeNotes.id })
+          .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
           .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`));
-        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
-          conditions.push(inArray(echoeNotes.id, noteIds));
+          conditions.push(inArray(echoeNotes.noteId, noteIds));
         } else {
           return [];
         }
@@ -1103,12 +1118,12 @@ export class EchoeDeckService {
         // Quoted string - search in sfld
         const text = term.replace(/"/g, '');
         const notes = await db
-          .select({ id: echoeNotes.id })
+          .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
           .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`));
-        const noteIds = notes.map((n: Pick<EchoeNotes, 'id'>) => n.id);
+        const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
-          conditions.push(inArray(echoeNotes.id, noteIds));
+          conditions.push(inArray(echoeNotes.noteId, noteIds));
         } else {
           return [];
         }
@@ -1122,11 +1137,11 @@ export class EchoeDeckService {
       const hasNoteCondition = conditions.some((c) => c && typeof c === 'object' && 'constructor' in c);
       if (hasNoteCondition || searchQuery.includes('tag:') || searchQuery.includes('front:') || searchQuery.includes('back:') || searchQuery.includes('"')) {
         // Get note IDs from conditions
-        let noteIds: number[] = [];
+        let noteIds: string[] = [];
         for (const cond of conditions) {
           if (cond && typeof cond === 'object' && 'constructor' in cond) {
-            const notes = await db.select({ id: echoeNotes.id }).from(echoeNotes).where(cond);
-            noteIds = [...noteIds, ...notes.map((n: Pick<EchoeNotes, 'id'>) => n.id)];
+            const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(cond);
+            noteIds = [...noteIds, ...notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId)];
           }
         }
         // Remove duplicates

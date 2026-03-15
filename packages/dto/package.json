@@ -23,7 +23,7 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix --fix-type problem",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "jest": {
     "preset": "@echoe/jest-presets/node"

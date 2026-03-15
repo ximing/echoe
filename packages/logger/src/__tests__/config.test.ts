@@ -37,10 +37,10 @@ describe('Config', () => {
       expect(config.maxFiles).toBe('30d');
     });
 
-    it('should generate default logDir with projectName', () => {
+    it('should generate default logDir in unified echoe directory', () => {
       const config = resolveConfig({ projectName: 'test-app' });
 
-      const expectedPath = path.join(os.homedir(), '.osg', 'logs', 'test-app');
+      const expectedPath = path.join(os.homedir(), '.echoe', 'logs');
       expect(config.logDir).toBe(expectedPath);
     });
 

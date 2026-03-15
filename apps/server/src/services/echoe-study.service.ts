@@ -11,7 +11,8 @@ import { EchoeDeckService } from './echoe-deck.service.js';
 import { DEFAULT_FSRS_RUNTIME_CONFIG } from './fsrs-default-config.js';
 import { logger } from '../utils/logger.js';
 import { calculateRetrievability } from '../utils/fsrs-retrievability.js';
-import { generateRevlogId } from '../utils/id.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 import { parseStepToMinutes, minutesToFsrsSteps } from '../utils/fsrs-steps.js';
 import { safeJsonParse, parseNoteFields, parseTags } from '../utils/echoe-note.utils.js';
 import type { FSRSConfig, FSRSInput } from './fsrs.service.js';
@@ -33,7 +34,7 @@ import type {
  * For new cards we pass through native FSRS Card initialization.
  */
 type FSRSCardInput = FSRSInput | Card;
-type StudyReviewResultDto = ReviewResultDto & { reviewId?: number };
+type StudyReviewResultDto = ReviewResultDto & { reviewId?: string };
 
 type FsrsTimingContext = {
   elapsedDays: number;
@@ -122,14 +123,20 @@ export class EchoeStudyService {
     const result: StudyQueueItemDto[] = [];
     for (const card of cards) {
       const note = await db.query.echoeNotes.findFirst({
-        where: eq(echoeNotes.id, card.nid),
+        where: and(
+          eq(echoeNotes.uid, uid),
+          eq(echoeNotes.noteId, card.nid)
+        ),
       });
 
       if (!note) continue;
 
       // Get note type to access templates
       const noteType = await db.query.echoeNotetypes.findFirst({
-        where: eq(echoeNotetypes.id, note.mid),
+        where: and(
+          eq(echoeNotetypes.uid, uid),
+          eq(echoeNotetypes.noteTypeId, note.mid)
+        ),
       });
 
       if (!noteType) continue;
@@ -158,7 +165,7 @@ export class EchoeStudyService {
       const retrievability = calculateRetrievability(card.lastReview, card.stability, now).value;
 
       result.push({
-        cardId: card.id,
+        cardId: card.cardId,
         noteId: card.nid,
         deckId: card.did,
         cardType: card.type,
@@ -191,7 +198,7 @@ export class EchoeStudyService {
 
     // Get the card
     const card = await db.query.echoeCards.findFirst({
-      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, dto.cardId)),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, dto.cardId)),
     });
 
     if (!card) {
@@ -200,7 +207,7 @@ export class EchoeStudyService {
 
     // Get the note
     const note = await db.query.echoeNotes.findFirst({
-      where: and(eq(echoeNotes.uid, uid), eq(echoeNotes.id, card.nid)),
+      where: and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, card.nid)),
     });
 
     if (!note) {
@@ -209,7 +216,7 @@ export class EchoeStudyService {
 
     // Get the deck
     const deck = await db.query.echoeDecks.findFirst({
-      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, card.did)),
+      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, card.did)),
     });
 
     if (!deck) {
@@ -218,7 +225,7 @@ export class EchoeStudyService {
 
     // Get deck config
     const deckConfig = await db.query.echoeDeckConfig.findFirst({
-      where: and(eq(echoeDeckConfig.id, deck.conf), eq(echoeDeckConfig.uid, uid)),
+      where: and(eq(echoeDeckConfig.deckConfigId, deck.conf), eq(echoeDeckConfig.uid, uid)),
     });
 
     // Build FSRS config from deck config
@@ -254,6 +261,12 @@ export class EchoeStudyService {
       return {
         card: {
           ...card,
+          // Semantic business ID fields (preferred)
+          cardId: card.cardId,
+          noteId: card.nid,
+          deckId: card.did,
+          // @deprecated aliases - retained for backwards compatibility
+          id: card.cardId,
           nid: card.nid,
           did: card.did,
           due: card.due,
@@ -262,12 +275,15 @@ export class EchoeStudyService {
           left: card.left,
           note: note ? {
             ...note,
-            id: note.id,
+            // Semantic business ID fields (preferred)
+            noteId: note.noteId,
+            // @deprecated alias - retained for backwards compatibility
+            id: note.noteId,
             mid: note.mid,
             mod: note.mod,
             csum: note.csum,
-          tags: parseTags(note.tags),
-          fields: parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
+            tags: parseTags(note.tags),
+            fields: parseNoteFields(note.fieldsJson as Record<string, string> | null, note.sfld),
           } : undefined,
         } as any,
         nextDue,
@@ -279,7 +295,7 @@ export class EchoeStudyService {
     }
 
     const revlogType = this.resolveRevlogType(card, deck);
-    const reviewId = generateRevlogId();
+    const reviewId = generateTypeId(OBJECT_TYPE.ECHOE_REVLOG);
 
     // Leech detection - check if card lapsed and exceeds threshold
     const lapseConfig = deckConfig?.lapseConfig ? JSON.parse(deckConfig.lapseConfig) : null;
@@ -294,7 +310,7 @@ export class EchoeStudyService {
     const buryRelated = newConfig?.bury || false;
 
     // Fetch siblings before transaction (reads can stay outside)
-    let siblingIds: number[] = [];
+    let siblingIds: string[] = [];
     if (buryRelated && !isLeech) {
       const siblings = await db
         .select()
@@ -302,10 +318,10 @@ export class EchoeStudyService {
         .where(and(
           eq(echoeCards.uid, uid),
           eq(echoeCards.nid, card.nid),
-          sql`${echoeCards.id} != ${dto.cardId}`,
+          sql`${echoeCards.cardId} != ${dto.cardId}`,
           sql`${echoeCards.queue} >= 0`
         ));
-      siblingIds = siblings.map((s: { id: number }) => s.id);
+      siblingIds = siblings.map((s: { cardId: string }) => s.cardId);
     }
 
     // Execute all writes in a single transaction to ensure atomicity
@@ -328,11 +344,11 @@ export class EchoeStudyService {
           difficulty: schedulingResult.difficulty,
           lastReview: now.getTime(),
         })
-        .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
+        .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)));
 
       // Log the review using pre-review card state
       await tx.insert(echoeRevlog).values({
-        id: reviewId,
+        revlogId: reviewId,
         cid: dto.cardId,
         uid,
         usn: -1,
@@ -368,7 +384,7 @@ export class EchoeStudyService {
               mod: Math.floor(now.getTime() / 1000),
               usn: -1,
             })
-            .where(and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)));
+            .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)));
         }
 
         // Always add 'leech' tag to the note if not already present
@@ -382,7 +398,7 @@ export class EchoeStudyService {
               mod: Math.floor(now.getTime() / 1000),
               usn: -1,
             })
-            .where(and(eq(echoeNotes.id, card.nid), eq(echoeNotes.uid, uid)));
+            .where(and(eq(echoeNotes.noteId, card.nid), eq(echoeNotes.uid, uid)));
         }
       }
 
@@ -396,13 +412,13 @@ export class EchoeStudyService {
           })
           .where(and(
             eq(echoeCards.uid, uid),
-            sql`${echoeCards.id} IN (${sql.join(siblingIds.map((id: number) => sql`${id}`), sql`, `)})`
+            sql`${echoeCards.cardId} IN (${sql.join(siblingIds.map((id: string) => sql`${id}`), sql`, `)})`
           ));
       }
 
       // Fetch and return the updated card within the transaction
       const cardAfterTx = await db.query.echoeCards.findFirst({
-        where: and(eq(echoeCards.id, dto.cardId), eq(echoeCards.uid, uid)),
+        where: and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)),
       });
       if (!cardAfterTx) {
         throw new Error('Failed to get updated card within transaction');
@@ -411,12 +427,18 @@ export class EchoeStudyService {
     });
 
     const fullNote = await db.query.echoeNotes.findFirst({
-      where: and(eq(echoeNotes.id, updatedCard.nid), eq(echoeNotes.uid, uid)),
+      where: and(eq(echoeNotes.noteId, updatedCard.nid), eq(echoeNotes.uid, uid)),
     });
 
     return {
       card: {
         ...updatedCard,
+        // Semantic business ID fields (preferred)
+        cardId: updatedCard.cardId,
+        noteId: updatedCard.nid,
+        deckId: updatedCard.did,
+        // @deprecated aliases - retained for backwards compatibility
+        id: updatedCard.cardId,
         nid: updatedCard.nid,
         did: updatedCard.did,
         due: updatedCard.due,
@@ -425,7 +447,10 @@ export class EchoeStudyService {
         left: updatedCard.left,
         note: fullNote ? {
           ...fullNote,
-          id: fullNote.id,
+          // Semantic business ID fields (preferred)
+          noteId: fullNote.noteId,
+          // @deprecated alias - retained for backwards compatibility
+          id: fullNote.noteId,
           mid: fullNote.mid,
           mod: fullNote.mod,
           csum: fullNote.csum,
@@ -445,13 +470,13 @@ export class EchoeStudyService {
   /**
    * Undo the last review
    */
-  async undo(uid: string, reviewId?: number): Promise<UndoResultDto> {
+  async undo(uid: string, reviewId?: string): Promise<UndoResultDto> {
     const db = getDatabase();
 
     // Get the most recent revlog entry, always filter by uid for tenant isolation
     const lastReview = await db.query.echoeRevlog.findFirst({
       where: reviewId
-        ? and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, reviewId))
+        ? and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.revlogId, reviewId))
         : eq(echoeRevlog.uid, uid),
       orderBy: [desc(echoeRevlog.id)],
     });
@@ -481,7 +506,7 @@ export class EchoeStudyService {
 
     // Get the card at that point, filter by uid for tenant isolation
     const card = await db.query.echoeCards.findFirst({
-      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, lastReview.cid)),
     });
 
     if (!card) {
@@ -512,10 +537,10 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, lastReview.cid)));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, lastReview.cid)));
 
       // Remove the revlog entry
-      await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, lastReview.id)));
+      await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.revlogId, lastReview.revlogId)));
     });
 
     return {
@@ -529,16 +554,16 @@ export class EchoeStudyService {
    * @param cardIds - Card IDs to bury
    * @param mode - 'card' for single card bury (queue=-2), 'note' for sibling bury (queue=-3)
    */
-  async buryCards(uid: string, cardIds: number[], mode: 'card' | 'note' = 'card'): Promise<void> {
+  async buryCards(uid: string, cardIds: string[], mode: 'card' | 'note' = 'card'): Promise<void> {
     const db = getDatabase();
     const now = Math.floor(Date.now() / 1000);
 
     if (mode === 'note') {
       // Bury all sibling cards (same note, different ordinal)
-      const noteIds = new Set<number>();
+      const noteIds = new Set<string>();
       for (const cardId of cardIds) {
         const card = await db.query.echoeCards.findFirst({
-          where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
+          where: and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, cardId)),
         });
         if (card) {
           noteIds.add(card.nid);
@@ -572,7 +597,7 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(and(eq(echoeCards.uid, uid), sql`${echoeCards.id} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`))
+        .where(and(eq(echoeCards.uid, uid), sql`${echoeCards.cardId} IN (${sql.join(cardIds.map(id => sql`${id}`), sql`, `)})`))
     }
   }
 
@@ -580,7 +605,7 @@ export class EchoeStudyService {
    * Forget cards (reset to new) via FSRSService.forgetCard() to ensure
    * all FSRS fields (including factor = stability * 1000) are correctly reset.
    */
-  async forgetCards(uid: string, cardIds: number[]): Promise<number> {
+  async forgetCards(uid: string, cardIds: string[]): Promise<number> {
     const db = getDatabase();
     const now = new Date();
     const nowSec = Math.floor(now.getTime() / 1000);
@@ -588,7 +613,7 @@ export class EchoeStudyService {
 
     for (const cardId of cardIds) {
       const card = await db.query.echoeCards.findFirst({
-        where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
+        where: and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, cardId)),
       });
       if (!card) continue;
 
@@ -624,7 +649,7 @@ export class EchoeStudyService {
           difficulty: resetCard.difficulty,
           lastReview: 0,
         })
-        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)));
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, cardId)));
 
       affected += 1;
     }
@@ -685,11 +710,11 @@ export class EchoeStudyService {
     // Using INNER JOIN would miss path-2 cards entirely, leaving them buried forever.
     const buriedCards = await db
       .selectDistinct({
-        id: echoeCards.id,
+        cardId: echoeCards.cardId,
         type: echoeCards.type,
       })
       .from(echoeCards)
-      .leftJoin(echoeRevlog, eq(echoeRevlog.cid, echoeCards.id))
+      .leftJoin(echoeRevlog, eq(echoeRevlog.cid, echoeCards.cardId))
       .where(
         and(
           eq(echoeCards.uid, uid),
@@ -729,7 +754,7 @@ export class EchoeStudyService {
           mod: now,
           usn: -1,
         })
-        .where(and(eq(echoeCards.id, Number(card.id)), eq(echoeCards.uid, uid)));
+        .where(and(eq(echoeCards.cardId, card.cardId), eq(echoeCards.uid, uid)));
 
       unburiedCount++;
     }
@@ -740,13 +765,13 @@ export class EchoeStudyService {
   /**
    * Get study counts for a deck
    */
-  async getCounts(uid: string, deckId?: number): Promise<StudyCountsDto> {
+  async getCounts(uid: string, deckId?: string): Promise<StudyCountsDto> {
     const db = getDatabase();
     const now = Date.now();
 
     // Build conditions
     let deckFilter: any = undefined;
-    let deckIds: number[] = [];
+    let deckIds: string[] = [];
     if (deckId) {
       deckIds = await this.echoeDeckService.getDeckAndSubdeckIds(uid, deckId);
       // Guard: deck not found or not owned by this user — return zero counts immediately
@@ -810,7 +835,7 @@ export class EchoeStudyService {
    * @param rawNewCount - Total new cards (queue=0) without any daily limit applied
    * @param deckIds - Optional deck IDs to scope the today-reviewed count; if undefined, all decks are included
    */
-  async applyNewCardDailyLimit(uid: string, rawNewCount: number, deckIds?: number[]): Promise<number> {
+  async applyNewCardDailyLimit(uid: string, rawNewCount: number, deckIds?: string[]): Promise<number> {
     if (rawNewCount === 0) {
       return 0;
     }
@@ -820,10 +845,10 @@ export class EchoeStudyService {
     // Get perDay from deck config
     const perDay = await this.getNewCardPerDay(uid, deckIds);
 
-    // Count today's new card reviews (revlog type=0, revlog id encodes ms * 1000)
+    // Count today's new card reviews (revlog type=0, revlog lastReview >= todayStart)
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const todayStartRevlogId = today.getTime() * 1000;
+    const todayStart = today.getTime();
 
     let todayNewReviewed: number;
     if (deckIds && deckIds.length > 0) {
@@ -831,13 +856,13 @@ export class EchoeStudyService {
       const result = await db
         .select({ count: sql<number>`count(*)` })
         .from(echoeRevlog)
-        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.id))
+        .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
             eq(echoeRevlog.uid, uid),
             eq(echoeCards.uid, uid),
             eq(echoeRevlog.type, 0),
-            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`,
+            sql`${echoeRevlog.lastReview} >= ${todayStart}`,
             sql`${echoeCards.did} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`
           )
         );
@@ -851,7 +876,7 @@ export class EchoeStudyService {
           and(
             eq(echoeRevlog.uid, uid),
             eq(echoeRevlog.type, 0),
-            sql`${echoeRevlog.id} >= ${todayStartRevlogId}`
+            sql`${echoeRevlog.lastReview} >= ${todayStart}`
           )
         );
       todayNewReviewed = Number(result[0]?.count || 0);
@@ -865,7 +890,7 @@ export class EchoeStudyService {
    * Get the perDay new card limit for the given deck IDs (or user default).
    * If multiple decks share different configs, returns the minimum perDay to be conservative.
    */
-  private async getNewCardPerDay(uid: string, deckIds?: number[]): Promise<number> {
+  private async getNewCardPerDay(uid: string, deckIds?: string[]): Promise<number> {
     const DEFAULT_PER_DAY = 20;
     const db = getDatabase();
 
@@ -886,17 +911,17 @@ export class EchoeStudyService {
     const decksWithConf = await db
       .select({ conf: echoeDecks.conf })
       .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.id} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`));
+      .where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.deckId} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`));
 
     if (decksWithConf.length === 0) {
       return DEFAULT_PER_DAY;
     }
 
-    const confIds = [...new Set(decksWithConf.map((d: { conf: number | bigint }) => Number(d.conf)))];
+    const confIds: string[] = Array.from(new Set(decksWithConf.map((d: { conf: string }) => d.conf)));
     const configs = await db
       .select({ newConfig: echoeDeckConfig.newConfig })
       .from(echoeDeckConfig)
-      .where(and(eq(echoeDeckConfig.uid, uid), sql`${echoeDeckConfig.id} IN (${sql.join(confIds.map(id => sql`${id}`), sql`, `)})`));
+      .where(and(eq(echoeDeckConfig.uid, uid), sql`${echoeDeckConfig.deckConfigId} IN (${sql.join(confIds.map(id => sql`${id}`), sql`, `)})`));
 
     if (configs.length === 0) {
       return DEFAULT_PER_DAY;
@@ -926,13 +951,13 @@ export class EchoeStudyService {
   /**
    * Get scheduling options for a card (preview of all rating outcomes)
    */
-  async getOptions(uid: string, cardId: number): Promise<StudyOptionsDto> {
+  async getOptions(uid: string, cardId: string): Promise<StudyOptionsDto> {
     const db = getDatabase();
     const now = new Date();
 
     // Get the card
     const card = await db.query.echoeCards.findFirst({
-      where: and(eq(echoeCards.uid, uid), eq(echoeCards.id, cardId)),
+      where: and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, cardId)),
     });
 
     if (!card) {
@@ -941,7 +966,7 @@ export class EchoeStudyService {
 
     // Get the deck
     const deck = await db.query.echoeDecks.findFirst({
-      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, card.did)),
+      where: and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, card.did)),
     });
 
     if (!deck) {
@@ -950,7 +975,7 @@ export class EchoeStudyService {
 
     // Get deck config
     const deckConfig = await db.query.echoeDeckConfig.findFirst({
-      where: and(eq(echoeDeckConfig.id, deck.conf), eq(echoeDeckConfig.uid, uid)),
+      where: and(eq(echoeDeckConfig.deckConfigId, deck.conf), eq(echoeDeckConfig.uid, uid)),
     });
 
     // Build FSRS config from deck config
@@ -1080,7 +1105,7 @@ export class EchoeStudyService {
 
     logger.warn('FSRS legacy fallback path hit', {
       event: 'fsrs_legacy_fallback',
-      cardId: card.id,
+      cardId: card.cardId,
       deckId: card.did,
       cardType: card.type,
       queue: card.queue,
@@ -1198,7 +1223,7 @@ export class EchoeStudyService {
    * 0=learning/new, 1=review, 2=relearning, 4=custom/filtered.
    */
   private resolveRevlogType(
-    card: Pick<typeof echoeCards.$inferSelect, 'id' | 'queue' | 'type'>,
+    card: Pick<typeof echoeCards.$inferSelect, 'cardId' | 'queue' | 'type'>,
     deck: Pick<typeof echoeDecks.$inferSelect, 'dyn'>
   ): number {
     if (deck.dyn === 1) {
@@ -1223,7 +1248,7 @@ export class EchoeStudyService {
     }
 
     logger.warn('Unknown pre-review state, fallback revlog.type to custom study', {
-      cardId: card.id,
+      cardId: card.cardId,
       queue: card.queue,
       type: card.type,
     });
@@ -1235,7 +1260,7 @@ export class EchoeStudyService {
    * Build FSRS config from deck config
    */
   private getFSRSConfig(deckConfig: any): FSRSConfig {
-    const deckConfigId = typeof deckConfig?.id === 'number' ? deckConfig.id : null;
+    const deckConfigId = typeof deckConfig?.deckConfigId === 'string' ? deckConfig.deckConfigId : null;
     const newConfig = this.parseDeckConfigSection(deckConfig?.newConfig);
     const revConfig = this.parseDeckConfigSection(deckConfig?.revConfig);
     const lapseConfig = this.parseDeckConfigSection(deckConfig?.lapseConfig);
@@ -1302,7 +1327,7 @@ export class EchoeStudyService {
     candidates: unknown[],
     fallback: readonly string[],
     field: 'learningSteps' | 'relearningSteps',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): string[] {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1342,7 +1367,7 @@ export class EchoeStudyService {
     schema: z.ZodType<number>,
     fallback: number,
     field: 'maxInterval' | 'requestRetention',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): number {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1364,7 +1389,7 @@ export class EchoeStudyService {
     candidates: unknown[],
     fallback: boolean,
     field: 'enableFuzz' | 'enableShortTerm',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): boolean {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1382,7 +1407,7 @@ export class EchoeStudyService {
     return fallback;
   }
 
-  private logInvalidFsrsConfigValue(deckConfigId: number | null, field: string, value: unknown): void {
+  private logInvalidFsrsConfigValue(deckConfigId: string | null, field: string, value: unknown): void {
     logger.warn('Invalid FSRS deck config detected, fallback to default', {
       event: 'fsrs_config_fallback',
       deckConfigId,

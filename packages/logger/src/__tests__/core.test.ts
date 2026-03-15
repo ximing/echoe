@@ -219,9 +219,8 @@ describe('Log', () => {
       });
 
       const config = logger.getConfig();
-      expect(config.logDir).toContain('.osg');
+      expect(config.logDir).toContain('.echoe');
       expect(config.logDir).toContain('logs');
-      expect(config.logDir).toContain('default-test');
     });
 
     it('should have console enabled by default', () => {

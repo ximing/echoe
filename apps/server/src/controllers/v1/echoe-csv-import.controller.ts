@@ -137,8 +137,8 @@ export class EchoeCsvImportController {
       columnMapping: typeof dto.columnMapping === 'string'
         ? JSON.parse(dto.columnMapping)
         : dto.columnMapping,
-      notetypeId: Number(dto.notetypeId),
-      deckId: Number(dto.deckId),
+      notetypeId: String(dto.notetypeId),
+      deckId: String(dto.deckId),
       hasHeader: dto.hasHeader === true || (dto.hasHeader as any) === 'true',
     };
 

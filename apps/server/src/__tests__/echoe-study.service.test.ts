@@ -58,8 +58,8 @@ describe('EchoeStudyService - FSRS input building', () => {
   });
 
   const buildCard = (overrides: Record<string, unknown> = {}) => ({
-    id: 1001,
-    did: 2001,
+    cardId: 'ec_test_1001',
+    did: 'ed_test_2001',
     queue: 2,
     due: new Date('2026-03-20T00:00:00.000Z').getTime(),
     stability: 12.5,
@@ -222,7 +222,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should prefer fsrs sub-config over legacy deck fields', () => {
     const config = getFSRSConfig({
-      id: 99,
+      deckConfigId: 'test-deck-config-99',
       newConfig: JSON.stringify({ steps: [1, 10] }),
       revConfig: JSON.stringify({
         maxInterval: 120,
@@ -248,7 +248,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should fallback to legacy fields when fsrs sub-config is missing', () => {
     const config = getFSRSConfig({
-      id: 100,
+      deckConfigId: 'test-deck-config-100',
       newConfig: JSON.stringify({ delays: [3, 12] }),
       revConfig: JSON.stringify({ maxInterval: 180 }),
       lapseConfig: JSON.stringify({ delays: [25] }),
@@ -264,7 +264,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should fallback invalid fsrs values to safe defaults', () => {
     const config = getFSRSConfig({
-      id: 101,
+      deckConfigId: 'test-deck-config-101',
       newConfig: JSON.stringify({ delays: [6, 16] }),
       revConfig: JSON.stringify({
         maxInterval: 150,
@@ -397,7 +397,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [1001]);
+    const affected = await service.forgetCards('test-uid', ['ec_1001']);
 
     expect(affected).toBe(1);
     expect(forgetCardMock).toHaveBeenCalledTimes(1);
@@ -436,7 +436,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [9999]);
+    const affected = await service.forgetCards('test-uid', ['ec_9999']);
 
     expect(affected).toBe(0);
     expect(forgetCardMock).not.toHaveBeenCalled();
@@ -473,7 +473,7 @@ describe('EchoeStudyService - forgetCards', () => {
       },
     } as any);
 
-    const affected = await service.forgetCards('test-uid', [1001, 1002]);
+    const affected = await service.forgetCards('test-uid', ['ec_1001', 'ec_1002']);
 
     expect(affected).toBe(2);
     expect(forgetCardMock).toHaveBeenCalledTimes(2);
@@ -701,8 +701,9 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
 
   const buildDbCard = (overrides: Record<string, unknown> = {}) => ({
     id: 1001,
-    nid: 2001,
-    did: 3001,
+    cardId: 'ec_test_1001',
+    nid: 'en_test_2001',
+    did: 'ed_test_3001',
     ord: 0,
     due: Date.now() - 1000,
     ivl: 0,
@@ -754,27 +755,27 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
         },
         echoeNotes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            id: 2001, noteId: 'en_test_2001', mid: 'ent_test_4001', sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
-            mod: 0, csum: 0,
+            mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
-          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, deckId: 'ed_test_3001', conf: 1, dyn: 0 }),
         },
         echoeDeckConfig: {
           findFirst: jest.fn().mockResolvedValue(null),
         },
         echoeNotetypes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 4001, type: 0,
+            id: 4001, noteTypeId: 'ent_test_4001', type: 0,
             tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
           }),
         },
       },
     }) as any);
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 3, timeTaken: 5000 });
 
     // 断言写库时 left = learningSteps（来自 FSRS 结果），而非硬编码 0
     expect(setMock).toHaveBeenCalledWith(
@@ -813,27 +814,27 @@ describe('EchoeStudyService - submitReview learning_steps persistence', () => {
         },
         echoeNotes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 2001, mid: 4001, sfld: 'Front', tags: '[]',
+            id: 2001, noteId: 'en_test_2001', mid: 'ent_test_4001', sfld: 'Front', tags: '[]',
             fieldsJson: { Front: 'Question', Back: 'Answer' },
-            mod: 0, csum: 0,
+            mod: 0, csum: '0',
           }),
         },
         echoeDecks: {
-          findFirst: jest.fn().mockResolvedValue({ id: 3001, conf: 1, dyn: 0 }),
+          findFirst: jest.fn().mockResolvedValue({ id: 3001, deckId: 'ed_test_3001', conf: 1, dyn: 0 }),
         },
         echoeDeckConfig: {
           findFirst: jest.fn().mockResolvedValue(null),
         },
         echoeNotetypes: {
           findFirst: jest.fn().mockResolvedValue({
-            id: 4001, type: 0,
+            id: 4001, noteTypeId: 'ent_test_4001', type: 0,
             tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Back}}' }]),
           }),
         },
       },
     }) as any);
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 3, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 3, timeTaken: 5000 });
 
     expect(setMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -863,8 +864,9 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
 
   const buildLeechCard = (lapses: number) => ({
     id: 1001,
-    nid: 2001,
-    did: 3001,
+    cardId: 'ec_test_1001',
+    nid: 'en_test_2001',
+    did: 'ed_test_3001',
     ord: 0,
     due: Date.now() - 1000,
     ivl: 1,
@@ -883,12 +885,13 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
 
   const buildMockNote = () => ({
     id: 2001,
-    mid: 4001,
+    noteId: 'en_test_2001',
+    mid: 'ent_test_4001',
     sfld: 'Front',
     tags: '[]',
     fieldsJson: { Front: 'Question', Back: 'Answer' },
     mod: 0,
-    csum: 0,
+    csum: '0',
   });
 
   const buildRelearningResult = () => ({
@@ -952,7 +955,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     scheduleCardMock.mockReturnValue(buildRelearningResult());
     const { updateMock, setMock } = buildMockDb({ leechAction: 0 });
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     // updateMock is called for: (1) card scheduling, (2) card suspension, (3) note tag
     const allSetCalls = setMock.mock.calls;
@@ -975,7 +978,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     scheduleCardMock.mockReturnValue(buildRelearningResult());
     const { updateMock, setMock } = buildMockDb({ leechAction: 1 });
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     const allSetCalls = setMock.mock.calls;
 
@@ -999,7 +1002,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     // lapseConfig without leechAction field
     const { setMock } = buildMockDb({});
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     const allSetCalls = setMock.mock.calls;
     const suspendCall = allSetCalls.find((args) => (args[0] as Record<string, unknown>).queue === -1);
@@ -1011,7 +1014,7 @@ describe('EchoeStudyService - submitReview leech detection with leechAction', ()
     // Note already has 'leech' tag
     const { updateMock } = buildMockDb({ leechAction: 0 }, '["leech"]');
 
-    await service.submitReview('test-uid', { cardId: 1001, rating: 1, timeTaken: 5000 });
+    await service.submitReview('test-uid', { cardId: 'ec_1001', rating: 1, timeTaken: 5000 });
 
     // Only 2 update calls: (1) card scheduling, (2) card suspension (no tag update needed)
     expect(updateMock).toHaveBeenCalledTimes(2);
@@ -1286,7 +1289,7 @@ describe('EchoeStudyService - empty deckIds guard (getQueue)', () => {
     const selectMock = jest.fn();
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getQueue('user-a', { deckId: 9999, limit: 20 });
+    const result = await service.getQueue('user-a', { deckId: 'ed_9999', limit: 20 });
 
     expect(result).toEqual([]);
     // DB select must NOT be called — the guard should short-circuit before any SQL query
@@ -1304,7 +1307,7 @@ describe('EchoeStudyService - empty deckIds guard (getQueue)', () => {
 
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getQueue('user-a', { deckId: 100, limit: 20 });
+    const result = await service.getQueue('user-a', { deckId: 'ed_100', limit: 20 });
 
     expect(result).toEqual([]);
     expect(selectMock).toHaveBeenCalled();
@@ -1347,7 +1350,7 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
     const selectMock = jest.fn();
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getCounts('user-a', 9999);
+    const result = await service.getCounts('user-a', 'ed_9999');
 
     expect(result).toEqual({ newCount: 0, learnCount: 0, reviewCount: 0, totalCount: 0 });
     // DB select must NOT be called — the guard should short-circuit before any SQL query
@@ -1371,7 +1374,7 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
 
     mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
 
-    const result = await service.getCounts('user-a', 200);
+    const result = await service.getCounts('user-a', 'ed_200');
 
     expect(selectMock).toHaveBeenCalled();
     expect(result).toHaveProperty('newCount');
@@ -1401,5 +1404,264 @@ describe('EchoeStudyService - empty deckIds guard (getCounts)', () => {
     expect(result).toHaveProperty('learnCount');
     expect(result).toHaveProperty('reviewCount');
     expect(result).toHaveProperty('totalCount');
+  });
+});
+
+describe('EchoeStudyService - getQueue tenant boundary', () => {
+  let service: EchoeStudyService;
+
+  const extractWhereSqlText = (expr: unknown): string => {
+    const maybeWrapper = expr as { getSQL?: () => unknown } | null | undefined;
+    const sqlExpr = typeof maybeWrapper?.getSQL === 'function' ? maybeWrapper.getSQL() : expr;
+
+    if (!sqlExpr || typeof (sqlExpr as { toQuery?: unknown }).toQuery !== 'function') {
+      return '';
+    }
+
+    return new MySqlDialect().sqlToQuery(sqlExpr as any).sql;
+  };
+
+  const buildDueCard = (overrides: Record<string, unknown> = {}) => ({
+    cardId: 'ec_queue_1',
+    nid: 'en_shared',
+    did: 'ed_default',
+    ord: 0,
+    type: 2,
+    queue: 2,
+    due: Date.now() - 1000,
+    ivl: 3,
+    factor: 2500,
+    reps: 5,
+    lapses: 0,
+    left: 0,
+    stability: 2.3,
+    lastReview: Date.now() - 10_000,
+    ...overrides,
+  });
+
+  const createSelectChain = (cards: Array<Record<string, unknown>>) => {
+    const limitMock = jest.fn().mockResolvedValue(cards);
+    const orderByMock = jest.fn().mockReturnValue({ limit: limitMock });
+    const whereMock = jest.fn().mockReturnValue({ orderBy: orderByMock });
+    const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+    const selectMock = jest.fn().mockReturnValue({ from: fromMock });
+
+    return { selectMock };
+  };
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should filter note lookup by uid and block cross-tenant note content leak', async () => {
+    const queueCards = [buildDueCard()];
+    const { selectMock } = createSelectChain(queueCards);
+
+    const noteFindFirstMock = jest.fn(async ({ where }: { where: unknown }) => {
+      const whereSql = extractWhereSqlText(where);
+      if (/echoe_notes.*uid/i.test(whereSql)) {
+        return null;
+      }
+
+      return {
+        noteId: 'en_shared',
+        mid: 'ent_shared',
+        fieldsJson: { Front: 'other-user-secret' },
+        sfld: 'other-user-secret',
+        tags: '[]',
+      };
+    });
+
+    const noteTypeFindFirstMock = jest.fn().mockResolvedValue({
+      noteTypeId: 'ent_shared',
+      type: 0,
+      tmpls: JSON.stringify([{ qfmt: '{{Front}}', afmt: '{{Front}}' }]),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      query: {
+        echoeNotes: { findFirst: noteFindFirstMock },
+        echoeNotetypes: { findFirst: noteTypeFindFirstMock },
+      },
+    } as any);
+
+    const result = await service.getQueue('user-a', { limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
+    expect(noteTypeFindFirstMock).not.toHaveBeenCalled();
+
+    const noteWhereSql = extractWhereSqlText(noteFindFirstMock.mock.calls[0]?.[0]?.where);
+    expect(noteWhereSql).toMatch(/echoe_notes.*uid/i);
+    expect(noteWhereSql).toMatch(/note_id/i);
+  });
+
+  it('should filter notetype lookup by uid when rendering queue cards', async () => {
+    const queueCards = [buildDueCard({ nid: 'en_owned_1' })];
+    const { selectMock } = createSelectChain(queueCards);
+
+    const noteFindFirstMock = jest.fn().mockResolvedValue({
+      noteId: 'en_owned_1',
+      mid: 'ent_shared',
+      fieldsJson: { Front: 'safe-content' },
+      sfld: 'safe-content',
+      tags: '[]',
+    });
+
+    const noteTypeFindFirstMock = jest.fn().mockResolvedValue(null);
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      query: {
+        echoeNotes: { findFirst: noteFindFirstMock },
+        echoeNotetypes: { findFirst: noteTypeFindFirstMock },
+      },
+    } as any);
+
+    const result = await service.getQueue('user-a', { limit: 20 });
+
+    expect(result).toEqual([]);
+    expect(noteTypeFindFirstMock).toHaveBeenCalledTimes(1);
+
+    const noteTypeWhereSql = extractWhereSqlText(noteTypeFindFirstMock.mock.calls[0]?.[0]?.where);
+    expect(noteTypeWhereSql).toMatch(/echoe_notetypes.*uid/i);
+    expect(noteTypeWhereSql).toMatch(/note_type_id/i);
+  });
+});
+
+/**
+ * Regression tests for issue #31:
+ * Revlog time queries must use `lastReview` (Unix ms) instead of `id` (auto-increment int).
+ *
+ * Previously, stats/daily-limit/deck queries used `echoeRevlog.id >= todayStart * 1000`,
+ * which fails when id is a small auto-increment value (1, 2, 3...) rather than epoch ms.
+ * The fix replaces these with `echoeRevlog.lastReview >= todayStart`.
+ */
+describe('EchoeStudyService - applyNewCardDailyLimit uses lastReview not id (regression #31)', () => {
+  let service: EchoeStudyService;
+
+  const uid = 'u_test_31';
+
+  /**
+   * Build a chainable mock that records the `where` argument passed to .where()
+   * so we can inspect the SQL expression used for time filtering.
+   */
+  function buildCapturingChainMock(returnValue: unknown): {
+    proxy: any;
+    capturedWhere: { args: unknown[] };
+  } {
+    const capturedWhere: { args: unknown[] } = { args: [] };
+    const chain: Record<string, jest.Mock> = {};
+    const methods = ['select', 'from', 'innerJoin', 'groupBy', 'limit'];
+    for (const method of methods) {
+      chain[method] = jest.fn().mockReturnValue(chain);
+    }
+    chain['where'] = jest.fn((...args: unknown[]) => {
+      capturedWhere.args = args;
+      return chain;
+    });
+    chain['then'] = jest.fn((fn: (v: unknown) => unknown) => Promise.resolve(fn(returnValue)));
+    const chainProxy = new Proxy(chain, {
+      get(target, prop) {
+        if (prop === 'then') return target['then'];
+        return target[prop as string] ?? jest.fn().mockReturnValue(chainProxy);
+      },
+    });
+    return { proxy: chainProxy, capturedWhere };
+  }
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    service = new EchoeStudyService(
+      { createCard: jest.fn() } as any,
+      { getDeckAndSubdeckIds: jest.fn() } as any
+    );
+  });
+
+  it('should query revlog using lastReview column (not id) for daily new card count', async () => {
+    // When applyNewCardDailyLimit queries how many new cards were reviewed today,
+    // it must filter on `last_review` (Unix ms timestamp) not on `id` (auto-increment).
+    // If id were used, all reviews with small auto-increment ids would be excluded
+    // since they are far below todayStart (millisecond epoch ~1.7e12).
+
+    const configChain = buildCapturingChainMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const { proxy: revlogChain, capturedWhere } = buildCapturingChainMock([{ count: 3 }]);
+
+    let selectCallCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        selectCallCount++;
+        // 1st select: deck config query; 2nd select: revlog count query
+        if (selectCallCount === 1) return configChain.proxy;
+        return revlogChain;
+      }),
+    } as any);
+
+    const result = await service.applyNewCardDailyLimit(uid, 10);
+
+    // Verify computation is correct (perDay=20, todayReviewed=3 => remaining=17, rawNew=10 => 10)
+    expect(result).toBe(10);
+
+    // Verify a where clause was captured for the revlog query
+    expect(capturedWhere.args.length).toBeGreaterThan(0);
+
+    // Serialize the WHERE expression to SQL text to inspect which column is used
+    const whereExpr = capturedWhere.args[0];
+    const dialect = new MySqlDialect();
+    const getExprSql = (expr: unknown): string => {
+      const maybeWrapper = expr as { getSQL?: () => unknown } | null | undefined;
+      const sqlExpr = typeof maybeWrapper?.getSQL === 'function' ? maybeWrapper.getSQL() : expr;
+      if (!sqlExpr || typeof (sqlExpr as { toQuery?: unknown }).toQuery !== 'function') {
+        return '';
+      }
+      return dialect.sqlToQuery(sqlExpr as any).sql;
+    };
+
+    const whereSql = getExprSql(whereExpr);
+
+    // Must reference `last_review` column (lastReview in Drizzle maps to last_review in SQL)
+    expect(whereSql).toMatch(/last_review/i);
+
+    // Must NOT use `echoe_revlog`.`id` for time comparison
+    // (id is a tiny auto-increment integer, not a timestamp)
+    // The only acceptable `id` reference would be uid or revlog_id, not the PK `id`
+    expect(whereSql).not.toMatch(/`echoe_revlog`\.`id`\s*>=/i);
+  });
+
+  it('should correctly count today reviews as non-zero when lastReview is today (not epoch*1000)', async () => {
+    // Simulate 5 new-card reviews that happened today.
+    // The mock returns count=5, which represents reviews filtered by lastReview >= todayStart.
+    // If the code had erroneously used `id >= todayStart * 1000`, the DB would return count=0
+    // (since auto-increment ids like 1,2,3 are far below todayStart*1000 ~ 1.7e15).
+    // This test verifies the count (5) is passed through unchanged when within daily limit.
+
+    const configChain = buildCapturingChainMock([{ newConfig: JSON.stringify({ perDay: 20 }) }]);
+    const revlogChain = buildCapturingChainMock([{ count: 5 }]);
+
+    let selectCallCount = 0;
+    mockedGetDatabase.mockReturnValue({
+      select: jest.fn(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) return configChain.proxy;
+        return revlogChain.proxy;
+      }),
+    } as any);
+
+    // rawNewCount=8, perDay=20, todayReviewed=5 => remaining=15, result=8
+    const result = await service.applyNewCardDailyLimit(uid, 8);
+    expect(result).toBe(8); // Not capped - today reviewed count is correctly recognised as 5
+
+    // If the buggy `id >= todayStart * 1000` were used, the mock would return 0 reviews,
+    // remaining=20, result=8 (coincidentally correct here but the query is wrong).
+    // The above SQL assertion in the previous test directly validates the column name.
   });
 });

@@ -39,9 +39,9 @@ describe('EchoeDuplicateService', () => {
   describe('findExactDuplicates', () => {
     it('should group notes with identical field values', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
-        { id: 2, sfld: 'Hello', flds: 'Hello\x1fThere', fieldsJson: { Front: 'Hello', Back: 'There' } },
-        { id: 3, sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
+        { id: 1, noteId: 'en_test1', sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, noteId: 'en_test2', sfld: 'Hello', flds: 'Hello\x1fThere', fieldsJson: { Front: 'Hello', Back: 'There' } },
+        { id: 3, noteId: 'en_test3', sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
       ];
 
       const result = service.findExactDuplicates(notes as any, 'Front');
@@ -52,8 +52,8 @@ describe('EchoeDuplicateService', () => {
 
     it('should return empty array when no duplicates', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
-        { id: 2, sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
+        { id: 1, noteId: 'en_test1', sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, noteId: 'en_test2', sfld: 'Goodbye', flds: 'Goodbye\x1fWorld', fieldsJson: { Front: 'Goodbye', Back: 'World' } },
       ];
 
       const result = service.findExactDuplicates(notes as any, 'Front');
@@ -62,7 +62,7 @@ describe('EchoeDuplicateService', () => {
     });
 
     it('should handle single note', () => {
-      const notes = [{ id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } }];
+      const notes = [{ id: 1, noteId: 'en_test1', sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } }];
 
       const result = service.findExactDuplicates(notes as any, 'Front');
 
@@ -73,10 +73,10 @@ describe('EchoeDuplicateService', () => {
   describe('findSimilarDuplicates', () => {
     it('should find notes above threshold', () => {
       const notes = [
-        { id: 1, sfld: 'Hello World', flds: 'Hello World\x1fTest', fieldsJson: { Front: 'Hello World', Back: 'Test' } },
-        { id: 2, sfld: 'Hello World', flds: 'Hello World\x1fAnother', fieldsJson: { Front: 'Hello World', Back: 'Another' } },
-        { id: 3, sfld: 'Hello Worrld', flds: 'Hello Worrld\x1fTest', fieldsJson: { Front: 'Hello Worrld', Back: 'Test' } },
-        { id: 4, sfld: 'Goodbye', flds: 'Goodbye\x1fTest', fieldsJson: { Front: 'Goodbye', Back: 'Test' } },
+        { id: 1, noteId: 'en_test1', sfld: 'Hello World', flds: 'Hello World\x1fTest', fieldsJson: { Front: 'Hello World', Back: 'Test' } },
+        { id: 2, noteId: 'en_test2', sfld: 'Hello World', flds: 'Hello World\x1fAnother', fieldsJson: { Front: 'Hello World', Back: 'Another' } },
+        { id: 3, noteId: 'en_test3', sfld: 'Hello Worrld', flds: 'Hello Worrld\x1fTest', fieldsJson: { Front: 'Hello Worrld', Back: 'Test' } },
+        { id: 4, noteId: 'en_test4', sfld: 'Goodbye', flds: 'Goodbye\x1fTest', fieldsJson: { Front: 'Goodbye', Back: 'Test' } },
       ];
 
       const threshold = 0.8;
@@ -90,8 +90,8 @@ describe('EchoeDuplicateService', () => {
 
     it('should return empty when threshold is too high', () => {
       const notes = [
-        { id: 1, sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
-        { id: 2, sfld: 'Hallo', flds: 'Hallo\x1fWorld', fieldsJson: { Front: 'Hallo', Back: 'World' } },
+        { id: 1, noteId: 'en_test1', sfld: 'Hello', flds: 'Hello\x1fWorld', fieldsJson: { Front: 'Hello', Back: 'World' } },
+        { id: 2, noteId: 'en_test2', sfld: 'Hallo', flds: 'Hallo\x1fWorld', fieldsJson: { Front: 'Hallo', Back: 'World' } },
       ];
 
       const threshold = 1.0; // Only exact matches

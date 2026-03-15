@@ -18,7 +18,7 @@ export class EchoeStatsController {
    * Get today's study statistics
    */
   @Get('/today')
-  async getTodayStats(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getTodayStats(@QueryParam('deckId') deckId?: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -38,7 +38,7 @@ export class EchoeStatsController {
    */
   @Get('/history')
   async getHistory(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('days') daysStr?: string,
     @CurrentUser() userDto?: UserInfoDto
   ) {
@@ -64,7 +64,7 @@ export class EchoeStatsController {
    * Get card maturity distribution
    */
   @Get('/maturity')
-  async getMaturity(@QueryParam('deckId') deckId?: number, @CurrentUser() userDto?: UserInfoDto) {
+  async getMaturity(@QueryParam('deckId') deckId?: string, @CurrentUser() userDto?: UserInfoDto) {
     try {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
@@ -84,7 +84,7 @@ export class EchoeStatsController {
    */
   @Get('/forecast')
   async getForecast(
-    @QueryParam('deckId') deckId?: number,
+    @QueryParam('deckId') deckId?: string,
     @QueryParam('days') daysStr?: string,
     @CurrentUser() userDto?: UserInfoDto
   ) {

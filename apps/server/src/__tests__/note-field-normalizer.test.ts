@@ -3,9 +3,9 @@ import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
 
 /** Helper: compute expected csum from sfld */
-function expectedCsum(sfld: string): number {
+function expectedCsum(sfld: string): string {
   const hash = createHash('sha1').update(sfld, 'utf8').digest('hex');
-  return parseInt(hash.slice(0, 8), 16);
+  return parseInt(hash.slice(0, 8), 16).toString();
 }
 
 /** Helper: build a simple plain-text paragraph doc */

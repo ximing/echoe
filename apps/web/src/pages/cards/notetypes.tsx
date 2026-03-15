@@ -111,12 +111,12 @@ const NoteTypesPageContent = view(() => {
 
   const handleCreateNew = () => {
     const newNoteType: NoteTypeWithCount = {
-      id: 0,
+      id: '',
       name: 'New Note Type',
       mod: Math.floor(Date.now() / 1000),
       sortf: 0,
-      did: 0,
-      tmpls: [{ id: 0, name: 'Card 1', ord: 0, qfmt: '{{Front}}', afmt: '{{FrontSide}}\n\n<hr>\n\n{{Back}}', bqfmt: '', bafmt: '', did: 0 }],
+      did: '',
+      tmpls: [{ id: '', name: 'Card 1', ord: 0, qfmt: '{{Front}}', afmt: '{{FrontSide}}\n\n<hr>\n\n{{Back}}', bqfmt: '', bafmt: '', did: '' }],
       flds: [
         { name: 'Front', ord: 0, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', mathjax: false, hidden: false },
         { name: 'Back', ord: 1, sticky: false, rtl: false, font: 'Arial', size: 20, description: '', mathjax: false, hidden: false },
@@ -157,7 +157,7 @@ const NoteTypesPageContent = view(() => {
         css: editCss,
       };
 
-      if (selectedNoteType.id === 0) {
+      if (!selectedNoteType.id) {
         // Creating new note type
         const res = await echoeApi.createNoteType({
           name: editName,
@@ -199,7 +199,7 @@ const NoteTypesPageContent = view(() => {
   };
 
   const handleDelete = async () => {
-    if (!selectedNoteType || selectedNoteType.id === 0) return;
+    if (!selectedNoteType || !selectedNoteType.id) return;
 
     try {
       const res = await echoeApi.deleteNoteType(selectedNoteType.id);
@@ -246,14 +246,14 @@ const NoteTypesPageContent = view(() => {
 
   const handleAddTemplate = () => {
     const newTemplate: EchoeTemplateDto = {
-      id: 0,
+      id: '',
       name: `Card ${editTemplates.length + 1}`,
       ord: editTemplates.length,
       qfmt: '{{Front}}',
       afmt: '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
       bqfmt: '',
       bafmt: '',
-      did: 0,
+      did: '',
     };
     setEditTemplates([...editTemplates, newTemplate]);
     setSelectedTemplateIndex(editTemplates.length);
@@ -388,7 +388,7 @@ const NoteTypesPageContent = view(() => {
                       <button
                         onClick={() => {
                           setIsEditing(false);
-                          if (selectedNoteType.id === 0) {
+                          if (!selectedNoteType.id) {
                             setSelectedNoteType(null);
                           }
                         }}
@@ -406,7 +406,7 @@ const NoteTypesPageContent = view(() => {
                     </>
                   ) : (
                     <>
-                      {selectedNoteType.id !== 0 && (
+                      {selectedNoteType.id && (
                         <button
                           onClick={() => setShowDeleteConfirm(true)}
                           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"

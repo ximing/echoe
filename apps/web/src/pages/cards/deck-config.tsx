@@ -118,8 +118,8 @@ const DeckConfigPageContent = view(() => {
   const toastService = useService(ToastService);
 
   const deckId = useMemo(() => {
-    const parsed = Number(params.deckId);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    const id = params.deckId;
+    return id && id.trim() !== '' ? id : null;
   }, [params.deckId]);
 
   const [deckName, setDeckName] = useState('');

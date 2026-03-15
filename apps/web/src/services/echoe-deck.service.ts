@@ -18,7 +18,7 @@ export class EchoeDeckService extends Service {
 
   // Expanded state for sub-decks (persisted in localStorage)
   private readonly expandedDecksStorageKey = 'echoe_cards_expanded_decks_v1';
-  expandedDecks: Set<number> = this.loadExpandedDecksFromStorage();
+  expandedDecks: Set<string> = this.loadExpandedDecksFromStorage();
 
   /**
    * Load all decks with counts
@@ -57,7 +57,7 @@ export class EchoeDeckService extends Service {
   /**
    * Update a deck
    */
-  async updateDeckData(id: number, data: UpdateEchoeDeckDto): Promise<boolean> {
+  async updateDeckData(id: string, data: UpdateEchoeDeckDto): Promise<boolean> {
     try {
       await updateDeck(id, data);
       await this.loadDecks();
@@ -72,7 +72,7 @@ export class EchoeDeckService extends Service {
   /**
    * Delete a deck
    */
-  async deleteDeckData(id: number, deleteCards: boolean = false): Promise<boolean> {
+  async deleteDeckData(id: string, deleteCards: boolean = false): Promise<boolean> {
     try {
       await deleteDeck(id, deleteCards);
       await this.loadDecks();
@@ -87,7 +87,7 @@ export class EchoeDeckService extends Service {
   /**
    * Toggle deck expansion
    */
-  toggleExpanded(deckId: number): void {
+  toggleExpanded(deckId: string): void {
     const nextExpandedDecks = new Set(this.expandedDecks);
 
     if (nextExpandedDecks.has(deckId)) {
@@ -103,7 +103,7 @@ export class EchoeDeckService extends Service {
   /**
    * Check if deck is expanded
    */
-  isExpanded(deckId: number): boolean {
+  isExpanded(deckId: string): boolean {
     return this.expandedDecks.has(deckId);
   }
 
@@ -126,7 +126,7 @@ export class EchoeDeckService extends Service {
   /**
    * Read expanded deck IDs from localStorage.
    */
-  private loadExpandedDecksFromStorage(): Set<number> {
+  private loadExpandedDecksFromStorage(): Set<string> {
     if (typeof window === 'undefined') {
       return new Set();
     }
@@ -144,8 +144,8 @@ export class EchoeDeckService extends Service {
 
       return new Set(
         parsed
-          .map((id) => Number(id))
-          .filter((id) => Number.isInteger(id) && id > 0)
+          .map((id) => String(id))
+          .filter((id) => id && id.trim() !== '')
       );
     } catch {
       return new Set();
@@ -176,7 +176,7 @@ export class EchoeDeckService extends Service {
     }
 
     const validDeckIds = this.collectDeckIds(this.decks);
-    const nextExpandedDecks = new Set<number>();
+    const nextExpandedDecks = new Set<string>();
 
     for (const deckId of this.expandedDecks) {
       if (validDeckIds.has(deckId)) {
@@ -193,12 +193,12 @@ export class EchoeDeckService extends Service {
   /**
    * Collect all deck IDs from hierarchy.
    */
-  private collectDeckIds(decks: EchoeDeckWithCountsDto[]): Set<number> {
-    const deckIds = new Set<number>();
+  private collectDeckIds(decks: EchoeDeckWithCountsDto[]): Set<string> {
+    const deckIds = new Set<string>();
 
     const visit = (items: EchoeDeckWithCountsDto[]) => {
       for (const item of items) {
-        deckIds.add(item.id);
+        deckIds.add(item.deckId);
         if (item.children.length > 0) {
           visit(item.children);
         }

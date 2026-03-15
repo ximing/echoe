@@ -17,6 +17,8 @@ import { echoeNotetypes, type NewEchoeNotetypes } from '../db/schema/echoe-notet
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
+import { generateTypeId } from '../utils/id.js';
+import { OBJECT_TYPE } from '../models/constant/type.js';
 
 export interface ImportResultDto {
   notesAdded: number;
@@ -131,9 +133,29 @@ interface EchoeNotetypeRow {
   req: string;
 }
 
+interface ImportReferenceMap {
+  midToNoteTypeId: Map<string, string>;
+  didToDeckId: Map<string, string>;
+  nidToNoteId: Map<string, string>;
+  cidToCardId: Map<string, string>;
+}
+
 @Service()
 export class EchoeImportService {
   constructor(@Inject(() => EchoeMediaService) private mediaService: EchoeMediaService) {}
+
+  private createImportReferenceMap(): ImportReferenceMap {
+    return {
+      midToNoteTypeId: new Map(),
+      didToDeckId: new Map(),
+      nidToNoteId: new Map(),
+      cidToCardId: new Map(),
+    };
+  }
+
+  private getSourceIdKey(id: number | string): string {
+    return String(id);
+  }
 
   /**
    * Detect the package type (Standard Anki vs Echoe Legacy)
@@ -268,26 +290,28 @@ export class EchoeImportService {
       // Read media manifest
       const mediaManifest = await this.parseMediaManifest(zip);
 
+      const referenceMap = this.createImportReferenceMap();
+
       try {
         // Import notetypes from col.models
-        const notetypeResult = await this.importNotetypesFromColJson(uid, col);
+        const notetypeResult = await this.importNotetypesFromColJson(uid, col, referenceMap);
         result.notetypesAdded = notetypeResult.added;
         result.errors.push(...notetypeResult.errors);
 
         // Import decks from col.decks
-        const deckResult = await this.importDecksFromColJson(uid, col);
+        const deckResult = await this.importDecksFromColJson(uid, col, referenceMap);
         result.decksAdded = deckResult.added;
         result.errors.push(...deckResult.errors);
 
         // Import notes from SQLite
-        const noteResult = await this.importNotesFromStandardAnki(uid, db, col, mediaManifest);
+        const noteResult = await this.importNotesFromStandardAnki(uid, db, col, mediaManifest, referenceMap);
         result.notesAdded = noteResult.added;
         result.notesUpdated = noteResult.updated;
         result.notesSkipped = noteResult.skipped;
         result.errors.push(...noteResult.errors);
 
         // Import cards from SQLite with FSRS backfill
-        const cardResult = await this.importCardsFromStandardAnki(uid, db, col);
+        const cardResult = await this.importCardsFromStandardAnki(uid, db, col, referenceMap);
         result.cardsAdded = cardResult.added;
         result.cardsUpdated = cardResult.updated;
         result.errors.push(...cardResult.errors);
@@ -297,7 +321,7 @@ export class EchoeImportService {
         result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
         // Import revlog
-        const revlogResult = await this.importRevlogFromStandardAnki(uid, db);
+        const revlogResult = await this.importRevlogFromStandardAnki(uid, db, referenceMap);
         result.revlogImported = revlogResult;
 
         // Import media files
@@ -334,26 +358,28 @@ export class EchoeImportService {
     // Open the SQLite database
     const db = new Database(collectionBuffer, { readonly: true });
 
+    const referenceMap = this.createImportReferenceMap();
+
     try {
       // Import notetypes first
-      const notetypeResult = await this.importNotetypes(uid, db);
+      const notetypeResult = await this.importNotetypes(uid, db, referenceMap);
       result.notetypesAdded = notetypeResult.added;
       result.errors.push(...notetypeResult.errors);
 
       // Import decks
-      const deckResult = await this.importDecks(uid, db);
+      const deckResult = await this.importDecks(uid, db, referenceMap);
       result.decksAdded = deckResult.added;
       result.errors.push(...deckResult.errors);
 
       // Import notes
-      const noteResult = await this.importNotes(uid, db);
+      const noteResult = await this.importNotes(uid, db, referenceMap);
       result.notesAdded = noteResult.added;
       result.notesUpdated = noteResult.updated;
       result.notesSkipped = noteResult.skipped;
       result.errors.push(...noteResult.errors);
 
       // Import cards
-      const cardResult = await this.importCards(uid, db);
+      const cardResult = await this.importCards(uid, db, referenceMap);
       result.cardsAdded = cardResult.added;
       result.cardsUpdated = cardResult.updated;
       result.errors.push(...cardResult.errors);
@@ -363,7 +389,7 @@ export class EchoeImportService {
       result.fsrsHeuristic = cardResult.fsrsHeuristic;
 
       // Import revlog
-      const revlogResult = await this.importRevlog(uid, db);
+      const revlogResult = await this.importRevlog(uid, db, referenceMap);
       result.revlogImported = revlogResult;
 
       // Import media files
@@ -404,7 +430,11 @@ export class EchoeImportService {
   /**
    * Import notetypes from col.json
    */
-  private async importNotetypesFromColJson(uid: string, col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
+  private async importNotetypesFromColJson(
+    uid: string,
+    col: Record<string, unknown>,
+    referenceMap: ImportReferenceMap
+  ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
 
@@ -431,25 +461,31 @@ export class EchoeImportService {
 
       for (const [mid, model] of Object.entries(models)) {
         try {
-          const modelId = parseInt(mid, 10);
+          const sourceMid = this.getSourceIdKey(mid);
+          const modelMid = Number.isFinite(model?.id) ? this.getSourceIdKey(model.id) : sourceMid;
 
-          // Check if notetype already exists in user scope
+          // Check if notetype already exists in user scope by name
           const existing = await db
-            .select({ id: echoeNotetypes.id })
+            .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, modelId)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name)))
             .limit(1);
 
-          if (existing.length === 0) {
-            // Insert new notetype
+          let noteTypeId = existing[0]?.noteTypeId;
+
+          if (!noteTypeId) {
+            // Generate new business ID for imported notetype
+            noteTypeId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+
+            // Insert new notetype with generated business ID
             await db.insert(echoeNotetypes).values({
-              id: modelId,
+              noteTypeId,
               uid,
               name: model.name,
               mod: model.mod || 0,
               usn: model.usn || 0,
               sortf: model.sortf || 0,
-              did: model.did || 1,
+              did: '',
               tmpls: model.tmpls || '[]',
               flds: model.flds || '[]',
               css: model.css || '',
@@ -460,6 +496,9 @@ export class EchoeImportService {
             });
             added++;
           }
+
+          referenceMap.midToNoteTypeId.set(sourceMid, noteTypeId);
+          referenceMap.midToNoteTypeId.set(modelMid, noteTypeId);
         } catch (error) {
           errors.push(`Failed to import notetype ${model?.name || mid}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -474,7 +513,11 @@ export class EchoeImportService {
   /**
    * Import decks from col.json
    */
-  private async importDecksFromColJson(uid: string, col: Record<string, unknown>): Promise<{ added: number; errors: string[] }> {
+  private async importDecksFromColJson(
+    uid: string,
+    col: Record<string, unknown>,
+    referenceMap: ImportReferenceMap
+  ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
 
@@ -498,27 +541,28 @@ export class EchoeImportService {
 
       for (const [did, deck] of Object.entries(decks)) {
         try {
-          const deckId = parseInt(did, 10);
+          const sourceDid = this.getSourceIdKey(did);
+          const deckDid = Number.isFinite(deck?.id) ? this.getSourceIdKey(deck.id) : sourceDid;
 
-          // Skip default deck with id=1
-          if (deckId === 1) {
-            continue;
-          }
-
-          // Check if deck already exists in user scope
+          // Check if deck already exists in user scope by name
           const existing = await db
-            .select({ id: echoeDecks.id })
+            .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, deckId)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deck.name)))
             .limit(1);
 
-          if (existing.length === 0) {
-            // Insert new deck
+          let deckId = existing[0]?.deckId;
+
+          if (!deckId) {
+            // Generate new business ID for imported deck
+            deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+
+            // Insert new deck with generated business ID
             await db.insert(echoeDecks).values({
-              id: deckId,
+              deckId,
               uid,
               name: deck.name,
-              conf: deck.conf || 1,
+              conf: '',
               extendNew: 20,
               extendRev: 200,
               usn: deck.usn || 0,
@@ -527,10 +571,13 @@ export class EchoeImportService {
               dyn: deck.dyn || 0,
               mod: deck.mod || 0,
               desc: deck.desc || '',
-              mid: 0,
+              mid: '',
             });
             added++;
           }
+
+          referenceMap.didToDeckId.set(sourceDid, deckId);
+          referenceMap.didToDeckId.set(deckDid, deckId);
         } catch (error) {
           errors.push(`Failed to import deck ${deck?.name || did}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -549,12 +596,13 @@ export class EchoeImportService {
     uid: string,
     sourceDb: Database.Database,
     col: Record<string, unknown>,
-    mediaManifest: Map<string, string>
+    mediaManifest: Map<string, string>,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
       const notetypeFieldsMap = this.buildNotetypeFieldsMapFromColJson(col);
-      return await this.importNotesRows(uid, rows, notetypeFieldsMap, mediaManifest);
+      return await this.importNotesRows(uid, rows, notetypeFieldsMap, mediaManifest, referenceMap);
     } catch (error) {
       return {
         added: 0,
@@ -568,16 +616,16 @@ export class EchoeImportService {
   /**
    * Build notetype fields map from col.json models
    */
-  private buildNotetypeFieldsMapFromColJson(col: Record<string, unknown>): Map<number, string[]> {
+  private buildNotetypeFieldsMapFromColJson(col: Record<string, unknown>): Map<string, string[]> {
     try {
       const models = col.models as Record<string, { flds: unknown }> | undefined;
       if (!models || typeof models !== 'object') {
         return new Map();
       }
 
+      // Build map using string IDs (convert from numeric keys in col.json)
       const rows = Object.entries(models)
-        .map(([mid, model]) => ({ id: Number.parseInt(mid, 10), flds: model?.flds }))
-        .filter((row) => Number.isFinite(row.id));
+        .map(([mid, model]) => ({ id: mid, flds: model?.flds }));
 
       return this.buildNotetypeFieldsMapFromRows(rows);
     } catch {
@@ -609,18 +657,23 @@ export class EchoeImportService {
   private async importCardsFromStandardAnki(
     uid: string,
     sourceDb: Database.Database,
-    _col: Record<string, unknown>
+    _col: Record<string, unknown>,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
-    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill');
+    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill', referenceMap);
   }
 
   /**
    * Import revlog from Standard Anki SQLite database
    */
-  private async importRevlogFromStandardAnki(uid: string, sourceDb: Database.Database): Promise<number> {
+  private async importRevlogFromStandardAnki(
+    uid: string,
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
+  ): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
+      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK }, referenceMap);
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -641,7 +694,8 @@ export class EchoeImportService {
    */
   private async importNotetypes(
     uid: string,
-    sourceDb: Database.Database
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
@@ -659,27 +713,32 @@ export class EchoeImportService {
 
       for (const row of rows) {
         try {
+          const sourceMid = this.getSourceIdKey(row.id);
+
           // Parse JSON fields
           const tmpls = row.tmpls || '[]';
           const flds = row.flds || '[]';
 
           // Check if notetype already exists in user scope
           const existing = await db
-            .select({ id: echoeNotetypes.id })
+            .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.id, row.id)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, row.name)))
             .limit(1);
 
-          if (existing.length === 0) {
-            // Insert new notetype
+          let noteTypeId = existing[0]?.noteTypeId;
+
+          if (!noteTypeId) {
+            noteTypeId = generateTypeId(OBJECT_TYPE.ECHOE_NOTETYPE);
+
             await db.insert(echoeNotetypes).values({
-              id: row.id,
+              noteTypeId,
               uid,
               name: row.name,
               mod: row.mod,
               usn: row.usn,
               sortf: row.sortf,
-              did: row.did,
+              did: '',
               tmpls,
               flds,
               css: row.css || '',
@@ -690,6 +749,8 @@ export class EchoeImportService {
             });
             added++;
           }
+
+          referenceMap.midToNoteTypeId.set(sourceMid, noteTypeId);
         } catch (error) {
           errors.push(`Failed to import notetype ${row.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -706,7 +767,8 @@ export class EchoeImportService {
    */
   private async importDecks(
     uid: string,
-    sourceDb: Database.Database
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
     let added = 0;
@@ -722,25 +784,26 @@ export class EchoeImportService {
 
       for (const row of rows) {
         try {
-          // Skip default deck with id=1 if it conflicts with existing
-          if (row.id === 1) {
-            continue;
-          }
+          const sourceDid = this.getSourceIdKey(row.id);
+          const sourceMid = this.getSourceIdKey(row.mid);
 
           // Check if deck already exists in user scope
           const existing = await db
-            .select({ id: echoeDecks.id })
+            .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.id, row.id)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, row.name)))
             .limit(1);
 
-          if (existing.length === 0) {
-            // Insert new deck
+          let deckId = existing[0]?.deckId;
+
+          if (!deckId) {
+            deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+
             await db.insert(echoeDecks).values({
-              id: row.id,
+              deckId,
               uid,
               name: row.name,
-              conf: row.conf || 1,
+              conf: '',
               extendNew: row.extendNew || 20,
               extendRev: row.extendRev || 200,
               usn: row.usn,
@@ -749,10 +812,12 @@ export class EchoeImportService {
               dyn: row.dyn || 0,
               mod: row.mod,
               desc: row.desc || '',
-              mid: row.mid || 0,
+              mid: referenceMap.midToNoteTypeId.get(sourceMid) ?? '',
             });
             added++;
           }
+
+          referenceMap.didToDeckId.set(sourceDid, deckId);
         } catch (error) {
           errors.push(`Failed to import deck ${row.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
@@ -768,7 +833,7 @@ export class EchoeImportService {
    * Build a map of notetype id → ordered field names by reading from the source database.
    * Anki's notetypes.flds is a JSON array of field definition objects, each with a "name" property.
    */
-  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<number, string[]> {
+  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<string, string[]> {
     try {
       const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: unknown }[];
       return this.buildNotetypeFieldsMapFromRows(rows);
@@ -782,12 +847,13 @@ export class EchoeImportService {
    */
   private async importNotes(
     uid: string,
-    sourceDb: Database.Database
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM notes').all() as EchoeNoteRow[];
       const notetypeFieldsMap = this.buildNotetypeFieldsMap(sourceDb);
-      return await this.importNotesRows(uid, rows, notetypeFieldsMap);
+      return await this.importNotesRows(uid, rows, notetypeFieldsMap, undefined, referenceMap);
     } catch (error) {
       return {
         added: 0,
@@ -807,9 +873,10 @@ export class EchoeImportService {
    */
   private async importCards(
     uid: string,
-    sourceDb: Database.Database
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
-    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill in legacy import');
+    return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill in legacy import', referenceMap);
   }
 
   /**
@@ -842,10 +909,14 @@ export class EchoeImportService {
   /**
    * Import revlog from source database with FSRS fields (insert ignore duplicates)
    */
-  private async importRevlog(uid: string, sourceDb: Database.Database): Promise<number> {
+  private async importRevlog(
+    uid: string,
+    sourceDb: Database.Database,
+    referenceMap: ImportReferenceMap
+  ): Promise<number> {
     try {
       const rows = sourceDb.prepare('SELECT * FROM revlog').all() as EchoeRevlogRow[];
-      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK });
+      return this.importRevlogRows(uid, rows, { difficultyFallback: FSRS_DIFFICULTY_FALLBACK }, referenceMap);
     } catch (error) {
       logger.error('Failed to import revlog:', error);
       return 0;
@@ -860,13 +931,14 @@ export class EchoeImportService {
     return this.importMediaEntries(uid, zip, mediaFiles);
   }
 
-  private buildNotetypeFieldsMapFromRows(rows: Array<{ id: number; flds: unknown }>): Map<number, string[]> {
-    const map = new Map<number, string[]>();
+  private buildNotetypeFieldsMapFromRows(rows: Array<{ id: string | number; flds: unknown }>): Map<string, string[]> {
+    const map = new Map<string, string[]>();
 
     for (const row of rows) {
       try {
         const fieldDefs = this.parseNotetypeFieldDefs(row.flds);
-        map.set(row.id, fieldDefs.map((field) => field.name));
+        // Convert numeric IDs to strings for consistency
+        map.set(String(row.id), fieldDefs.map((field) => field.name));
       } catch {
         // Skip invalid notetype field definitions
       }
@@ -890,8 +962,9 @@ export class EchoeImportService {
   private async importNotesRows(
     uid: string,
     rows: EchoeNoteRow[],
-    notetypeFieldsMap: Map<number, string[]>,
-    mediaManifest?: Map<string, string>
+    notetypeFieldsMap: Map<string, string[]>,
+    mediaManifest: Map<string, string> | undefined,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     if (rows.length === 0) {
       return { added: 0, updated: 0, skipped: 0, errors: [] };
@@ -905,7 +978,18 @@ export class EchoeImportService {
 
     for (const row of rows) {
       try {
-        const notetypeFields = notetypeFieldsMap.get(row.mid) ?? [];
+        const sourceMid = this.getSourceIdKey(row.mid);
+        const sourceNid = this.getSourceIdKey(row.id);
+        const mappedMid = referenceMap.midToNoteTypeId.get(sourceMid);
+
+        if (!mappedMid) {
+          skipped++;
+          errors.push(`Skipped note ${row.guid}: missing notetype mapping for source mid ${sourceMid}`);
+          continue;
+        }
+
+        // Convert numeric mid to string for source map lookup
+        const notetypeFields = notetypeFieldsMap.get(sourceMid) ?? [];
 
         const rawValues = row.flds.split('\x1f');
         const fields: Record<string, string> = {};
@@ -921,15 +1005,19 @@ export class EchoeImportService {
 
         // Check for existing note in user scope (uid, guid)
         const existing = await db
-          .select({ id: echoeNotes.id })
+          .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
           .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)))
           .limit(1);
 
         if (existing.length > 0) {
+          const noteId = existing[0].noteId;
+          referenceMap.nidToNoteId.set(sourceNid, noteId);
+
           await db
             .update(echoeNotes)
             .set({
+              mid: mappedMid,
               mod: row.mod,
               tags: row.tags || '[]',
               flds: normalized.flds,
@@ -941,11 +1029,14 @@ export class EchoeImportService {
             .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)));
           updated++;
         } else {
+          const noteId = generateTypeId(OBJECT_TYPE.ECHOE_NOTE);
+          referenceMap.nidToNoteId.set(sourceNid, noteId);
+
           const newNote: NewEchoeNotes = {
-            id: row.id,
+            noteId,
             uid,
             guid: row.guid,
-            mid: row.mid,
+            mid: mappedMid,
             mod: row.mod,
             usn: row.usn,
             tags: row.tags || '[]',
@@ -1041,10 +1132,21 @@ export class EchoeImportService {
     };
   }
 
+  private async isCardNoteBindingAllowed(uid: string, noteId: string): Promise<boolean> {
+    const db = getDatabase();
+    const noteOwner = await db.query.echoeNotes.findFirst({
+      columns: { uid: true },
+      where: eq(echoeNotes.noteId, noteId),
+    });
+
+    return !noteOwner || noteOwner.uid === uid;
+  }
+
   private async importCardsRows(
     uid: string,
     sourceDb: Database.Database,
-    revlogWarnMessage: string
+    revlogWarnMessage: string,
+    referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
     const emptyResult = {
       added: 0,
@@ -1073,11 +1175,27 @@ export class EchoeImportService {
 
       for (const row of rows) {
         try {
-          // Check for existing card in user scope
+          const sourceNid = this.getSourceIdKey(row.nid);
+          const sourceDid = this.getSourceIdKey(row.did);
+          const sourceCid = this.getSourceIdKey(row.id);
+
+          const mappedNid = referenceMap.nidToNoteId.get(sourceNid);
+          const mappedDid = referenceMap.didToDeckId.get(sourceDid);
+
+          if (!mappedNid) {
+            errors.push(`Skipped card ${row.id}: missing note mapping for source nid ${sourceNid}`);
+            continue;
+          }
+
+          if (!mappedDid) {
+            errors.push(`Skipped card ${row.id}: missing deck mapping for source did ${sourceDid}`);
+            continue;
+          }
+
           const existing = await db
-            .select({ id: echoeCards.id })
+            .select({ cardId: echoeCards.cardId })
             .from(echoeCards)
-            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, row.id)))
+            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, mappedNid), eq(echoeCards.ord, row.ord)))
             .limit(1);
 
           const fsrs = this.resolveCardFsrsBackfill(row, latestRevlogMap.get(row.id), now);
@@ -1091,13 +1209,25 @@ export class EchoeImportService {
 
           const normalizedDue = this.normalizeDueToMilliseconds(row.due, row.queue, row.type);
           const normalizedOdue = this.normalizeDueToMilliseconds(row.odue, row.type, row.type);
+          const mappedOdid = row.odid > 0
+            ? (referenceMap.didToDeckId.get(this.getSourceIdKey(row.odid)) ?? '')
+            : '';
+
+          const isBindingAllowed = await this.isCardNoteBindingAllowed(uid, mappedNid);
+          if (!isBindingAllowed) {
+            errors.push(`Skipped card ${row.id}: note ${mappedNid} belongs to another user`);
+            continue;
+          }
 
           if (existing.length > 0) {
+            const cardId = existing[0].cardId;
+            referenceMap.cidToCardId.set(sourceCid, cardId);
+
             await db
               .update(echoeCards)
               .set({
-                nid: row.nid,
-                did: row.did,
+                nid: mappedNid,
+                did: mappedDid,
                 ord: row.ord,
                 mod: row.mod,
                 usn: row.usn,
@@ -1110,21 +1240,24 @@ export class EchoeImportService {
                 lapses: row.lapses,
                 left: row.left,
                 odue: normalizedOdue,
-                odid: row.odid,
+                odid: mappedOdid,
                 flags: row.flags,
                 data: row.data || '{}',
                 stability: fsrs.stability,
                 difficulty: fsrs.difficulty,
                 lastReview: fsrs.lastReview,
               })
-              .where(and(eq(echoeCards.uid, uid), eq(echoeCards.id, row.id)));
+              .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, cardId)));
             updated++;
           } else {
+            const cardId = generateTypeId(OBJECT_TYPE.ECHOE_CARD);
+            referenceMap.cidToCardId.set(sourceCid, cardId);
+
             const newCard: NewEchoeCards = {
-              id: row.id,
+              cardId,
               uid,
-              nid: row.nid,
-              did: row.did,
+              nid: mappedNid,
+              did: mappedDid,
               ord: row.ord,
               mod: row.mod,
               usn: row.usn,
@@ -1137,7 +1270,7 @@ export class EchoeImportService {
               lapses: row.lapses,
               left: row.left,
               odue: normalizedOdue,
-              odid: row.odid,
+              odid: mappedOdid,
               flags: row.flags,
               data: row.data || '{}',
               stability: fsrs.stability,
@@ -1178,7 +1311,8 @@ export class EchoeImportService {
   private async importRevlogRows(
     uid: string,
     rows: EchoeRevlogRow[],
-    options: { difficultyFallback: number }
+    options: { difficultyFallback: number },
+    referenceMap: ImportReferenceMap
   ): Promise<number> {
     if (rows.length === 0) {
       return 0;
@@ -1189,11 +1323,17 @@ export class EchoeImportService {
 
     for (const row of rows) {
       try {
-        // Check for existing revlog in user scope
+        const sourceCid = this.getSourceIdKey(row.cid);
+        const mappedCid = referenceMap.cidToCardId.get(sourceCid);
+        if (!mappedCid) {
+          continue;
+        }
+
+        // Check for existing revlog in user scope by source revlog ID
         const existing = await db
-          .select({ id: echoeRevlog.id })
+          .select({ revlogId: echoeRevlog.revlogId })
           .from(echoeRevlog)
-          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.id, row.id)))
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.sourceRevlogId, row.id), eq(echoeRevlog.cid, mappedCid)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -1206,9 +1346,12 @@ export class EchoeImportService {
         const preStability = row.lastIvl > 0 ? row.lastIvl : 1;
         const preLastReview = lastReview - (row.lastIvl * DAY_MS);
 
+        const revlogId = generateTypeId(OBJECT_TYPE.ECHOE_REVLOG);
+
         const newRevlog: NewEchoeRevlog = {
-          id: row.id,
-          cid: row.cid,
+          revlogId,
+          sourceRevlogId: row.id, // Store original Anki revlog ID
+          cid: mappedCid,
           uid,
           usn: row.usn,
           ease: row.ease,

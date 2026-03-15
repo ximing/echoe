@@ -1,0 +1,1 @@
+ALTER TABLE `echoe_notes` MODIFY COLUMN `csum` varchar(191) NOT NULL;
