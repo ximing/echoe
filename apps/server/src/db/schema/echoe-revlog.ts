@@ -16,7 +16,7 @@ import {
 export const echoeRevlog = mysqlTable(
   'echoe_revlog',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     revlogId: varchar('revlog_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     cid: varchar('cid', { length: 191 }).notNull(), // Card ID - now business ID string
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this review record)

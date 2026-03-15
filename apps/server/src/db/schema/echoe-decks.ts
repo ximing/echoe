@@ -1,6 +1,5 @@
 import {
   mysqlTable,
-  bigint,
   int,
   varchar,
   text,
@@ -16,7 +15,7 @@ import {
 export const echoeDecks = mysqlTable(
   'echoe_decks',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     deckId: varchar('deck_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Deck name (supports '::' for sub-decks)

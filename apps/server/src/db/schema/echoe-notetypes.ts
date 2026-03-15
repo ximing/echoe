@@ -1,6 +1,5 @@
 import {
   mysqlTable,
-  bigint,
   int,
   varchar,
   text,
@@ -15,7 +14,7 @@ import {
 export const echoeNotetypes = mysqlTable(
   'echoe_notetypes',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     noteTypeId: varchar('note_type_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     name: varchar('name', { length: 191 }).notNull(), // Note type name

@@ -16,7 +16,7 @@ import {
 export const echoeCards = mysqlTable(
   'echoe_cards',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     cardId: varchar('card_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     nid: varchar('nid', { length: 191 }).notNull(), // Note ID - now business ID string

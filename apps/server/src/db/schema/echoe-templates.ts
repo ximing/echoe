@@ -1,6 +1,5 @@
 import {
   mysqlTable,
-  bigint,
   int,
   varchar,
   text,
@@ -17,7 +16,7 @@ import {
 export const echoeTemplates = mysqlTable(
   'echoe_templates',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     templateId: varchar('template_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     ntid: varchar('ntid', { length: 191 }).notNull(), // Note type ID - now business ID string

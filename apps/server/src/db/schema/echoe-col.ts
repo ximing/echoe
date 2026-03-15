@@ -16,7 +16,7 @@ import {
 export const echoeCol = mysqlTable(
   'echoe_col',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     colId: varchar('col_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull().unique(), // User ID for tenant isolation
     crt: int('crt').notNull(), // Day that the collection was created (Unix timestamp in seconds, midnight local)

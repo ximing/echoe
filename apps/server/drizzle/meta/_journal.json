@@ -78,6 +78,13 @@
       "when": 1773561509542,
       "tag": "0010_normal_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1773571429237,
+      "tag": "0011_strong_colleen_wing",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,5 @@
 import {
   mysqlTable,
-  bigint,
   int,
   varchar,
   text,
@@ -17,7 +16,7 @@ import type { CanonicalFields, RichTextFields } from '../../types/note-fields.js
 export const echoeNotes = mysqlTable(
   'echoe_notes',
   {
-    id: bigint('id', { mode: 'number' }).primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
+    id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     noteId: varchar('note_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     guid: varchar('guid', { length: 191 }).notNull(), // Globally unique ID for sync (40 char hex string)
