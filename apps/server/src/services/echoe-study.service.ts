@@ -1260,7 +1260,7 @@ export class EchoeStudyService {
    * Build FSRS config from deck config
    */
   private getFSRSConfig(deckConfig: any): FSRSConfig {
-    const deckConfigId = typeof deckConfig?.id === 'number' ? deckConfig.id : null;
+    const deckConfigId = typeof deckConfig?.deckConfigId === 'string' ? deckConfig.deckConfigId : null;
     const newConfig = this.parseDeckConfigSection(deckConfig?.newConfig);
     const revConfig = this.parseDeckConfigSection(deckConfig?.revConfig);
     const lapseConfig = this.parseDeckConfigSection(deckConfig?.lapseConfig);
@@ -1327,7 +1327,7 @@ export class EchoeStudyService {
     candidates: unknown[],
     fallback: readonly string[],
     field: 'learningSteps' | 'relearningSteps',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): string[] {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1367,7 +1367,7 @@ export class EchoeStudyService {
     schema: z.ZodType<number>,
     fallback: number,
     field: 'maxInterval' | 'requestRetention',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): number {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1389,7 +1389,7 @@ export class EchoeStudyService {
     candidates: unknown[],
     fallback: boolean,
     field: 'enableFuzz' | 'enableShortTerm',
-    deckConfigId: number | null
+    deckConfigId: string | null
   ): boolean {
     for (const candidate of candidates) {
       if (candidate === undefined || candidate === null) {
@@ -1407,7 +1407,7 @@ export class EchoeStudyService {
     return fallback;
   }
 
-  private logInvalidFsrsConfigValue(deckConfigId: number | null, field: string, value: unknown): void {
+  private logInvalidFsrsConfigValue(deckConfigId: string | null, field: string, value: unknown): void {
     logger.warn('Invalid FSRS deck config detected, fallback to default', {
       event: 'fsrs_config_fallback',
       deckConfigId,

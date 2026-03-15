@@ -222,7 +222,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should prefer fsrs sub-config over legacy deck fields', () => {
     const config = getFSRSConfig({
-      id: 99,
+      deckConfigId: 'test-deck-config-99',
       newConfig: JSON.stringify({ steps: [1, 10] }),
       revConfig: JSON.stringify({
         maxInterval: 120,
@@ -248,7 +248,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should fallback to legacy fields when fsrs sub-config is missing', () => {
     const config = getFSRSConfig({
-      id: 100,
+      deckConfigId: 'test-deck-config-100',
       newConfig: JSON.stringify({ delays: [3, 12] }),
       revConfig: JSON.stringify({ maxInterval: 180 }),
       lapseConfig: JSON.stringify({ delays: [25] }),
@@ -264,7 +264,7 @@ describe('EchoeStudyService - FSRS input building', () => {
 
   it('should fallback invalid fsrs values to safe defaults', () => {
     const config = getFSRSConfig({
-      id: 101,
+      deckConfigId: 'test-deck-config-101',
       newConfig: JSON.stringify({ delays: [6, 16] }),
       revConfig: JSON.stringify({
         maxInterval: 150,
