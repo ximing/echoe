@@ -179,7 +179,7 @@ export class EchoeNoteService {
     const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId))).limit(1);
 
     if (notetype.length === 0) {
-      throw new Error(`Note type ${dto.notetypeId} not found`);
+      throw new Error(`Invalid relation: Note type '${dto.notetypeId}' not found for field 'mid' (notetypeId)`);
     }
 
     // Parse templates and extract ordered field names from notetype definition
@@ -312,7 +312,7 @@ export class EchoeNoteService {
         .limit(1);
 
       if (notetype.length === 0) {
-        throw new Error(`Note type ${note[0].mid} not found`);
+        throw new Error(`Invalid relation: Note type '${note[0].mid}' not found for field 'mid' (notetypeId)`);
       }
 
       const notetypeFieldDefs = JSON.parse(notetype[0].flds) as Array<{ name: string; ord?: number }>;
