@@ -8,6 +8,13 @@
       "when": 1773585023276,
       "tag": "0000_massive_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1773586800000,
+      "tag": "0001_drop_echoe_foreign_keys",
+      "breakpoints": true
     }
   ]
 }
