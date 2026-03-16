@@ -7,6 +7,7 @@ jest.mock('drizzle-orm', () => {
     and: jest.fn((...args) => ({ type: 'and', conditions: args })),
     eq: jest.fn((col, val) => ({ type: 'eq', col, val })),
     isNull: jest.fn((col) => ({ type: 'isNull', col })),
+    isNotNull: jest.fn((col) => ({ type: 'isNotNull', col })),
     gte: jest.fn((col, val) => ({ type: 'gte', col, val })),
     lte: jest.fn((col, val) => ({ type: 'lte', col, val })),
     gt: jest.fn((col, val) => ({ type: 'gt', col, val })),
@@ -677,32 +678,62 @@ describe('InboxAiService', () => {
         },
       ];
 
-      // Mock database queries - both for AI attempt and fallback
-      let orderByCallCount = 0;
-      let whereCallCount = 0;
+      // Mock database queries
+      // The generateDailyReport makes 3 queries in AI path + 2 queries in fallback path:
+      // AI path: 1) daily inbox items 2) deleted items 3) report summaries
+      // Then AI fails, so fallback path: 4) daily inbox items 5) deleted items
+      let selectCount = 0;
       mockedGetDatabase.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockImplementation(() => {
-          whereCallCount++;
-          if (whereCallCount === 3) {
-            // Third where: fallback query (no orderBy, returns directly)
-            return Promise.resolve(dailyInboxItems);
+        select: jest.fn().mockImplementation((fields?: any) => {
+          selectCount++;
+
+          if (selectCount === 1) {
+            // AI path: Query 1 - daily inbox items (with orderBy)
+            return {
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue({
+                  orderBy: jest.fn().mockResolvedValue(dailyInboxItems),
+                }),
+              }),
+            };
+          } else if (selectCount === 2) {
+            // AI path: Query 2 - deleted items (with count field)
+            return {
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue([]),
+              }),
+            };
+          } else if (selectCount === 3) {
+            // AI path: Query 3 - report summaries (with orderBy and limit)
+            return {
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue({
+                  orderBy: jest.fn().mockReturnValue({
+                    limit: jest.fn().mockResolvedValue([]),
+                  }),
+                }),
+              }),
+            };
+          } else if (selectCount === 4) {
+            // Fallback path: Query 1 - daily inbox items (no orderBy)
+            return {
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue(dailyInboxItems),
+              }),
+            };
+          } else if (selectCount === 5) {
+            // Fallback path: Query 2 - deleted items
+            return {
+              from: jest.fn().mockReturnValue({
+                where: jest.fn().mockResolvedValue([]),
+              }),
+            };
           }
-          // For other where calls, return this to continue chaining
+
+          // Default fallback
           return {
-            orderBy: jest.fn().mockImplementation(() => {
-              orderByCallCount++;
-              if (orderByCallCount === 1) {
-                // First orderBy: daily inbox items query for AI attempt
-                return Promise.resolve(dailyInboxItems);
-              } else if (orderByCallCount === 2) {
-                // Second orderBy: report summaries query (has limit chained)
-                return {
-                  limit: jest.fn().mockResolvedValue([]),
-                };
-              }
-              return Promise.resolve([]);
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
             }),
           };
         }),
