@@ -16,6 +16,7 @@ import DuplicatesPage from './pages/cards/duplicates';
 import LandingPage from './pages/landing';
 import SettingsPage from './pages/settings';
 import { AccountSettings } from './pages/settings/components/account-settings';
+import { ApiTokenSettings } from './pages/settings/components/api-token-settings';
 import { ModelSettings } from './pages/settings/components/model-settings';
 import { ThemeSettings } from './pages/settings/components/theme-settings';
 import { About } from './pages/settings/components/about';
@@ -234,6 +235,7 @@ function App() {
         >
           <Route index element={<Navigate to="/settings/account" replace />} />
           <Route path="account" element={<AccountSettings />} />
+          <Route path="api-tokens" element={<ApiTokenSettings />} />
           <Route path="models" element={<ModelSettings />} />
           <Route path="theme" element={<ThemeSettings />} />
           <Route path="about" element={<About />} />

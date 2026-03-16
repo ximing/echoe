@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router';
-import { User, Bot, Palette, Info, Upload, Copy, BookOpen, Monitor, Volume2, Database, Layers } from 'lucide-react';
+import { User, Bot, Palette, Info, Upload, Copy, BookOpen, Monitor, Volume2, Database, Layers, Key } from 'lucide-react';
 
 export const SettingsMenu = () => {
   const cardManagementItems: Array<{ id: string; label: string; icon: React.ReactNode; to: string }> = [
@@ -53,6 +53,12 @@ export const SettingsMenu = () => {
       label: '账户设置',
       icon: <User className="w-5 h-5" />,
       to: '/settings/account',
+    },
+    {
+      id: 'api-tokens',
+      label: 'API Token',
+      icon: <Key className="w-5 h-5" />,
+      to: '/settings/api-tokens',
     },
     {
       id: 'models',
