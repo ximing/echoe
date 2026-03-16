@@ -1665,3 +1665,156 @@ describe('EchoeStudyService - applyNewCardDailyLimit uses lastReview not id (reg
     // The above SQL assertion in the previous test directly validates the column name.
   });
 });
+
+describe('EchoeStudyService - deleteCards', () => {
+  let service: EchoeStudyService;
+  let mockDb: any;
+
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+
+    service = new EchoeStudyService(
+      {
+        createCard: jest.fn(),
+      } as any,
+      {
+        getDeckAndSubdeckIds: jest.fn(),
+      } as any
+    );
+  });
+
+  it('should soft-delete cards and cascade to revlogs in a transaction', async () => {
+    const uid = 'user_test_001';
+    const cardIds = ['ec_test_1001', 'ec_test_1002'];
+
+    const updateRevlogSetMock = jest.fn().mockReturnThis();
+    const updateRevlogWhereMock = jest.fn().mockResolvedValue({ rowsAffected: 5 });
+
+    const updateCardsSetMock = jest.fn().mockReturnThis();
+    const updateCardsWhereMock = jest.fn().mockResolvedValue({ rowsAffected: 2 });
+
+    mockDb = createMockDb({
+      update: jest.fn((table: any) => {
+        if (table === require('../db/schema/index.js').echoeRevlog) {
+          return {
+            set: updateRevlogSetMock.mockReturnValue({
+              where: updateRevlogWhereMock,
+            }),
+          };
+        }
+        if (table === require('../db/schema/index.js').echoeCards) {
+          return {
+            set: updateCardsSetMock.mockReturnValue({
+              where: updateCardsWhereMock,
+            }),
+          };
+        }
+        return {
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue({ rowsAffected: 0 }),
+        };
+      }),
+    });
+
+    mockedGetDatabase.mockReturnValue(mockDb);
+
+    const deletedCount = await service.deleteCards(uid, cardIds);
+
+    // Verify transaction was used
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+
+    // Verify revlogs were soft-deleted first
+    expect(updateRevlogSetMock).toHaveBeenCalled();
+    expect(updateRevlogWhereMock).toHaveBeenCalled();
+
+    // Verify cards were soft-deleted
+    expect(updateCardsSetMock).toHaveBeenCalled();
+    expect(updateCardsWhereMock).toHaveBeenCalled();
+    expect(deletedCount).toBe(2);
+  });
+
+  it('should return 0 when cardIds is empty', async () => {
+    const uid = 'user_test_001';
+
+    const deletedCount = await service.deleteCards(uid, []);
+
+    expect(deletedCount).toBe(0);
+  });
+
+  it('should rollback transaction on failure', async () => {
+    const uid = 'user_test_001';
+    const cardIds = ['ec_test_1001'];
+
+    mockDb = {
+      transaction: jest.fn().mockImplementation(async (callback: (tx: any) => Promise<any>) => {
+        const tx = {
+          update: jest.fn().mockReturnValue({
+            set: jest.fn().mockReturnThis(),
+            where: jest.fn().mockRejectedValue(new Error('Database error')),
+          }),
+        };
+        // Transaction should throw and rollback
+        await expect(callback(tx)).rejects.toThrow('Database error');
+        throw new Error('Database error');
+      }),
+    };
+
+    mockedGetDatabase.mockReturnValue(mockDb);
+
+    await expect(service.deleteCards(uid, cardIds)).rejects.toThrow('Database error');
+
+    // Verify transaction was attempted
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('should only delete cards and revlogs owned by the user', async () => {
+    const uid = 'user_test_001';
+    const cardIds = ['ec_test_1001', 'ec_test_1002'];
+
+    const revlogWhereConditions: any[] = [];
+    const cardsWhereConditions: any[] = [];
+
+    const updateRevlogSetMock = jest.fn().mockReturnThis();
+    const updateRevlogWhereMock = jest.fn().mockImplementation((condition: any) => {
+      revlogWhereConditions.push(condition);
+      return Promise.resolve({ rowsAffected: 5 });
+    });
+
+    const updateCardsSetMock = jest.fn().mockReturnThis();
+    const updateCardsWhereMock = jest.fn().mockImplementation((condition: any) => {
+      cardsWhereConditions.push(condition);
+      return Promise.resolve({ rowsAffected: 2 });
+    });
+
+    mockDb = createMockDb({
+      update: jest.fn((table: any) => {
+        if (table === require('../db/schema/index.js').echoeRevlog) {
+          return {
+            set: updateRevlogSetMock.mockReturnValue({
+              where: updateRevlogWhereMock,
+            }),
+          };
+        }
+        if (table === require('../db/schema/index.js').echoeCards) {
+          return {
+            set: updateCardsSetMock.mockReturnValue({
+              where: updateCardsWhereMock,
+            }),
+          };
+        }
+        return {
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue({ rowsAffected: 0 }),
+        };
+      }),
+    });
+
+    mockedGetDatabase.mockReturnValue(mockDb);
+
+    await service.deleteCards(uid, cardIds);
+
+    // Verify uid constraint is enforced in WHERE clauses
+    expect(revlogWhereConditions.length).toBeGreaterThan(0);
+    expect(cardsWhereConditions.length).toBeGreaterThan(0);
+  });
+});

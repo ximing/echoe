@@ -12,6 +12,7 @@ import type {
   StudyCountsDto,
   BuryCardsDto,
   ForgetCardsDto,
+  DeleteCardsDto,
   StudyOptionsDto,
   UserInfoDto,
 } from '@echoe/dto';
@@ -155,6 +156,29 @@ export class EchoeStudyController {
       return ResponseUtil.success({ success: true });
     } catch (error) {
       logger.error('Forget cards error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * POST /api/v1/study/delete
+   * Delete cards (soft-delete with cascade to revlog)
+   */
+  @Post('/delete')
+  async deleteCards(@Body() dto: DeleteCardsDto, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      if (!dto.cardIds || dto.cardIds.length === 0) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
+      }
+
+      const deletedCount = await this.echoeStudyService.deleteCards(userDto.uid, dto.cardIds);
+      return ResponseUtil.success({ success: true, deletedCount });
+    } catch (error) {
+      logger.error('Delete cards error:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }

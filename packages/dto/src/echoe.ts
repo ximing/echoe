@@ -717,6 +717,11 @@ export interface ForgetCardsDto {
   cardIds: string[];
 }
 
+export interface DeleteCardsDto {
+  /** Card IDs to delete */
+  cardIds: string[];
+}
+
 // ===== Media =====
 
 export interface EchoeMediaDto {

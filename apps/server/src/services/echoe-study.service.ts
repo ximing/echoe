@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, sql, desc, asc, isNull, or } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, isNull, or, inArray } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
 import { withTransaction } from '../db/transaction.js';
 import { echoeCards, echoeNotes, echoeRevlog, echoeCol, echoeDecks, echoeDeckConfig, echoeNotetypes, users } from '../db/schema/index.js';
@@ -664,6 +664,35 @@ export class EchoeStudyService {
     }
 
     return affected;
+  }
+
+  /**
+   * Delete cards (soft-delete) with cascade to revlog.
+   * This is the Owner Service orchestration method for card deletion per FR-3.
+   */
+  async deleteCards(uid: string, cardIds: string[]): Promise<number> {
+    if (!cardIds || cardIds.length === 0) {
+      return 0;
+    }
+
+    const db = getDatabase();
+    const now = Date.now(); // Millisecond timestamp for soft delete
+
+    // Wrap all mutation operations in a transaction to prevent partial-delete state
+    // Cascade: cards -> revlogs (FR-3)
+    return withTransaction(async (tx) => {
+      // Soft delete revlogs for all cards (cascade from cards)
+      await tx.update(echoeRevlog)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
+
+      // Soft delete cards
+      const result = await tx.update(echoeCards)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.cardId, cardIds)));
+
+      return result.rowsAffected || 0;
+    });
   }
 
   /**
