@@ -91,10 +91,13 @@ export const organizeInboxItem = async (inboxId: string, async?: boolean) => {
       {},
       { params }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle 503 AI service unavailable
-    if (error?.response?.status === 503) {
-      throw new Error('AI service is temporarily unavailable. Please try again later.');
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 503) {
+        throw new Error('AI service is temporarily unavailable. Please try again later.');
+      }
     }
     throw error;
   }

@@ -3,7 +3,7 @@
  * Verifies that deleted rows are absent from normal APIs
  */
 
-import { getDatabase } from '../db/connection.js';
+import { getDatabase, initializeDatabase, closeDatabase } from '../db/connection.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
@@ -26,10 +26,14 @@ describe('Soft Delete Filtering (Issue #63)', () => {
   let testCardId: string;
 
   beforeAll(async () => {
+    // Initialize database connection
+    initializeDatabase();
     const db = getDatabase();
-    noteService = new EchoeNoteService({} as any, {} as any);
+
+    // Initialize services with proper dependencies
     deckService = new EchoeDeckService();
     statsService = new EchoeStatsService(deckService);
+    noteService = new EchoeNoteService({} as any, deckService);
 
     // Create test deck
     testDeckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
@@ -115,6 +119,8 @@ describe('Soft Delete Filtering (Issue #63)', () => {
     await db.delete(echoeNotes).where(eq(echoeNotes.uid, testUid));
     await db.delete(echoeNotetypes).where(eq(echoeNotetypes.uid, testUid));
     await db.delete(echoeDecks).where(eq(echoeDecks.uid, testUid));
+    // Close database connection
+    await closeDatabase();
   });
 
   describe('Note queries exclude soft-deleted rows', () => {

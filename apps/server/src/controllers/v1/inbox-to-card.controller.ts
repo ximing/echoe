@@ -116,18 +116,28 @@ export class InboxToCardController {
       const frontFieldName = fieldMapping.front || notetypeFields[0];
       const backFieldName = fieldMapping.back || (notetypeFields.length > 1 ? notetypeFields[1] : undefined);
 
+      // Validate front field exists in notetype
       if (!notetypeFields.includes(frontFieldName)) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, `Field '${frontFieldName}' not found in note type`);
       }
 
-      if (notetypeFields.length > 1 && !notetypeFields.includes(backFieldName)) {
+      // Validate back field: if user explicitly provided back field but notetype has only one field, reject
+      if (fieldMapping.back && notetypeFields.length === 1) {
+        return ResponseUtil.error(
+          ErrorCode.PARAMS_ERROR,
+          `Note type has only one field, cannot map 'back' field`
+        );
+      }
+
+      // Validate back field exists in notetype (when backFieldName is defined)
+      if (backFieldName !== undefined && !notetypeFields.includes(backFieldName)) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, `Field '${backFieldName}' not found in note type`);
       }
 
       // 6. Build fields object for note creation
       const fields: Record<string, string> = {};
       fields[frontFieldName] = inboxItem.front;
-      if (notetypeFields.length > 1) {
+      if (backFieldName !== undefined) {
         fields[backFieldName] = inboxItem.back || '';
       }
 

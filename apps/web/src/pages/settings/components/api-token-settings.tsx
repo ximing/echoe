@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { view, useService } from '@rabjs/react';
 import { ApiTokenService } from '../../../services/api-token.service';
-import { Key, Plus, Trash2, Copy, Check, AlertCircle } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, AlertCircle } from 'lucide-react';
 import { toast } from '../../../services/toast.service';
 import type { ApiTokenListItemDto } from '@echoe/dto';
 
@@ -10,7 +10,7 @@ export const ApiTokenSettings = view(() => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [createdToken, setCreatedToken] = useState<string | null>(null);
-  const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
+  const [, setCopiedTokenId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const tokenInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,7 +52,7 @@ export const ApiTokenSettings = view(() => {
         setTimeout(() => setCopiedTokenId(null), 2000);
       }
       toast.success('Token 已复制到剪贴板');
-    } catch (error) {
+    } catch {
       toast.error('复制失败');
     }
   };

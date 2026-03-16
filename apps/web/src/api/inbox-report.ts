@@ -54,10 +54,11 @@ export const generateInboxReport = async (date: string, async?: boolean) => {
       { date },
       { params }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle 409 conflict - report already exists
-    if (error?.response?.status === 409) {
-      const existingReport = error?.response?.data;
+    const axiosError = error as { response?: { status?: number; data?: unknown } };
+    if (axiosError?.response?.status === 409) {
+      const existingReport = axiosError?.response?.data;
       throw {
         status: 409,
         message: 'Report already exists for this date',

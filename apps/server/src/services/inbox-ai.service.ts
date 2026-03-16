@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, isNull, gte, lte, desc, gt, lt } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, gte, lte, desc, gt, lt } from 'drizzle-orm';
 import dayjs from 'dayjs';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
@@ -510,6 +510,19 @@ export class InboxAiService {
         )
         .orderBy(desc(inbox.createdAt));
 
+      // Get count of deleted items for the target date (separate query)
+      const deletedItems = await db
+        .select({ count: inbox.inboxId })
+        .from(inbox)
+        .where(
+          and(
+            eq(inbox.uid, uid),
+            isNotNull(inbox.deletedAt),
+            gte(inbox.createdAt, startOfDay),
+            lte(inbox.createdAt, endOfDay)
+          )
+        );
+
       // Get 30-day report summaries for context (L2 context)
       const thirtyDaysAgo = targetDate.subtract(30, 'day').format('YYYY-MM-DD');
       const reportSummaries = await db
@@ -536,7 +549,7 @@ export class InboxAiService {
       const totalInbox = dailyInboxItems.length;
       const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
       const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
-      const deletedInbox = dailyInboxItems.filter((item: Inbox) => item.deletedAt !== null).length;
+      const deletedInbox = deletedItems.length;
 
       // Category breakdown
       const categoryMap = new Map<string, number>();
@@ -720,12 +733,23 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
           )
         );
 
+      // Get count of deleted items for the target date (separate query)
+      const deletedItems = await db
+        .select({ count: inbox.inboxId })
+        .from(inbox)
+        .where(
+          and(
+            eq(inbox.uid, uid),
+            isNotNull(inbox.deletedAt),
+            gte(inbox.createdAt, startOfDay),
+            lte(inbox.createdAt, endOfDay)
+          )
+        );
+
       const totalInbox = dailyInboxItems.length;
       const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
       const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
-      // Note: Since we filter by isNull(deletedAt), deletedInbox will always be 0
-      // This is intentional - deleted items are excluded from the report
-      const deletedInbox = 0;
+      const deletedInbox = deletedItems.length;
 
       const categoryMap = new Map<string, number>();
       dailyInboxItems.forEach((item: Inbox) => {

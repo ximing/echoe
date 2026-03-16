@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import dotenv from 'dotenv';
 
@@ -9,8 +8,10 @@ import { logger } from '../utils/logger.js';
 const environment = process.env.NODE_ENV || 'development';
 
 // 获取项目根路径
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// In Jest/CommonJS, __dirname is available as a global
+// In ESM runtime, we need to derive it from import.meta.url, but we can't reference
+// import.meta in a file that Jest will transform to CommonJS, so we just use __dirname
+// which will be available in both contexts (Node provides it, Jest injects it)
 const projectRoot = path.resolve(__dirname, '../..');
 
 // 加载环境变量

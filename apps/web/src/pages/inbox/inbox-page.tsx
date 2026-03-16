@@ -635,7 +635,6 @@ const DeleteConfirmDialog = view(
 // Convert to Card Dialog Component
 const ConvertToCardDialog = view(
   ({
-    item,
     onClose,
     onSubmit,
   }: {

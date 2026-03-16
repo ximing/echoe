@@ -1,6 +1,5 @@
 import { Service } from '@rabjs/react';
 import type {
-  InboxDto,
   InboxListItemDto,
   CreateInboxDto,
   UpdateInboxDto,

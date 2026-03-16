@@ -58,10 +58,14 @@ export const apiTokenAuthMiddleware = async (
     }
 
     // Get user from database
+    // Note: findUserByUid already filters out soft-deleted users (deletedAt != 0)
+    // The deletedAt check below is defensive - it protects against future changes
+    // to findUserByUid that might remove this filter
     const userService = Container.get(UserService);
     const user = await userService.findUserByUid(apiToken.uid);
 
     // User not found or soft-deleted - return 401
+    // Note: users.deletedAt is bigint (number type), 0 means not deleted
     if (!user || user.deletedAt > 0) {
       metricsService.trackTokenAuthFailure('user_not_found_or_deleted', apiToken.tokenId);
       return response.status(401).json({

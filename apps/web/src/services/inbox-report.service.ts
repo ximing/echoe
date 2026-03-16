@@ -80,10 +80,11 @@ export class InboxReportService extends Service {
         await this.loadReports();
         return response.data;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Handle 409 conflict (report already exists)
-      if (err.response?.status === 409) {
-        const existingReport = err.response?.data?.data;
+      const error = err as { response?: { status?: number; data?: { data?: unknown } } };
+      if (error.response?.status === 409) {
+        const existingReport = error.response?.data?.data;
         if (existingReport) {
           toast.warning(`${date} 的日报已存在`);
           await this.loadReports();
