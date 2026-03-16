@@ -766,3 +766,38 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Database query mocks need to match the exact chain: select().from().where().orderBy().limit()
   - Use mockReturnValueOnce for sequential query mocking instead of stateful counters
 ---
+
+## 2026-03-16 23:05 - US-027
+- Fixed test infrastructure and quality gate issues
+- Fixed env.ts to use __dirname global instead of import.meta.url for Jest compatibility
+- Fixed soft-delete-filtering.test.ts to initialize database connection and properly inject service dependencies
+- Fixed backend code issues found during testing:
+  - inbox-to-card.controller.ts: Improved field validation for single-field notetypes
+  - api-token-auth.middleware.ts: Added defensive comments for deletedAt checks
+  - inbox-ai.service.ts: Fixed deleted items count with separate query
+- Fixed frontend lint errors:
+  - Replaced 'any' types with 'unknown' and proper type guards
+  - Removed unused imports and variables
+  - Improved type safety in error handling across inbox and report APIs
+- Files changed:
+  - apps/server/src/__tests__/soft-delete-filtering.test.ts
+  - apps/server/src/config/env.ts
+  - apps/server/src/controllers/v1/inbox-to-card.controller.ts
+  - apps/server/src/middlewares/api-token-auth.middleware.ts
+  - apps/server/src/services/inbox-ai.service.ts
+  - apps/web/src/api/inbox-report.ts
+  - apps/web/src/api/inbox.ts
+  - apps/web/src/pages/inbox/inbox-page.tsx
+  - apps/web/src/pages/settings/components/api-token-settings.tsx
+  - apps/web/src/services/inbox-report.service.ts
+  - apps/web/src/services/inbox.service.ts
+- **Quality gates results:**
+  - Backend: 412 tests passing, typecheck passes, lint 0 errors
+  - Frontend: typecheck passes, lint 0 errors (4 warnings acceptable)
+- **Learnings for future iterations:**
+  - Jest transforms ESM to CommonJS and injects __dirname/__filename globals - avoid manual declarations
+  - Integration tests using real database must call initializeDatabase() and closeDatabase()
+  - Service dependencies in tests must be properly initialized with real instances
+  - Use 'unknown' type for catch blocks and add type guards instead of 'any'
+  - Separate queries needed for soft-deleted items count (can't filter by both null and not-null in same query)
+---
