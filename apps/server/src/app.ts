@@ -19,6 +19,7 @@ import { initializeDatabase, checkConnectionHealth, closeDatabase } from './db/c
 import { runMigrations } from './db/migrate.js';
 import { EchoeSeedService } from './services/echoe-seed.service.js';
 import { EchoeStudyService } from './services/echoe-study.service.js';
+import { InboxScheduledJobsService } from './services/inbox-scheduled-jobs.service.js';
 import { initIOC } from './ioc.js';
 import { authHandler } from './middlewares/auth-handler.js';
 import { apiTokenAuthMiddleware } from './middlewares/api-token-auth.middleware.js';
@@ -98,6 +99,78 @@ export async function createApp() {
 
   // Catch-up run for deployments/restarts that cross day boundary.
   await runStudyUnburyJob('startup');
+
+  // Inbox scheduled jobs
+  const inboxScheduledJobsService = Container.get(InboxScheduledJobsService);
+
+  // Weekly summary aggregation job - runs every Sunday at 2 AM
+  const weeklySummaryCron = '0 2 * * 0';
+  const runWeeklySummaryJob = async (trigger: 'startup' | 'schedule') => {
+    try {
+      const { processedUsers } = await inboxScheduledJobsService.runWeeklySummaryAggregation();
+      logger.info('Weekly summary aggregation job completed', {
+        event: 'weekly_summary_aggregation_job_completed',
+        trigger,
+        processedUsers,
+      });
+    } catch (error) {
+      logger.error('Weekly summary aggregation job failed', {
+        event: 'weekly_summary_aggregation_job_failed',
+        trigger,
+        error,
+      });
+    }
+  };
+
+  const weeklySummaryTask = cron.schedule(
+    weeklySummaryCron,
+    () => {
+      void runWeeklySummaryJob('schedule');
+    },
+    { timezone: config.locale.timezone }
+  );
+
+  logger.info('Weekly summary aggregation cron registered', {
+    event: 'weekly_summary_aggregation_cron_registered',
+    cron: weeklySummaryCron,
+    timezone: config.locale.timezone,
+  });
+
+  // Cleanup deleted records job - runs daily at 3 AM
+  const cleanupDeletedCron = '0 3 * * *';
+  const runCleanupDeletedJob = async (trigger: 'startup' | 'schedule') => {
+    try {
+      const { deletedInboxCount, deletedReportCount, deletedTokenCount } =
+        await inboxScheduledJobsService.runCleanupDeletedRecords();
+      logger.info('Cleanup deleted records job completed', {
+        event: 'cleanup_deleted_records_job_completed',
+        trigger,
+        deletedInboxCount,
+        deletedReportCount,
+        deletedTokenCount,
+      });
+    } catch (error) {
+      logger.error('Cleanup deleted records job failed', {
+        event: 'cleanup_deleted_records_job_failed',
+        trigger,
+        error,
+      });
+    }
+  };
+
+  const cleanupDeletedTask = cron.schedule(
+    cleanupDeletedCron,
+    () => {
+      void runCleanupDeletedJob('schedule');
+    },
+    { timezone: config.locale.timezone }
+  );
+
+  logger.info('Cleanup deleted records cron registered', {
+    event: 'cleanup_deleted_records_cron_registered',
+    cron: cleanupDeletedCron,
+    timezone: config.locale.timezone,
+  });
 
   const app: any = express();
 
@@ -193,6 +266,8 @@ export async function createApp() {
       try {
         // Stop scheduled tasks before database shutdown.
         studyUnburyTask.stop();
+        weeklySummaryTask.stop();
+        cleanupDeletedTask.stop();
 
         // Close MySQL connection pool
         await closeDatabase();

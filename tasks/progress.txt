@@ -458,3 +458,41 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Optional fields in DTOs: Remove validation tests when fields become optional
   - aiRecommended flag distinguishes between explicit user choice vs AI/fallback selection
 ---
+## 2026-03-16 21:48 - US-019
+- Implemented InboxQueueService with centralized retry and timeout policies
+- Created simple in-memory queue implementation (concurrency: 5) to avoid p-queue ESM import issues
+- Added job definitions for generate_report, organize_inbox, and to_card_ai
+- Configured retry policies matching PRD:
+  - generate_report: 30s timeout, 2 retries with 30s delay
+  - organize_inbox: 15s timeout, 2 retries with 10s delay
+  - to_card_ai: 15s timeout, 2 retries with 10s delay (placeholder implementation)
+- Updated InboxReportController to support async/sync execution paths:
+  - Added async query param to /api/v1/inbox/reports/generate
+  - Implemented idempotent report generation (checks existing report before generation)
+  - Returns 409 conflict if report already exists
+- Added organize endpoint to InboxController:
+  - POST /api/v1/inbox/:inboxId/organize with optional ?async=true
+  - Supports both sync (default) and async execution paths
+- Added comprehensive tests (11 tests passing with proper timeout configuration for retry delays)
+- All typecheck passes
+- Files changed:
+  - apps/server/src/services/inbox-queue.service.ts (new)
+  - apps/server/src/__tests__/inbox-queue.service.test.ts (new)
+  - apps/server/src/controllers/v1/inbox-report.controller.ts (updated)
+  - apps/server/src/controllers/v1/inbox.controller.ts (updated)
+  - apps/server/src/__tests__/inbox-report.controller.test.ts (updated)
+  - apps/server/src/__tests__/inbox.controller.test.ts (updated)
+  - apps/server/src/__tests__/inbox-to-card.controller.test.ts (updated)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - p-queue v6 has ESM/CJS compatibility issues with Jest - implemented simple in-memory queue instead
+  - Simple queue implementation: track pending count, process queue recursively with concurrency limit
+  - pRetry library handles retry logic with exponential backoff and onFailedAttempt callbacks
+  - Test timeout configuration: Use jest.setTimeout or test-level timeout for tests with retry delays
+  - Controller pattern: Inject multiple services via constructor for clean dependency management
+  - Async/sync execution pattern: Check query param, call enqueue() for async or executeSync() for sync
+  - Idempotency pattern: Check for existing result before expensive operation, return existing if found
+  - Queue service hooks: enqueue() for async, executeSync() for sync (both use same retry logic)
+  - Test mocking pattern: Mock services before importing to avoid module initialization issues
+  - Job configuration: Use Record<JobType, Config> for type-safe job config lookup
+---

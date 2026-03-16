@@ -48,11 +48,17 @@ export class InboxToCardController {
       let aiRecommended = false;
 
       // 2. AI recommendation when deckId/notetypeId is absent
+      // Only recommend for missing parameters, preserve user-specified values
       if (!finalDeckId || !finalNotetypeId) {
         try {
           const recommendation = await this.recommendDeckAndNotetype(userDto.uid, inboxItem);
-          finalDeckId = recommendation.deckId;
-          finalNotetypeId = recommendation.notetypeId;
+          // Only use AI recommendation for missing parameters
+          if (!finalDeckId) {
+            finalDeckId = recommendation.deckId;
+          }
+          if (!finalNotetypeId) {
+            finalNotetypeId = recommendation.notetypeId;
+          }
           aiRecommended = recommendation.aiRecommended;
 
           logger.info('AI recommendation succeeded', {
@@ -61,6 +67,8 @@ export class InboxToCardController {
             deckId: finalDeckId,
             notetypeId: finalNotetypeId,
             aiRecommended,
+            userProvidedDeckId: !!dto.deckId,
+            userProvidedNotetypeId: !!dto.notetypeId,
           });
         } catch (error) {
           logger.error('AI recommendation failed, using fallback', {
@@ -71,8 +79,13 @@ export class InboxToCardController {
 
           // Fallback to deterministic default mapping
           const fallback = await this.getDefaultDeckAndNotetype(userDto.uid);
-          finalDeckId = fallback.deckId;
-          finalNotetypeId = fallback.notetypeId;
+          // Only use fallback for missing parameters
+          if (!finalDeckId) {
+            finalDeckId = fallback.deckId;
+          }
+          if (!finalNotetypeId) {
+            finalNotetypeId = fallback.notetypeId;
+          }
           aiRecommended = false;
         }
       }

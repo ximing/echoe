@@ -501,6 +501,7 @@ export class InboxAiService {
         .where(
           and(
             eq(inbox.uid, uid),
+            isNull(inbox.deletedAt),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
