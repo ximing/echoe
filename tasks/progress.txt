@@ -221,3 +221,34 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Input validation: Trim whitespace, check length, validate required fields
   - Service injection: Constructor injection via TypeDI (constructor(private service: Service) {})
 ---
+## 2026-03-16 18:53 - US-011
+- Verified inbox CRUD and read-state service implementation (already completed in previous iteration)
+- Service implements all required methods:
+  - create(): Creates inbox item with generateInboxId(), defaults source='manual' and category='backend'
+  - list(): Returns paginated items with filters for category and isRead, ordered by createdAt DESC
+  - update(): Updates inbox item with uid scoping and ownership verification
+  - delete(): Soft-deletes by setting deletedAt timestamp
+  - markRead(): Marks single inbox item as read (isRead=1)
+  - markReadAll(): Marks all unread items as read, returns { updatedCount } count
+  - findByIdAndUid(): Helper for ownership verification
+- All operations scoped by uid and filter by isNull(deletedAt) for soft-delete semantics
+- List supports pagination (page, pageSize) and filters (category, isRead)
+- All 16 tests pass successfully covering:
+  - Create with defaults, list with filters/pagination, update/delete with validation
+  - markRead and markReadAll with count tracking
+  - Error handling for not-found items
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/inbox.service.ts (already implemented)
+  - apps/server/src/__tests__/inbox.service.test.ts (already implemented with 16 tests)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Service pattern: @Service() decorator for TypeDI auto-registration
+  - All database queries must filter by uid AND isNull(deletedAt) for tenant isolation and soft-delete
+  - Pagination pattern: page/pageSize with offset calculation, return total/totalPages
+  - Filter building: Conditionally build where conditions array based on provided params
+  - markReadAll pattern: Query unread items first to get count, then update in bulk
+  - Ownership verification: Always check findByIdAndUid() before update/delete operations
+  - Error handling: Throw descriptive errors ('Inbox item not found'), let controller handle HTTP status
+  - Logger usage: logger.info for success operations, logger.error for failures
+---
