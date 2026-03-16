@@ -86,6 +86,8 @@ export interface UpdateEchoeDeckDto {
   name?: string;
   /** New deck description */
   desc?: string;
+  /** New deck config ID */
+  conf?: string;
 }
 
 export interface EchoeDeckConfigDto {

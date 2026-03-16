@@ -439,7 +439,19 @@ export class EchoeDeckService {
     }
 
     // Validate conf (deck config) exists within the same uid
-    if (dto.conf) {
+    // If not provided, use the first available deck config as default
+    let finalConf: string;
+    if (!dto.conf) {
+      const defaultConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(eq(echoeDeckConfig.uid, uid))
+        .limit(1);
+      if (defaultConfig.length === 0) {
+        throw new Error('No deck config found for user. Please create a deck config first.');
+      }
+      finalConf = defaultConfig[0].deckConfigId;
+    } else {
       const deckConfig = await db
         .select()
         .from(echoeDeckConfig)
@@ -448,6 +460,7 @@ export class EchoeDeckService {
       if (deckConfig.length === 0) {
         throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
       }
+      finalConf = dto.conf;
     }
 
     // Determine if this is a filtered deck
@@ -459,7 +472,7 @@ export class EchoeDeckService {
       deckId: deckId,
       uid,
       name: dto.name,
-      conf: dto.conf || '',
+      conf: finalConf,
       extendNew: 20,
       extendRev: 200,
       usn: 0,
@@ -516,6 +529,18 @@ export class EchoeDeckService {
       return null;
     }
 
+    // Validate conf (deck config) exists within the same uid if provided
+    if (dto.conf !== undefined) {
+      const deckConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .limit(1);
+      if (deckConfig.length === 0) {
+        throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
+      }
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const updates: Partial<EchoeDecks> = {
       mod: now,
@@ -536,6 +561,10 @@ export class EchoeDeckService {
 
     if (dto.desc !== undefined) {
       updates.desc = dto.desc;
+    }
+
+    if (dto.conf !== undefined) {
+      updates.conf = dto.conf;
     }
 
     await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));

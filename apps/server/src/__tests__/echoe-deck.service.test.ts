@@ -384,3 +384,225 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     expect(revlogDeleteIndex).toBeLessThan(cardsDeleteIndex);
   });
 });
+
+describe('EchoeDeckService - conf validation (Issue #58)', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+  });
+
+  /**
+   * Helper to build DB mock for createDeck validation tests:
+   * - Call 1: Parent deck check (if name contains '::')
+   * - Call 2: Deck config validation
+   * - Call 3: Insert new deck
+   */
+  const buildCreateDeckDbMock = (deckConfigRows: any[], parentDeckRows: any[] = []) => {
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      // First call: parent deck check
+      if (selectCallCount === 1 && parentDeckRows.length > 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(parentDeckRows),
+            }),
+          }),
+        };
+      }
+      // Subsequent calls: deck config validation
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(deckConfigRows),
+          }),
+        }),
+      };
+    });
+
+    const insertMock = jest.fn().mockReturnValue({
+      values: jest.fn().mockResolvedValue(undefined),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      insert: insertMock,
+    } as any);
+
+    return { selectMock, insertMock };
+  };
+
+  /**
+   * Helper to build DB mock for updateDeck validation tests:
+   * - Call 1: Deck existence check
+   * - Call 2: Deck config validation (if conf provided)
+   * - Call 3: Parent deck check (if name contains '::')
+   * - Call 4: Update deck
+   * - Call 5+: getDeckById (complex hierarchy query)
+   */
+  const buildUpdateDeckDbMock = (deckRows: any[], deckConfigRows: any[] = [], parentDeckRows: any[] = []) => {
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      // First call: deck existence check
+      if (selectCallCount === 1) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(deckRows),
+            }),
+          }),
+        };
+      }
+      // Second call: deck config validation
+      if (selectCallCount === 2 && deckConfigRows.length >= 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(deckConfigRows),
+            }),
+          }),
+        };
+      }
+      // Third call: parent deck check
+      if (selectCallCount === 3 && parentDeckRows.length > 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(parentDeckRows),
+            }),
+          }),
+        };
+      }
+      // Subsequent calls: getDeckById query (return empty to avoid complex mocking)
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      };
+    });
+
+    const updateMock = jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      update: updateMock,
+    } as any);
+
+    return { selectMock, updateMock };
+  };
+
+  describe('createDeck', () => {
+    it('should throw error when conf is provided but does not exist for the user', async () => {
+      buildCreateDeckDbMock([]); // Empty config rows = not found
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.createDeck('uid-test', {
+          name: 'TestDeck',
+          conf: 'edc_nonexistent',
+        })
+      ).rejects.toThrow("Invalid relation: Deck config 'edc_nonexistent' not found for field 'conf' (deckConfigId)");
+    });
+
+    it('should use first available config when conf is not provided', async () => {
+      const { insertMock } = buildCreateDeckDbMock([
+        { deckConfigId: 'edc_default', uid: 'uid-test', name: 'Default' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      await svc.createDeck('uid-test', {
+        name: 'TestDeck',
+      });
+
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      const insertedDeck = insertMock.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedDeck.conf).toBe('edc_default');
+    });
+
+    it('should throw error when conf is not provided and no configs exist for the user', async () => {
+      buildCreateDeckDbMock([]); // No configs available
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.createDeck('uid-test', {
+          name: 'TestDeck',
+        })
+      ).rejects.toThrow('No deck config found for user. Please create a deck config first.');
+    });
+
+    it('should create deck when valid conf is provided', async () => {
+      const { insertMock } = buildCreateDeckDbMock([
+        { deckConfigId: 'edc_valid', uid: 'uid-test', name: 'Valid Config' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      await svc.createDeck('uid-test', {
+        name: 'TestDeck',
+        conf: 'edc_valid',
+      });
+
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      const insertedDeck = insertMock.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedDeck.conf).toBe('edc_valid');
+    });
+  });
+
+  describe('updateDeck', () => {
+    it('should throw error when conf is provided but does not exist for the user', async () => {
+      buildUpdateDeckDbMock(
+        [{ deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' }],
+        [] // Empty config rows = not found
+      );
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.updateDeck('uid-test', 'ed_test', {
+          conf: 'edc_nonexistent',
+        })
+      ).rejects.toThrow("Invalid relation: Deck config 'edc_nonexistent' not found for field 'conf' (deckConfigId)");
+    });
+
+    it('should update conf when valid conf is provided', async () => {
+      const { updateMock } = buildUpdateDeckDbMock(
+        [{ deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' }],
+        [{ deckConfigId: 'edc_new', uid: 'uid-test', name: 'New Config' }]
+      );
+
+      const svc = new EchoeDeckService();
+      // Mock getDeckById to return null to avoid complex query mocking
+      jest.spyOn(svc, 'getDeckById').mockResolvedValue(null);
+
+      await svc.updateDeck('uid-test', 'ed_test', {
+        conf: 'edc_new',
+      });
+
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      const setCall = updateMock.mock.results[0].value.set.mock.calls[0][0];
+      expect(setCall.conf).toBe('edc_new');
+    });
+
+    it('should not update conf when conf is not provided', async () => {
+      const { updateMock } = buildUpdateDeckDbMock([
+        { deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      // Mock getDeckById to return null to avoid complex query mocking
+      jest.spyOn(svc, 'getDeckById').mockResolvedValue(null);
+
+      await svc.updateDeck('uid-test', 'ed_test', {
+        name: 'NewName',
+      });
+
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      const setCall = updateMock.mock.results[0].value.set.mock.calls[0][0];
+      expect(setCall.conf).toBeUndefined();
+      expect(setCall.name).toBe('NewName');
+    });
+  });
+});
