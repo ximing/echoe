@@ -190,6 +190,23 @@ describe('EchoeNoteService - Soft Delete for Note Types (Issue #57)', () => {
       // Verify no delete operations (only updates)
       expect(mockTx.delete).not.toHaveBeenCalled();
     });
+
+    it('should rollback entire transaction on failure (Issue #59)', async () => {
+      const uid = 'test-user';
+      const notetypeId = 'ent_test_006';
+
+      // Mock notetype exists
+      mockDb.limit.mockResolvedValueOnce([{ noteTypeId: notetypeId, deletedAt: 0 }]);
+
+      // Simulate transaction failure - withTransaction rejects
+      mockedWithTransaction.mockRejectedValueOnce(new Error('DB write failure'));
+
+      // Verify entire operation fails and throws
+      await expect(service.deleteNoteType(uid, notetypeId)).rejects.toThrow('DB write failure');
+
+      // Verify transaction was attempted
+      expect(mockedWithTransaction).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Query Filter Validation', () => {
