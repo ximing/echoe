@@ -375,3 +375,34 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Sort options: sortBy ('date' | 'createdAt'), order ('asc' | 'desc')
   - Placeholder report generation (TODO: implement AI report generation in US-016)
 ---
+## 2026-03-16 19:35 - US-016
+- Implemented AI report generation pipeline with 30-day memory and evidence
+- Added generateDailyReport method to InboxAiService that:
+  - Retrieves daily inbox items for the target date
+  - Fetches 30-day report summaries for context (L2 memory)
+  - Detects repeat suggestions from last 7 days and filters them out
+  - Calls AI model with structured prompt including daily facts and memory context
+  - Validates AI output with Zod schema (topics, mistakes, actions, insights with evidenceIds)
+  - Returns fallback report with basic statistics when AI fails
+- Updated InboxReportController to use AI generation instead of placeholder
+- Updated controller tests to mock InboxAiService.generateDailyReport
+- Added comprehensive tests for generateDailyReport (success and fallback cases)
+- All 16 inbox-ai service tests pass, all 17 inbox-report controller tests pass
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/inbox-ai.service.ts (added generateDailyReport method)
+  - apps/server/src/controllers/v1/inbox-report.controller.ts (integrated AI generation)
+  - apps/server/src/__tests__/inbox-ai.service.test.ts (added 2 new tests)
+  - apps/server/src/__tests__/inbox-report.controller.test.ts (updated mocks)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - AI report generation uses 30s timeout (longer than organize's 15s) for more complex analysis
+  - Report summary includes structured fields: topics, mistakes, actions, insights with evidenceIds
+  - Repeat suggestion detection: parse last 7 days' report summaries and extract actions array
+  - AI prompt instructs model to avoid repeating recent suggestions
+  - Fallback report provides basic statistics when AI unavailable
+  - Test mocking pattern: stateful orderBy/where functions to handle multiple query chains
+  - Query pattern: first query has no .limit() (just .orderBy()), second query has .limit()
+  - Fallback query in catch block has no .orderBy(), just .where()
+  - Mock must handle all three query patterns correctly for tests to pass
+---
