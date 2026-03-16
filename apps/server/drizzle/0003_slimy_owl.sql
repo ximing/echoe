@@ -1,0 +1,1 @@
+ALTER TABLE `api_token` MODIFY COLUMN `name` varchar(100) NOT NULL;

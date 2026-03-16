@@ -17,7 +17,7 @@ export const apiToken = mysqlTable(
     id: int('id').primaryKey().autoincrement(), // Auto-increment primary key
     tokenId: varchar('token_id', { length: 191 }).notNull(), // Unique token identifier (nanoid with 'at' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this token)
-    name: varchar('name', { length: 255 }).notNull(), // Human-readable token name
+    name: varchar('name', { length: 100 }).notNull(), // Human-readable token name
     tokenHash: varchar('token_hash', { length: 255 }).notNull(), // Hashed token value for security
     deletedAt: bigint('deleted_at', { mode: 'number' }).default(0).notNull(), // Soft delete timestamp (0 = not deleted, >0 = deleted)
     createdAt: timestamp('created_at', { mode: 'date', fsp: 3 }).notNull().defaultNow(), // Token creation time
