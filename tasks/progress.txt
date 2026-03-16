@@ -288,3 +288,29 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - DTO usage: Import from @echoe/dto for type safety across frontend/backend boundary
   - GET /api/v1/inbox/:inboxId added for single item retrieval (bonus endpoint for frontend convenience)
 ---
+## 2026-03-16 19:05 - US-013
+- Verified AI organize context retrieval pipeline implementation (already implemented in previous iteration)
+- InboxAiService includes all required features:
+  - getL0Context(): Retrieves current inbox item for context
+  - getL1Context(): Retrieves related inbox items from last 7 days (top 10) with similarity scoring
+  - getL2Context(): Retrieves report summaries from last 30 days
+  - buildContext(): Assembles complete context with all three levels
+  - buildPrompt(): Builds AI prompt following PRD structure (task/currentInput/retrievedContext/constraints)
+  - trimByPriority(): Trims context by similarity, recency, and diversity when exceeding token budget
+- Fixed test mock setup issue:
+  - Root cause: getDatabase() is called once and reused for multiple queries (stored in const db)
+  - Previous mock setup created separate mock chains for each call, but service reuses the same db object
+  - Solution: Made limitFn stateful to return different data for each query (queryCount-based logic)
+  - All 10 tests now pass successfully
+- Files changed:
+  - apps/server/src/__tests__/inbox-ai.service.test.ts (fixed mock setup)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Service pattern: Single getDatabase() call reused for multiple queries (const db = getDatabase())
+  - Test mock pattern: When db is reused, mock chain must be stateful (track queryCount in limitFn)
+  - Context retrieval uses L0/L1/L2 hierarchy: current item, related items (7d), reports (30d)
+  - Similarity scoring uses category match (0.4), length similarity (0.3), word overlap (0.3)
+  - Token budget trimming: similarity first, then recency, then diversity
+  - AI prompt structure: { task, currentInput, retrievedContext, constraints }
+  - Test debugging tip: Add console.log to track mock call count and returned data
+---
