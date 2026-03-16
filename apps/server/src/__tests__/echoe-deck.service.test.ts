@@ -310,4 +310,77 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     expect(txUpdateCalls[0].setData).toEqual({ did: null });
     expect(txUpdateCalls[1].setData).toEqual({ did: null });
   });
+
+  it('should delete revlogs before deleting cards when deleteCards=true (FR-3)', async () => {
+    // Mock deck existence check
+    buildDeleteDeckDbMock([{ id: 'ed_deck', name: 'TestDeck' }]);
+
+    // Mock getDeckAndSubdeckIds to return single deck
+    const svc = new EchoeDeckService();
+    jest.spyOn(svc as any, 'getDeckAndSubdeckIds').mockResolvedValue(['ed_deck']);
+
+    // Track all transaction delete operations in order
+    const txDeleteTables: any[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        delete: jest.fn().mockImplementation((table: any) => {
+          // Capture the table object being deleted
+          txDeleteTables.push(table);
+          return {
+            where: jest.fn().mockResolvedValue(undefined),
+          };
+        }),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      };
+      return cb(tx);
+    });
+
+    // Import table schemas to compare against
+    const { echoeRevlog } = await import('../db/schema/echoe-revlog.js');
+    const { echoeCards } = await import('../db/schema/echoe-cards.js');
+
+    // Mock the cards fetch to return cards with cardIds
+    const db = mockedGetDatabase();
+    const originalSelect = db.select;
+    mockedGetDatabase.mockReturnValue({
+      ...db,
+      select: jest.fn().mockImplementation((fields?: any) => {
+        // For card fetch (has nid and cardId fields)
+        if (fields && fields.nid && fields.cardId) {
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                { nid: 'en_note1', cardId: 'ec_card1' },
+                { nid: 'en_note1', cardId: 'ec_card2' },
+              ]),
+            }),
+          };
+        }
+        // For other queries, use original mock
+        return originalSelect.call(db, fields);
+      }),
+    } as any);
+
+    await svc.deleteDeck('uid-d', 'ed_deck', true);
+
+    // Verify delete operations occurred
+    expect(txDeleteTables.length).toBeGreaterThan(0);
+
+    // Find indices of revlog and cards deletes
+    const revlogDeleteIndex = txDeleteTables.indexOf(echoeRevlog);
+    const cardsDeleteIndex = txDeleteTables.indexOf(echoeCards);
+
+    // Verify revlogs are deleted before cards (FR-3 cascade requirement)
+    expect(revlogDeleteIndex).toBeGreaterThanOrEqual(0);
+    expect(cardsDeleteIndex).toBeGreaterThanOrEqual(0);
+    expect(revlogDeleteIndex).toBeLessThan(cardsDeleteIndex);
+  });
 });

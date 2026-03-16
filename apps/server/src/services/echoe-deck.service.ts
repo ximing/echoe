@@ -558,11 +558,13 @@ export class EchoeDeckService {
     // Pre-fetch data needed inside the transaction to minimize read locks
     let deckIds: string[] = [];
     let noteIds: string[] = [];
+    let cardIds: string[] = [];
 
     if (deleteCards) {
       deckIds = await this.getDeckAndSubdeckIds(uid, id);
-      const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+      const cards = await db.select({ nid: echoeCards.nid, cardId: echoeCards.cardId }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
       noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+      cardIds = cards.map((c: Pick<EchoeCards, 'cardId'>) => c.cardId);
     }
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
@@ -570,6 +572,11 @@ export class EchoeDeckService {
       const now = Math.floor(Date.now() / 1000);
 
       if (deleteCards) {
+        // Delete revlogs for all cards (cascade from cards, FR-3)
+        if (cardIds.length > 0) {
+          await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
+        }
+
         if (noteIds.length > 0) {
           // Add notes to graves
           for (const nid of noteIds) {
