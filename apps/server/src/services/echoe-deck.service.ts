@@ -825,6 +825,133 @@ export class EchoeDeckService {
   }
 
   /**
+   * Delete a deck config and cascade soft-delete to associated decks
+   * Implements FR-3: deck_config deletion triggers deck cascade (Owner Service orchestration)
+   */
+  async deleteDeckConfig(uid: string, deckConfigId: string): Promise<boolean> {
+    const db = getDatabase();
+
+    // Check if deck_config exists (outside transaction for early exit)
+    const config = await db
+      .select()
+      .from(echoeDeckConfig)
+      .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deckConfigId), isActiveDeckConfig))
+      .limit(1);
+
+    if (config.length === 0) {
+      return false;
+    }
+
+    // Pre-fetch all decks using this config (minimize read locks in transaction)
+    const affectedDecks = await db
+      .select({ deckId: echoeDecks.deckId })
+      .from(echoeDecks)
+      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.conf, deckConfigId), isActiveDeck));
+
+    const deckIds = affectedDecks.map((d: { deckId: string }) => d.deckId);
+
+    // Wrap all mutations in single transaction to ensure atomicity
+    return withTransaction(async (tx) => {
+      const now = Date.now(); // Millisecond timestamp for soft delete
+
+      // Cascade soft-delete to all decks using this config (triggers downstream processing)
+      // Each deck deletion will handle its own cascade to cards/revlog via deleteDeck logic
+      for (const deckId of deckIds) {
+        // Fetch deck and subdeck data needed for cascade
+        const deckRow = await db
+          .select({ name: echoeDecks.name })
+          .from(echoeDecks)
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), isActiveDeck))
+          .limit(1);
+
+        if (deckRow.length === 0) continue;
+
+        // Get all subdeck IDs
+        const allDeckIds = [deckId];
+        const subDecks = await db
+          .select({ deckId: echoeDecks.deckId })
+          .from(echoeDecks)
+          .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deckRow[0].name}::%`), isActiveDeck));
+
+        for (const subDeck of subDecks) {
+          allDeckIds.push(subDeck.deckId);
+        }
+
+        // Fetch all cards in these decks for cascade to revlog
+        const cards = await db
+          .select({ nid: echoeCards.nid, cardId: echoeCards.cardId })
+          .from(echoeCards)
+          .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, allDeckIds), isActiveCard));
+
+        const noteIds: string[] = Array.from(new Set(cards.map((c: { nid: string; cardId: string }) => c.nid)));
+        const cardIds: string[] = cards.map((c: { nid: string; cardId: string }) => c.cardId);
+
+        // Soft delete revlogs for all cards (cascade from cards, FR-3)
+        if (cardIds.length > 0) {
+          await tx
+            .update(echoeRevlog)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
+        }
+
+        if (noteIds.length > 0) {
+          // Add notes to graves
+          for (const nid of noteIds) {
+            await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: nid, type: 1 });
+          }
+
+          // Soft delete cards
+          await tx.update(echoeCards).set({ deletedAt: now }).where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.did, allDeckIds)));
+
+          // Soft delete notes
+          await tx.update(echoeNotes).set({ deletedAt: now }).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), inArray(echoeNotes.noteId, noteIds)));
+        }
+
+        // Set templates.did to null for child decks being deleted
+        if (allDeckIds.length > 1) {
+          await tx
+            .update(echoeTemplates)
+            .set({ did: null })
+            .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.did, allDeckIds.slice(1))));
+        }
+
+        // Soft delete sub-decks
+        if (allDeckIds.length > 1) {
+          await tx
+            .update(echoeDecks)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), inArray(echoeDecks.deckId, allDeckIds.slice(1))));
+        }
+
+        // Add main deck to graves
+        await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: deckId, type: 0 });
+
+        // Set templates.did to null for main deck being deleted
+        await tx.update(echoeTemplates).set({ did: null }).where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.did, deckId)));
+
+        // Soft delete main deck
+        await tx.update(echoeDecks).set({ deletedAt: now }).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), eq(echoeDecks.deckId, deckId)));
+      }
+
+      // Finally soft delete the deck_config itself
+      await tx
+        .update(echoeDeckConfig)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deletedAt, 0), eq(echoeDeckConfig.deckConfigId, deckConfigId)));
+
+      logger.info('Soft deleted deck_config with cascade', {
+        event: 'soft_delete_finished',
+        uid,
+        rootObject: 'deck_config',
+        deckConfigId,
+        affectedDecks: deckIds.length,
+      });
+
+      return true;
+    });
+  }
+
+  /**
    * Map database config to DTO
    */
   private mapConfigToDto(config: EchoeDeckConfig): EchoeDeckConfigDto {

@@ -182,6 +182,28 @@ export class EchoeDeckController {
   }
 
   /**
+   * DELETE /api/v1/decks/config/:deckConfigId
+   * Delete a deck configuration and cascade soft-delete to associated decks
+   */
+  @Delete('/config/:deckConfigId')
+  async deleteDeckConfig(@Param('deckConfigId') deckConfigId: string, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      const result = await this.echoeDeckService.deleteDeckConfig(userDto.uid, deckConfigId);
+      if (!result) {
+        return ResponseUtil.error(ErrorCode.NOT_FOUND);
+      }
+      return ResponseUtil.success({ success: true });
+    } catch (error) {
+      logger.error('Delete deck config error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
    * POST /api/v1/decks/filtered
    * Create a filtered deck
    */
