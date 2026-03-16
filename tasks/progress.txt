@@ -496,3 +496,33 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Test mocking pattern: Mock services before importing to avoid module initialization issues
   - Job configuration: Use Record<JobType, Config> for type-safe job config lookup
 ---
+## 2026-03-16 21:55 - US-020
+- Implemented InboxScheduledJobsService with two scheduled jobs
+- Added weekly summary aggregation job (Sundays at 2 AM):
+  - Aggregates inbox and report data for all users
+  - Processes last 7 days of reports for AI memory context
+  - Extracts and consolidates topics/actions from report summaries
+- Added cleanup deleted records job (Daily at 3 AM):
+  - Permanently deletes soft-deleted records older than 30 days
+  - Cleans up inbox items, inbox reports, and API tokens
+- Registered cron jobs in app.ts with proper startup/shutdown lifecycle
+- Added 8 comprehensive tests covering all scenarios
+- All tests pass successfully
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/inbox-scheduled-jobs.service.ts (new)
+  - apps/server/src/__tests__/inbox-scheduled-jobs.service.test.ts (new)
+  - apps/server/src/app.ts (added cron job registration and shutdown handlers)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Cron job pattern: Use cron.schedule() with timezone config from config.locale.timezone
+  - Job wrapper pattern: Create async runJobName(trigger) function to handle errors and logging
+  - Shutdown pattern: Store task references and call task.stop() in shutdown handler
+  - Idempotent job pattern: Process each user independently, continue on individual failures
+  - Cleanup pattern: Use lt() and isNotNull() to find soft-deleted records older than cutoff date
+  - Weekly aggregation: Use selectDistinct() to get unique user IDs from multiple tables
+  - Set deduplication: Use new Set<string>() to merge and deduplicate user IDs
+  - JSON parsing safety: Wrap JSON.parse() in try-catch, continue on parse errors
+  - Logging pattern: Log start/completion with metrics (processedUsers, deletedCount, duration)
+  - Drizzle delete: result.rowsAffected ?? 0 handles missing rowsAffected field
+---
