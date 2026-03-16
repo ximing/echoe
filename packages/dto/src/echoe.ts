@@ -59,6 +59,8 @@ export interface CreateEchoeDeckDto {
   desc?: string;
   /** Optional deck config ID (defaults to default config) */
   conf?: string;
+  /** Optional last note type used (mid) - validated if provided per FR-2 */
+  mid?: string;
   /** Whether this is a filtered deck (dyn=1) */
   dyn?: boolean;
   /** Search query for filtered deck */
@@ -88,6 +90,8 @@ export interface UpdateEchoeDeckDto {
   desc?: string;
   /** New deck config ID */
   conf?: string;
+  /** Last note type used (mid) - validated if provided per FR-2 */
+  mid?: string;
 }
 
 export interface EchoeDeckConfigDto {
@@ -294,6 +298,8 @@ export interface CreateEchoeTemplateDto {
   qfmt: string;
   /** Answer format */
   afmt?: string;
+  /** Target deck ID (did) - optional, validated if provided per FR-2 */
+  did?: string;
 }
 
 export interface EchoeFieldRenameDto {
@@ -372,6 +378,8 @@ export interface CreateEchoeNoteDto {
 }
 
 export interface UpdateEchoeNoteDto {
+  /** Note type ID (mid) - mutable per FR-2 */
+  mid?: string;
   /** Field values */
   fields?: Record<string, string>;
   /** Tags */

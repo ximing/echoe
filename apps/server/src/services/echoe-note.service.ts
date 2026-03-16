@@ -321,16 +321,32 @@ export class EchoeNoteService {
     const now = Math.floor(Date.now() / 1000);
     const updates: any = { mod: now, usn: 0 };
 
-    if (dto.fields !== undefined || dto.richTextFields !== undefined) {
-      // Fetch notetype to get ordered field names
+    // FR-2: Validate mid if provided (mutable field)
+    if (dto.mid !== undefined) {
       const notetype = await db
         .select()
         .from(echoeNotetypes)
-        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid), isActiveNotetype))
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.mid), isActiveNotetype))
         .limit(1);
 
       if (notetype.length === 0) {
-        throw new Error(`Invalid relation: Note type '${note[0].mid}' not found for field 'mid' (notetypeId)`);
+        throw new Error(`Invalid relation: Note type '${dto.mid}' not found for field 'mid'`);
+      }
+      updates.mid = dto.mid;
+    }
+
+    if (dto.fields !== undefined || dto.richTextFields !== undefined) {
+      // Fetch notetype to get ordered field names
+      // Use the updated mid if provided, otherwise use existing mid
+      const targetMid = dto.mid !== undefined ? dto.mid : note[0].mid;
+      const notetype = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, targetMid), isActiveNotetype))
+        .limit(1);
+
+      if (notetype.length === 0) {
+        throw new Error(`Invalid relation: Note type '${targetMid}' not found for field 'mid' (notetypeId)`);
       }
 
       const notetypeFieldDefs = JSON.parse(notetype[0].flds) as Array<{ name: string; ord?: number }>;
@@ -926,6 +942,20 @@ export class EchoeNoteService {
       }))
     );
 
+    // FR-2: Validate did for each template if provided (optional field)
+    for (const template of templates) {
+      if (template.did !== undefined && template.did !== '') {
+        const deck = await db
+          .select()
+          .from(echoeDecks)
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, template.did), isActiveDeck))
+          .limit(1);
+        if (deck.length === 0) {
+          throw new Error(`Invalid relation: Deck '${template.did}' not found for field 'did' in template '${template.name}'`);
+        }
+      }
+    }
+
     // Build JSON templates
     const tmplsJson = JSON.stringify(
       templates.map((t, i) => ({
@@ -935,7 +965,7 @@ export class EchoeNoteService {
         afmt: t.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
         bqfmt: '',
         bafmt: '',
-        did: 0,
+        did: t.did || '',
       }))
     );
 
@@ -976,7 +1006,7 @@ export class EchoeNoteService {
         afmt: template.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
         bqfmt: '',
         bafmt: '',
-        did: '',
+        did: template.did || '',
         mod: now,
         usn: 0,
       });
@@ -988,7 +1018,7 @@ export class EchoeNoteService {
         afmt: template.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
         bqfmt: '',
         bafmt: '',
-        did: '',
+        did: template.did || '',
       });
     }
 
@@ -1070,6 +1100,20 @@ export class EchoeNoteService {
 
     // Add new templates if provided
     if (dto.tmpls) {
+      // FR-2: Validate did for each template if provided (optional field)
+      for (const t of dto.tmpls) {
+        if (t.did !== undefined && t.did !== '') {
+          const deck = await db
+            .select()
+            .from(echoeDecks)
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, t.did), isActiveDeck))
+            .limit(1);
+          if (deck.length === 0) {
+            throw new Error(`Invalid relation: Deck '${t.did}' not found for field 'did' in template '${t.name}'`);
+          }
+        }
+      }
+
       const existingTemplates = JSON.parse(notetype[0].tmpls) as any[];
       const newOrd = existingTemplates.length;
 
@@ -1086,7 +1130,7 @@ export class EchoeNoteService {
           afmt: t.afmt || '{{FrontSide}}\n\n<hr>\n\n{{Back}}',
           bqfmt: '',
           bafmt: '',
-          did: '',
+          did: t.did || '',
           mod: now,
           usn: 0,
         });

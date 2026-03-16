@@ -470,6 +470,20 @@ export class EchoeDeckService {
       finalConf = dto.conf;
     }
 
+    // FR-2: Validate mid if provided (optional field, validated if provided)
+    let finalMid: string | null = null;
+    if (dto.mid !== undefined) {
+      const notetype = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.mid), isActiveNotetype))
+        .limit(1);
+      if (notetype.length === 0) {
+        throw new Error(`Invalid relation: Note type '${dto.mid}' not found for field 'mid'`);
+      }
+      finalMid = dto.mid;
+    }
+
     // Determine if this is a filtered deck
     const isFiltered = dto.dyn === true;
     const dyn = isFiltered ? 1 : 0;
@@ -488,7 +502,7 @@ export class EchoeDeckService {
       dyn,
       mod: now,
       desc,
-      mid: null,
+      mid: finalMid,
     };
 
     await db.insert(echoeDecks).values(newDeck);
@@ -548,6 +562,18 @@ export class EchoeDeckService {
       }
     }
 
+    // FR-2: Validate mid if provided (optional field, validated if provided)
+    if (dto.mid !== undefined) {
+      const notetype = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.mid), isActiveNotetype))
+        .limit(1);
+      if (notetype.length === 0) {
+        throw new Error(`Invalid relation: Note type '${dto.mid}' not found for field 'mid'`);
+      }
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const updates: Partial<EchoeDecks> = {
       mod: now,
@@ -572,6 +598,10 @@ export class EchoeDeckService {
 
     if (dto.conf !== undefined) {
       updates.conf = dto.conf;
+    }
+
+    if (dto.mid !== undefined) {
+      updates.mid = dto.mid;
     }
 
     await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
