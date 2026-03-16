@@ -17,8 +17,8 @@ export interface InboxReportDto {
   content: string;
   /** 结构化 AI 摘要 (JSON 字符串) */
   summary: string | null;
-  /** 软删除时间戳 (null = 活跃) */
-  deletedAt: Date | null;
+  /** 软删除时间戳 (0 = 未删除, >0 = 已删除) */
+  deletedAt: number;
   /** 报告创建时间 */
   createdAt: Date;
   /** 最后更新时间 */

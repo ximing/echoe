@@ -3,6 +3,7 @@ import {
   varchar,
   text,
   boolean,
+  bigint,
   timestamp,
   index,
   unique,
@@ -22,7 +23,7 @@ export const inbox = mysqlTable(
     source: varchar('source', { length: 255 }).notNull().default('manual'), // Source of the item (e.g., 'manual', 'web', 'api')
     category: varchar('category', { length: 255 }).notNull().default('backend'), // Category/tag for organizing (e.g., 'backend', 'frontend', 'design')
     isRead: boolean('is_read').default(false).notNull(), // Read state (false = unread, true = read)
-    deletedAt: timestamp('deleted_at', { mode: 'date', fsp: 3 }), // Soft delete timestamp (null = active)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).default(0).notNull(), // Soft delete timestamp (0 = not deleted, >0 = deleted)
     createdAt: timestamp('created_at', { mode: 'date', fsp: 3 }).notNull().defaultNow(), // Item creation time
     updatedAt: timestamp('updated_at', { mode: 'date', fsp: 3 })
       .notNull()

@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { Service } from 'typedi';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { apiToken } from '../db/schema/api-token.js';
@@ -58,7 +58,7 @@ export class ApiTokenService {
       const results = await db
         .select()
         .from(apiToken)
-        .where(and(eq(apiToken.uid, uid), isNull(apiToken.deletedAt)))
+        .where(and(eq(apiToken.uid, uid), eq(apiToken.deletedAt, 0)))
         .limit(100);
 
       return results;
@@ -81,11 +81,11 @@ export class ApiTokenService {
         throw new Error('Token not found');
       }
 
-      // Soft delete by setting deletedAt timestamp
+      // Soft delete by setting deletedAt timestamp (bigint = current timestamp in ms)
       await db
         .update(apiToken)
-        .set({ deletedAt: new Date() })
-        .where(and(eq(apiToken.tokenId, tokenId), eq(apiToken.uid, uid), isNull(apiToken.deletedAt)));
+        .set({ deletedAt: Date.now() })
+        .where(and(eq(apiToken.tokenId, tokenId), eq(apiToken.uid, uid), eq(apiToken.deletedAt, 0)));
 
       logger.info(`API token deleted for user ${uid}: ${tokenId}`);
 
@@ -106,7 +106,7 @@ export class ApiTokenService {
       const results = await db
         .select()
         .from(apiToken)
-        .where(and(eq(apiToken.uid, uid), eq(apiToken.tokenId, tokenId), isNull(apiToken.deletedAt)))
+        .where(and(eq(apiToken.uid, uid), eq(apiToken.tokenId, tokenId), eq(apiToken.deletedAt, 0)))
         .limit(1);
 
       return results.length > 0 ? results[0] : null;
@@ -127,7 +127,7 @@ export class ApiTokenService {
       const results = await db
         .select()
         .from(apiToken)
-        .where(and(eq(apiToken.tokenHash, tokenHash), isNull(apiToken.deletedAt)))
+        .where(and(eq(apiToken.tokenHash, tokenHash), eq(apiToken.deletedAt, 0)))
         .limit(1);
 
       return results.length > 0 ? results[0] : null;

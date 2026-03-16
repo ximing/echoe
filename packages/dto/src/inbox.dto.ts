@@ -55,8 +55,8 @@ export interface InboxDto {
   category: InboxCategory;
   /** 已读状态 (false = 未读, true = 已读) */
   isRead: boolean;
-  /** 软删除时间戳 (null = 活跃) */
-  deletedAt: Date | null;
+  /** 软删除时间戳 (0 = 未删除, >0 = 已删除) */
+  deletedAt: number;
   /** 创建时间 */
   createdAt: Date;
   /** 最后更新时间 */

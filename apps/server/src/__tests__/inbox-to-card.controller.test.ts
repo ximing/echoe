@@ -57,7 +57,7 @@ describe('InboxToCardController', () => {
     source: 'manual',
     category: 'backend',
     isRead: false,
-    deletedAt: null,
+    deletedAt: 0,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };

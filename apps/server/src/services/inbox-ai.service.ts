@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, isNull, isNotNull, gte, lte, desc, gt, lt } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, gt, lt } from 'drizzle-orm';
 import dayjs from 'dayjs';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
@@ -118,7 +118,7 @@ export class InboxAiService {
       const results = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
       if (results.length === 0) {
@@ -154,7 +154,7 @@ export class InboxAiService {
       const currentItem = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, currentInboxId), isNull(inbox.deletedAt)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, currentInboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
       const sevenDaysAgo = dayjs().subtract(7, 'day').toDate();
@@ -163,7 +163,7 @@ export class InboxAiService {
       const results = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), isNull(inbox.deletedAt), gte(inbox.createdAt, sevenDaysAgo)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.deletedAt, 0), gte(inbox.createdAt, sevenDaysAgo)))
         .orderBy(desc(inbox.createdAt))
         .limit(L1_RETRIEVAL_LIMIT * 2); // Get more to filter out current item
 
@@ -219,7 +219,7 @@ export class InboxAiService {
         .where(
           and(
             eq(inboxReport.uid, uid),
-            isNull(inboxReport.deletedAt),
+            eq(inboxReport.deletedAt, 0),
             gte(inboxReport.date, thirtyDaysAgo),
             lte(inboxReport.date, today)
           )
@@ -300,7 +300,7 @@ export class InboxAiService {
     const currentItem = await db
       .select()
       .from(inbox)
-      .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+      .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
       .limit(1);
 
     if (currentItem.length === 0) {
@@ -503,7 +503,7 @@ export class InboxAiService {
         .where(
           and(
             eq(inbox.uid, uid),
-            isNull(inbox.deletedAt),
+            eq(inbox.deletedAt, 0),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
@@ -517,7 +517,7 @@ export class InboxAiService {
         .where(
           and(
             eq(inbox.uid, uid),
-            isNotNull(inbox.deletedAt),
+            gt(inbox.deletedAt, 0),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
@@ -531,7 +531,7 @@ export class InboxAiService {
         .where(
           and(
             eq(inboxReport.uid, uid),
-            isNull(inboxReport.deletedAt),
+            eq(inboxReport.deletedAt, 0),
             gte(inboxReport.date, thirtyDaysAgo),
             lt(inboxReport.date, date) // Exclude current date
           )
@@ -727,7 +727,7 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
         .where(
           and(
             eq(inbox.uid, uid),
-            isNull(inbox.deletedAt),
+            eq(inbox.deletedAt, 0),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
@@ -740,7 +740,7 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
         .where(
           and(
             eq(inbox.uid, uid),
-            isNotNull(inbox.deletedAt),
+            gt(inbox.deletedAt, 0),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
@@ -826,7 +826,7 @@ ${sourceBreakdown.map((s) => `- ${s.source}: ${s.count}`).join('\n')}
       const currentItem = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
       if (currentItem.length === 0) {
@@ -947,7 +947,7 @@ Your response must be valid JSON matching this schema:
       const currentItem = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
       const originalFront = currentItem[0]?.front || '';

@@ -103,7 +103,7 @@ describe('InboxQueueService', () => {
         date: '2026-03-16',
         content: mockReportData.content,
         summary: JSON.stringify(mockReportData.summary),
-        deletedAt: null,
+        deletedAt: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -140,7 +140,7 @@ describe('InboxQueueService', () => {
         date: '2026-03-16',
         content: 'Existing content',
         summary: '{}',
-        deletedAt: null,
+        deletedAt: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

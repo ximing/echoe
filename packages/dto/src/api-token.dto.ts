@@ -15,8 +15,8 @@ export interface ApiTokenDto {
   name: string;
   /** Token 哈希值 (用于安全验证) */
   tokenHash: string;
-  /** 软删除时间戳 (null = 活跃) */
-  deletedAt: Date | null;
+  /** 软删除时间戳 (0 = 未删除, >0 = 已删除) */
+  deletedAt: number;
   /** Token 创建时间 */
   createdAt: Date;
   /** 最后更新时间 */
@@ -31,8 +31,8 @@ export interface ApiTokenListItemDto {
   tokenId: string;
   /** Token 名称 (人工可读) */
   name: string;
-  /** 软删除时间戳 (null = 活跃) */
-  deletedAt: Date | null;
+  /** 软删除时间戳 (0 = 未删除, >0 = 已删除) */
+  deletedAt: number;
   /** Token 创建时间 */
   createdAt: Date;
   /** 最后更新时间 */

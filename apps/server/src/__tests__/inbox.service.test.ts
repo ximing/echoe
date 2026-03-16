@@ -45,7 +45,7 @@ describe('InboxService', () => {
         source: 'manual',
         category: 'backend',
         isRead: false,
-        deletedAt: null,
+        deletedAt: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -255,7 +255,7 @@ describe('InboxService', () => {
         source: 'web',
         category: 'frontend',
         isRead: true,
-        deletedAt: null,
+        deletedAt: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -371,7 +371,7 @@ describe('InboxService', () => {
         source: 'manual',
         category: 'backend',
         isRead: true,
-        deletedAt: null,
+        deletedAt: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

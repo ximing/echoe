@@ -2,6 +2,7 @@ import {
   mysqlTable,
   varchar,
   text,
+  bigint,
   timestamp,
   index,
   unique,
@@ -22,7 +23,7 @@ export const inboxReport = mysqlTable(
     date: varchar('date', { length: 10 }).notNull(), // Report date (YYYY-MM-DD format)
     content: text('content').notNull().$type<string>(), // Markdown content of the report
     summary: text('summary').$type<string>(), // Structured AI summary (JSON string)
-    deletedAt: timestamp('deleted_at', { mode: 'date', fsp: 3 }), // Soft delete timestamp (null = active)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).default(0).notNull(), // Soft delete timestamp (0 = not deleted, >0 = deleted)
     createdAt: timestamp('created_at', { mode: 'date', fsp: 3 })
       .notNull()
       .defaultNow(), // Report creation time

@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { lt, isNotNull, and, eq, gte, lte } from 'drizzle-orm';
+import { lt, and, eq, gte, lte, gt, isNotNull } from 'drizzle-orm';
 import dayjs from 'dayjs';
 
 import { getDatabase } from '../db/connection.js';
@@ -144,23 +144,23 @@ export class InboxScheduledJobsService {
       const db = getDatabase();
       const startTime = Date.now();
 
-      // Calculate cutoff date (30 days ago)
-      const thirtyDaysAgo = dayjs().subtract(30, 'days').toDate();
+      // Calculate cutoff date (30 days ago) as number timestamp (ms)
+      const thirtyDaysAgoMs = dayjs().subtract(30, 'days').valueOf();
 
-      // Delete old soft-deleted inbox items
+      // Delete old soft-deleted inbox items (deletedAt > 0 and older than 30 days)
       const deletedInboxResult = await db
         .delete(inbox)
-        .where(and(isNotNull(inbox.deletedAt), lt(inbox.deletedAt, thirtyDaysAgo)));
+        .where(and(gt(inbox.deletedAt, 0), lt(inbox.deletedAt, thirtyDaysAgoMs)));
 
       // Delete old soft-deleted inbox reports
       const deletedReportResult = await db
         .delete(inboxReport)
-        .where(and(isNotNull(inboxReport.deletedAt), lt(inboxReport.deletedAt, thirtyDaysAgo)));
+        .where(and(gt(inboxReport.deletedAt, 0), lt(inboxReport.deletedAt, thirtyDaysAgoMs)));
 
       // Delete old soft-deleted API tokens
       const deletedTokenResult = await db
         .delete(apiToken)
-        .where(and(isNotNull(apiToken.deletedAt), lt(apiToken.deletedAt, thirtyDaysAgo)));
+        .where(and(gt(apiToken.deletedAt, 0), lt(apiToken.deletedAt, thirtyDaysAgoMs)));
 
       const duration = Date.now() - startTime;
 
@@ -169,7 +169,7 @@ export class InboxScheduledJobsService {
         deletedInboxCount: deletedInboxResult.rowsAffected ?? 0,
         deletedReportCount: deletedReportResult.rowsAffected ?? 0,
         deletedTokenCount: deletedTokenResult.rowsAffected ?? 0,
-        cutoffDate: thirtyDaysAgo.toISOString(),
+        cutoffDate: new Date(thirtyDaysAgoMs).toISOString(),
         durationMs: duration,
       });
 

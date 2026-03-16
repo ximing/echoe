@@ -6,9 +6,12 @@
 
 import { eq } from 'drizzle-orm';
 
+import { apiToken } from '../db/schema/api-token.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
 import { echoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
+import { inbox } from '../db/schema/inbox.js';
+import { inboxReport } from '../db/schema/inbox-report.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeRevlog } from '../db/schema/echoe-revlog.js';
@@ -48,3 +51,18 @@ export const isActiveTemplate = eq(echoeTemplates.deletedAt, 0);
  * Predicate for active deck config (deleted_at = 0)
  */
 export const isActiveDeckConfig = eq(echoeDeckConfig.deletedAt, 0);
+
+/**
+ * Predicate for active API tokens (deleted_at = 0)
+ */
+export const isActiveApiToken = eq(apiToken.deletedAt, 0);
+
+/**
+ * Predicate for active inbox items (deleted_at = 0)
+ */
+export const isActiveInbox = eq(inbox.deletedAt, 0);
+
+/**
+ * Predicate for active inbox reports (deleted_at = 0)
+ */
+export const isActiveInboxReport = eq(inboxReport.deletedAt, 0);

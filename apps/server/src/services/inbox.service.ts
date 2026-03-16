@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, isNull, desc } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { inbox } from '../db/schema/inbox.js';
@@ -69,7 +69,7 @@ export class InboxService {
       const [createdInbox] = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)));
 
       logger.info(`Inbox item created for user ${uid}: ${inboxId}`);
       this.metricsService.trackInboxCreate(uid, inboxId, newInboxItem.source || 'manual');
@@ -93,26 +93,26 @@ export class InboxService {
       const offset = (page - 1) * pageSize;
 
       // Build where conditions based on filters
-      let conditions: any[] = [eq(inbox.uid, uid), isNull(inbox.deletedAt)];
+      let conditions: any[] = [eq(inbox.uid, uid), eq(inbox.deletedAt, 0)];
 
       if (params.category !== undefined && params.isRead !== undefined) {
         conditions = [
           eq(inbox.uid, uid),
           eq(inbox.category, params.category),
           eq(inbox.isRead, params.isRead),
-          isNull(inbox.deletedAt),
+          eq(inbox.deletedAt, 0),
         ];
       } else if (params.category !== undefined) {
         conditions = [
           eq(inbox.uid, uid),
           eq(inbox.category, params.category),
-          isNull(inbox.deletedAt),
+          eq(inbox.deletedAt, 0),
         ];
       } else if (params.isRead !== undefined) {
         conditions = [
           eq(inbox.uid, uid),
           eq(inbox.isRead, params.isRead),
-          isNull(inbox.deletedAt),
+          eq(inbox.deletedAt, 0),
         ];
       }
 
@@ -171,13 +171,13 @@ export class InboxService {
       await db
         .update(inbox)
         .set(updateValues)
-        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), eq(inbox.deletedAt, 0)));
 
       // Fetch updated inbox item
       const [updatedInbox] = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)));
 
       logger.info(`Inbox item updated for user ${uid}: ${inboxId}`);
 
@@ -201,11 +201,11 @@ export class InboxService {
         throw new Error('Inbox item not found');
       }
 
-      // Soft delete by setting deletedAt timestamp
+      // Soft delete by setting deletedAt timestamp (bigint = current timestamp in ms)
       await db
         .update(inbox)
-        .set({ deletedAt: new Date() })
-        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), isNull(inbox.deletedAt)));
+        .set({ deletedAt: Date.now() })
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), eq(inbox.deletedAt, 0)));
 
       logger.info(`Inbox item deleted for user ${uid}: ${inboxId}`);
 
@@ -233,13 +233,13 @@ export class InboxService {
       await db
         .update(inbox)
         .set({ isRead: true })
-        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), eq(inbox.deletedAt, 0)));
 
       // Fetch updated inbox item
       const [updatedInbox] = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)));
 
       logger.info(`Inbox item marked as read for user ${uid}: ${inboxId}`);
 
@@ -262,7 +262,7 @@ export class InboxService {
       const unreadItems = await db
         .select({ inboxId: inbox.inboxId })
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), eq(inbox.deletedAt, 0)));
 
       const updatedCount = unreadItems.length;
 
@@ -271,7 +271,7 @@ export class InboxService {
         await db
           .update(inbox)
           .set({ isRead: true })
-          .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), isNull(inbox.deletedAt)));
+          .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), eq(inbox.deletedAt, 0)));
 
         logger.info(`Marked ${updatedCount} inbox items as read for user ${uid}`);
       }
@@ -293,7 +293,7 @@ export class InboxService {
       const results = await db
         .select()
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
       return results.length > 0 ? results[0] : null;

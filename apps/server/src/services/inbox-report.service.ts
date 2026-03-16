@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, isNull, desc, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, gte, lte } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { inboxReport } from '../db/schema/inbox-report.js';
@@ -64,7 +64,7 @@ export class InboxReportService {
       const [createdReport] = await db
         .select()
         .from(inboxReport)
-        .where(and(eq(inboxReport.inboxReportId, inboxReportId), isNull(inboxReport.deletedAt)));
+        .where(and(eq(inboxReport.inboxReportId, inboxReportId), eq(inboxReport.deletedAt, 0)));
 
       logger.info(`Inbox report created for user ${uid} on ${data.date}: ${inboxReportId}`);
 
@@ -92,7 +92,7 @@ export class InboxReportService {
       const order = params.order ?? 'desc';
 
       // Build where conditions based on filters
-      const conditions: any[] = [eq(inboxReport.uid, uid), isNull(inboxReport.deletedAt)];
+      const conditions: any[] = [eq(inboxReport.uid, uid), eq(inboxReport.deletedAt, 0)];
 
       if (params.date) {
         conditions.push(eq(inboxReport.date, params.date));
@@ -153,7 +153,7 @@ export class InboxReportService {
           and(
             eq(inboxReport.uid, uid),
             eq(inboxReport.inboxReportId, inboxReportId),
-            isNull(inboxReport.deletedAt)
+            eq(inboxReport.deletedAt, 0)
           )
         )
         .limit(1);
@@ -176,7 +176,7 @@ export class InboxReportService {
         .select()
         .from(inboxReport)
         .where(
-          and(eq(inboxReport.uid, uid), eq(inboxReport.date, date), isNull(inboxReport.deletedAt))
+          and(eq(inboxReport.uid, uid), eq(inboxReport.date, date), eq(inboxReport.deletedAt, 0))
         )
         .limit(1);
 
