@@ -694,3 +694,75 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Form validation: Disable submit button until required fields are filled
   - Loading states: Show spinner during async operations, disable buttons to prevent double-submit
 ---
+## 2026-03-16 22:40 - US-025
+- Implemented inbox reports UI with comprehensive list and detail pages
+- Created InboxReportService for reactive state management:
+  - Observable list state with pagination (items, total, page, limit, totalPages)
+  - loadReports() with date filtering and sorting support
+  - loadReport(reportId) for fetching single report details
+  - generateReport(date) with 409 conflict handling for duplicate reports
+  - Proper null checking for API responses to prevent errors
+- Built InboxReportsPage with full UI:
+  - List view showing report cards with date, topics preview, and creation time
+  - Empty state with helpful message and call-to-action
+  - Generate report dialog with date picker (defaults to yesterday)
+  - Pagination controls for navigating through reports
+  - Click-to-navigate to detail page
+- Built InboxReportDetailPage with rich content display:
+  - Back button navigation to list page
+  - Date header with creation timestamp
+  - Summary section with structured display:
+    - Topics as purple badge pills
+    - Mistakes as orange bullet list with AlertCircle icon
+    - Actions as green checklist with CheckCircle2 icon
+  - Markdown content rendering using marked library
+  - DOMPurify sanitization for XSS protection
+  - Prose styling with dark mode support
+- Added marked@^17.0.4 package for markdown-to-HTML conversion
+- Registered InboxReportService in main.tsx
+- Added /inbox/reports and /inbox/reports/:reportId routes to App.tsx
+- Browser verified: Successfully tested report generation and detail rendering
+- Typecheck passes successfully
+- Commit: cdd68e7
+- Files changed:
+  - apps/web/src/services/inbox-report.service.ts (new, 105 lines)
+  - apps/web/src/pages/inbox/inbox-reports-page.tsx (new, 230 lines)
+  - apps/web/src/pages/inbox/inbox-report-detail-page.tsx (new, 180 lines)
+  - apps/web/src/App.tsx (added routes)
+  - apps/web/src/main.tsx (registered service)
+  - apps/web/package.json (added marked dependency)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Markdown rendering: Use marked.setOptions({ breaks: true, gfm: true }) for GitHub-flavored markdown
+  - HTML sanitization: Always use DOMPurify.sanitize() before dangerouslySetInnerHTML
+  - Prose styling: Use Tailwind prose classes with dark:prose-invert for dark mode
+  - Date picker: HTML5 date input with max attribute to prevent future dates
+  - Default date: Use new Date(), setDate(getDate() - 1), toISOString().split('T')[0] for yesterday
+  - 409 conflict handling: Check err.response?.status === 409 and extract existing report from error response
+  - Summary JSON parsing: Backend stores summary as JSON string, frontend receives it as string
+  - Report detail: Use useParams<{ reportId: string }>() from react-router to get route params
+  - Navigation: Use navigate() from useNavigate() hook for programmatic routing
+  - Cleanup: Use return cleanup function in useEffect to clear state when component unmounts
+  - Browser caching: 304 Not Modified responses can cause stale data, but functionality works correctly
+---
+
+## 2026-03-16 22:43 - US-026
+- Enhanced backend test coverage for token, inbox, and AI reliability flows
+- Fixed inbox-ai.service.test.ts by adding isNotNull mock to drizzle-orm
+- Fixed generateDailyReport fallback test to properly mock all 5 database queries (3 for AI path + 2 for fallback path)
+- Verified all acceptance criteria:
+  - Token precedence over JWT: Already tested in api-token-auth.middleware.test.ts (line 243-275)
+  - Inbox CRUD filters: Already tested in inbox.service.test.ts (category and isRead filters)
+  - Organize fallback: Enhanced tests in inbox-ai.service.test.ts (timeout, parse failure, schema validation, not found)
+  - Report generate idempotency: Already tested in inbox-report.service.test.ts (REPORT_ALREADY_EXISTS error)
+- All 42 critical tests pass (api-token-auth, inbox.service, inbox-ai, inbox-report.service)
+- Full test suite: 400 tests pass (1 pre-existing failure in soft-delete-filtering.test.ts unrelated to US-026)
+- Typecheck passes
+- Files changed:
+  - apps/server/src/__tests__/inbox-ai.service.test.ts (added isNotNull mock, fixed fallback test)
+- **Learnings for future iterations:**
+  - When testing services that query deleted items, ensure isNotNull is mocked in drizzle-orm
+  - AI fallback paths often make multiple queries - mock all queries in sequence with proper return types
+  - Database query mocks need to match the exact chain: select().from().where().orderBy().limit()
+  - Use mockReturnValueOnce for sequential query mocking instead of stateful counters
+---
