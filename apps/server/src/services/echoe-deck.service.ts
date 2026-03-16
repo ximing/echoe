@@ -370,7 +370,7 @@ export class EchoeDeckService {
         reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id)))
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id), isActiveCard))
       .groupBy(echoeCards.did);
 
     // Get FSRS stats for this deck
@@ -387,7 +387,7 @@ export class EchoeDeckService {
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id)))
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, id), isActiveCard))
       .groupBy(echoeCards.did);
 
     const count = counts[0] || { newCount: 0, learnCount: 0, reviewCount: 0 };
@@ -452,7 +452,7 @@ export class EchoeDeckService {
       const defaultConfig = await db
         .select()
         .from(echoeDeckConfig)
-        .where(eq(echoeDeckConfig.uid, uid))
+        .where(and(eq(echoeDeckConfig.uid, uid), isActiveDeckConfig))
         .limit(1);
       if (defaultConfig.length === 0) {
         throw new Error('No deck config found for user. Please create a deck config first.');
@@ -462,7 +462,7 @@ export class EchoeDeckService {
       const deckConfig = await db
         .select()
         .from(echoeDeckConfig)
-        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf), isActiveDeckConfig))
         .limit(1);
       if (deckConfig.length === 0) {
         throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
@@ -541,7 +541,7 @@ export class EchoeDeckService {
       const deckConfig = await db
         .select()
         .from(echoeDeckConfig)
-        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf), isActiveDeckConfig))
         .limit(1);
       if (deckConfig.length === 0) {
         throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
@@ -1009,7 +1009,7 @@ export class EchoeDeckService {
     const cards = await db
       .select()
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != ''`));
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.did, deckId), sql`${echoeCards.odid} IS NOT NULL AND ${echoeCards.odid} != ''`, isActiveCard));
 
     if (cards.length === 0) {
       return true;
@@ -1189,7 +1189,7 @@ export class EchoeDeckService {
         const notes = await db
           .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
-          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`));
+          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${fieldSearch}%`}`, isActiveNote));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.noteId, noteIds));
@@ -1202,7 +1202,7 @@ export class EchoeDeckService {
         const notes = await db
           .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
-          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`));
+          .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.sfld} LIKE ${`%${text}%`}`, isActiveNote));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.noteId, noteIds));
@@ -1222,7 +1222,7 @@ export class EchoeDeckService {
         let noteIds: string[] = [];
         for (const cond of conditions) {
           if (cond && typeof cond === 'object' && 'constructor' in cond) {
-            const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(cond);
+            const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(and(cond, isActiveNote));
             noteIds = [...noteIds, ...notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId)];
           }
         }

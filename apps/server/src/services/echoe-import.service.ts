@@ -548,7 +548,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deck.name)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deck.name), eq(echoeDecks.deletedAt, 0)))
             .limit(1);
 
           let deckId = existing[0]?.deckId;
@@ -791,7 +791,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, row.name)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, row.name), eq(echoeDecks.deletedAt, 0)))
             .limit(1);
 
           let deckId = existing[0]?.deckId;
@@ -1039,7 +1039,7 @@ export class EchoeImportService {
         const existing = await db
           .select({ noteId: echoeNotes.noteId })
           .from(echoeNotes)
-          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)))
+          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid), eq(echoeNotes.deletedAt, 0)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -1228,7 +1228,7 @@ export class EchoeImportService {
           const noteExists = await db
             .select({ noteId: echoeNotes.noteId })
             .from(echoeNotes)
-            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, mappedNid)))
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, mappedNid), eq(echoeNotes.deletedAt, 0)))
             .limit(1);
 
           if (noteExists.length === 0) {
@@ -1240,7 +1240,7 @@ export class EchoeImportService {
           const deckExists = await db
             .select({ deckId: echoeDecks.deckId })
             .from(echoeDecks)
-            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, mappedDid)))
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, mappedDid), eq(echoeDecks.deletedAt, 0)))
             .limit(1);
 
           if (deckExists.length === 0) {
@@ -1251,7 +1251,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ cardId: echoeCards.cardId })
             .from(echoeCards)
-            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, mappedNid), eq(echoeCards.ord, row.ord)))
+            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, mappedNid), eq(echoeCards.ord, row.ord), eq(echoeCards.deletedAt, 0)))
             .limit(1);
 
           const fsrs = this.resolveCardFsrsBackfill(row, latestRevlogMap.get(row.id), now);
@@ -1389,7 +1389,7 @@ export class EchoeImportService {
         const cardExists = await db
           .select({ cardId: echoeCards.cardId })
           .from(echoeCards)
-          .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, mappedCid)))
+          .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, mappedCid), eq(echoeCards.deletedAt, 0)))
           .limit(1);
 
         if (cardExists.length === 0) {
@@ -1401,7 +1401,7 @@ export class EchoeImportService {
         const existing = await db
           .select({ revlogId: echoeRevlog.revlogId })
           .from(echoeRevlog)
-          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.sourceRevlogId, row.id), eq(echoeRevlog.cid, mappedCid)))
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.sourceRevlogId, row.id), eq(echoeRevlog.cid, mappedCid), eq(echoeRevlog.deletedAt, 0)))
           .limit(1);
 
         if (existing.length > 0) {

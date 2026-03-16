@@ -136,7 +136,7 @@ export class EchoeNoteService {
     const countResult = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(echoeNotes)
-      .where(whereClause);
+      .where(and(whereClause, isActiveNote));
 
     const total = Number(countResult[0]?.count || 0);
 
@@ -145,7 +145,7 @@ export class EchoeNoteService {
     const notes = await db
       .select()
       .from(echoeNotes)
-      .where(whereClause)
+      .where(and(whereClause, isActiveNote))
       .orderBy(desc(echoeNotes.mod))
       .limit(limit)
       .offset(offset);
@@ -426,7 +426,7 @@ export class EchoeNoteService {
       return null;
     }
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, card[0].nid))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, card[0].nid), isActiveNote)).limit(1);
 
     if (note.length === 0) {
       return null;
@@ -512,7 +512,7 @@ export class EchoeNoteService {
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
       .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.noteId))
-      .where(whereClause);
+      .where(and(whereClause, isActiveCard, isActiveNote));
 
     const total = countResult[0]?.count || 0;
 
@@ -707,7 +707,7 @@ export class EchoeNoteService {
         const targetDeck = await db
           .select({ deckId: echoeDecks.deckId })
           .from(echoeDecks)
-          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, payload.deckId)))
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, payload.deckId), isActiveDeck))
           .limit(1);
         if (targetDeck.length === 0) {
           logger.warn('bulkCardOperation move: target deckId does not belong to uid', {
@@ -1125,7 +1125,7 @@ export class EchoeNoteService {
         const affectedNotes = await db
           .select({ noteId: echoeNotes.noteId, fieldsJson: echoeNotes.fieldsJson })
           .from(echoeNotes)
-          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id)));
+          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id), isActiveNote));
 
         if (affectedNotes.length > 0) {
           for (const note of affectedNotes) {

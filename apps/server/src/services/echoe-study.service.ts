@@ -117,7 +117,7 @@ export class EchoeStudyService {
     const cards = await db
       .select()
       .from(echoeCards)
-      .where(and(...conditions))
+      .where(and(...conditions, isActiveCard))
       .orderBy(
         // 优先级：learning(1)/relearning(3) > review(2) > new(0)，同优先级按 due 升序（最早到期优先）
         sql`CASE WHEN ${echoeCards.queue} IN (1, 3) THEN 0
@@ -326,6 +326,7 @@ export class EchoeStudyService {
         .where(and(
           eq(echoeCards.uid, uid),
           eq(echoeCards.nid, card.nid),
+          isActiveCard,
           sql`${echoeCards.cardId} != ${dto.cardId}`,
           sql`${echoeCards.queue} >= 0`
         ));
@@ -725,6 +726,8 @@ export class EchoeStudyService {
       .leftJoin(echoeRevlog, eq(echoeRevlog.cid, echoeCards.cardId))
       .where(
         and(
+          isActiveCard,
+          isActiveRevlog,
           eq(echoeCards.uid, uid),
           sql`${echoeCards.queue} IN (-2, -3)`,
           or(
@@ -801,7 +804,7 @@ export class EchoeStudyService {
     const rawNewCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
-      .where(and(...newConditions))
+      .where(and(...newConditions, isActiveCard))
       .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     // Apply daily new card limit: newCount = min(rawNewCount, max(0, perDay - todayNewReviewed))
@@ -814,7 +817,7 @@ export class EchoeStudyService {
     const learnCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
-      .where(and(...learnConditions))
+      .where(and(...learnConditions, isActiveCard))
       .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     // Review cards (queue=2 and due <= now)
@@ -824,7 +827,7 @@ export class EchoeStudyService {
     const reviewCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(echoeCards)
-      .where(and(...reviewConditions))
+      .where(and(...reviewConditions, isActiveCard))
       .then((r: Array<{ count: number | string | bigint }>) => Number(r[0]?.count || 0));
 
     return {
@@ -867,6 +870,8 @@ export class EchoeStudyService {
         .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
         .where(
           and(
+            isActiveRevlog,
+            isActiveCard,
             eq(echoeRevlog.uid, uid),
             eq(echoeCards.uid, uid),
             eq(echoeRevlog.type, 0),
@@ -883,6 +888,7 @@ export class EchoeStudyService {
         .where(
           and(
             eq(echoeRevlog.uid, uid),
+            isActiveRevlog,
             eq(echoeRevlog.type, 0),
             sql`${echoeRevlog.lastReview} >= ${todayStart}`
           )
@@ -907,7 +913,7 @@ export class EchoeStudyService {
       const configs = await db
         .select({ newConfig: echoeDeckConfig.newConfig })
         .from(echoeDeckConfig)
-        .where(eq(echoeDeckConfig.uid, uid))
+        .where(and(eq(echoeDeckConfig.uid, uid), isActiveDeckConfig))
         .limit(1);
       if (configs.length === 0) {
         return DEFAULT_PER_DAY;
@@ -919,7 +925,7 @@ export class EchoeStudyService {
     const decksWithConf = await db
       .select({ conf: echoeDecks.conf })
       .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.deckId} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`));
+      .where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.deckId} IN (${sql.join(deckIds.map(d => sql`${d}`), sql`, `)})`, isActiveDeck));
 
     if (decksWithConf.length === 0) {
       return DEFAULT_PER_DAY;
@@ -929,7 +935,7 @@ export class EchoeStudyService {
     const configs = await db
       .select({ newConfig: echoeDeckConfig.newConfig })
       .from(echoeDeckConfig)
-      .where(and(eq(echoeDeckConfig.uid, uid), sql`${echoeDeckConfig.deckConfigId} IN (${sql.join(confIds.map(id => sql`${id}`), sql`, `)})`));
+      .where(and(eq(echoeDeckConfig.uid, uid), sql`${echoeDeckConfig.deckConfigId} IN (${sql.join(confIds.map(id => sql`${id}`), sql`, `)})`, isActiveDeckConfig));
 
     if (configs.length === 0) {
       return DEFAULT_PER_DAY;

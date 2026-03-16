@@ -280,7 +280,7 @@ export class EchoeExportService {
       const deck = await db
         .select()
         .from(echoeDecks)
-        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId)))
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), eq(echoeDecks.deletedAt, 0)))
         .limit(1);
 
       if (deck.length === 0) {
@@ -292,13 +292,13 @@ export class EchoeExportService {
       const subDecks = await db
         .select()
         .from(echoeDecks)
-        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0))); // Exclude filtered decks
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0), eq(echoeDecks.deletedAt, 0))); // Exclude filtered decks
 
       return subDecks.filter((d: { name: string }) => d.name.startsWith(deckName + '::') || d.name === deckName) as ExportDeckRow[];
     }
 
     // Export all decks (excluding filtered decks) in user scope
-    return (await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0)))) as ExportDeckRow[];
+    return (await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.dyn, 0), eq(echoeDecks.deletedAt, 0)))) as ExportDeckRow[];
   }
 
   /**
@@ -336,7 +336,7 @@ export class EchoeExportService {
     const cards = await db
       .select({ nid: echoeCards.nid })
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds), eq(echoeCards.deletedAt, 0)));
 
     // Get unique note IDs (already strings, no conversion needed)
     const noteIds: string[] = [...new Set<string>(cards.map((c: { nid: string }) => c.nid))];
@@ -344,7 +344,7 @@ export class EchoeExportService {
     if (noteIds.length === 0) return [];
 
     // Get the notes for this user by business ID
-    const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
+    const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds), eq(echoeNotes.deletedAt, 0)));
 
     return notes as ExportNoteRow[];
   }
@@ -1052,7 +1052,7 @@ export class EchoeExportService {
     const cards = (await db
       .select()
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)))) as ExportCardRow[];
+      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds), eq(echoeCards.deletedAt, 0)))) as ExportCardRow[];
 
     const stmt = tempDb.prepare(`
       INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags, data)
@@ -1186,7 +1186,7 @@ export class EchoeExportService {
     const cardIds = [...cardIdToCid.keys()];
 
     // Get revlog entries for exported cards in user scope (use business IDs)
-    const revlogs = await db.select().from(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
+    const revlogs = await db.select().from(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds), eq(echoeRevlog.deletedAt, 0)));
 
     const stmt = tempDb.prepare(`
       INSERT INTO revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type)
