@@ -37,3 +37,22 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Text columns use `.notNull().$type<string>()` pattern for proper type inference
   - tinyint(1) is used for boolean flags (is_read: 0 = unread, 1 = read)
 ---
+## 2026-03-16 18:37 - US-004
+- Verified inbox_report schema implementation (already completed in previous iteration)
+- Schema includes all required fields: inbox_report_id (PK), uid, date, content, summary, deleted_at, created_at, updated_at
+- Unique constraint uid_date_unique ensures one report per user per day
+- Indexes created for: inbox_report_id (unique), uid, date
+- Date field uses varchar(10) for YYYY-MM-DD format storage
+- Summary field stores JSON string for structured AI memory retrieval
+- Schema properly exported from apps/server/src/db/schema/index.ts
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/db/schema/inbox-report.ts (already implemented)
+  - apps/server/src/db/schema/index.ts (already exported)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Date field uses varchar(10) instead of DATE type for explicit YYYY-MM-DD string format
+  - Summary field uses text().$type<string>() to store JSON as string (parsed at application layer)
+  - Unique constraint on uid+date prevents duplicate daily reports at database level
+  - This pattern supports idempotent report generation (409 conflict response)
+---
