@@ -13,12 +13,21 @@ jest.mock('../services/inbox-report.service.js', () => ({
   },
 }));
 
+// Mock the InboxAiService
+jest.mock('../services/inbox-ai.service.js', () => ({
+  InboxAiService: class MockInboxAiService {
+    generateDailyReport = jest.fn();
+  },
+}));
+
 // Import after mock
 import { InboxReportService } from '../services/inbox-report.service.js';
+import { InboxAiService } from '../services/inbox-ai.service.js';
 
 describe('InboxReportController', () => {
   let controller: InboxReportController;
   let mockInboxReportService: jest.Mocked<InboxReportService>;
+  let mockInboxAiService: jest.Mocked<InboxAiService>;
 
   // Mock user data
   const mockUser = {
@@ -52,7 +61,7 @@ describe('InboxReportController', () => {
   ];
 
   beforeEach(() => {
-    // Create mock service
+    // Create mock services
     mockInboxReportService = {
       create: jest.fn(),
       list: jest.fn(),
@@ -60,8 +69,12 @@ describe('InboxReportController', () => {
       findByUidAndDate: jest.fn(),
     } as unknown as jest.Mocked<InboxReportService>;
 
-    // Create controller with mock service
-    controller = new InboxReportController(mockInboxReportService);
+    mockInboxAiService = {
+      generateDailyReport: jest.fn(),
+    } as unknown as jest.Mocked<InboxAiService>;
+
+    // Create controller with mock services
+    controller = new InboxReportController(mockInboxReportService, mockInboxAiService);
   });
 
   afterEach(() => {
@@ -246,25 +259,34 @@ describe('InboxReportController', () => {
 
   describe('POST /api/v1/inbox/reports/generate', () => {
     it('should generate a new inbox report', async () => {
+      const aiReportData = {
+        content: '# Daily Inbox Report - 2026-03-17\n\nAI-generated report',
+        summary: {
+          topics: ['topic1', 'topic2'],
+          mistakes: ['mistake1'],
+          actions: ['action1'],
+          totalInbox: 5,
+          newInbox: 2,
+          processedInbox: 3,
+          deletedInbox: 0,
+          categoryBreakdown: [{ category: 'backend', count: 3 }],
+          sourceBreakdown: [{ source: 'manual', count: 5 }],
+          insights: [{ text: 'insight1', evidenceIds: ['i1', 'i2'] }],
+        },
+      };
+
       const newReport = {
         inboxReportId: 'ir_new',
         uid: 'test-user-uid',
         date: '2026-03-17',
-        content: '# Daily Inbox Report - 2026-03-17\n\nReport generated for test-user-uid',
-        summary: JSON.stringify({
-          totalInbox: 0,
-          newInbox: 0,
-          processedInbox: 0,
-          deletedInbox: 0,
-          categoryBreakdown: [],
-          sourceBreakdown: [],
-          insights: [],
-        }),
+        content: aiReportData.content,
+        summary: JSON.stringify(aiReportData.summary),
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
+      mockInboxAiService.generateDailyReport.mockResolvedValue(aiReportData);
       mockInboxReportService.create.mockResolvedValue(newReport);
 
       const result = await controller.generateReport(mockUser, { date: '2026-03-17' });
@@ -272,14 +294,35 @@ describe('InboxReportController', () => {
       expect(result.code).toBe(ErrorCode.SUCCESS);
       expect(result.data).not.toBeNull();
       expect(result.data!.date).toBe('2026-03-17');
+      expect(mockInboxAiService.generateDailyReport).toHaveBeenCalledWith({
+        uid: mockUser.uid,
+        date: '2026-03-17',
+      });
       expect(mockInboxReportService.create).toHaveBeenCalledWith(mockUser.uid, {
         date: '2026-03-17',
-        content: expect.stringContaining('Daily Inbox Report - 2026-03-17'),
-        summary: expect.any(String),
+        content: aiReportData.content,
+        summary: JSON.stringify(aiReportData.summary),
       });
     });
 
     it('should return 409 conflict when report already exists', async () => {
+      const aiReportData = {
+        content: '# Report',
+        summary: {
+          topics: [],
+          mistakes: [],
+          actions: [],
+          totalInbox: 0,
+          newInbox: 0,
+          processedInbox: 0,
+          deletedInbox: 0,
+          categoryBreakdown: [],
+          sourceBreakdown: [],
+          insights: [],
+        },
+      };
+
+      mockInboxAiService.generateDailyReport.mockResolvedValue(aiReportData);
       mockInboxReportService.create.mockRejectedValue(new Error('REPORT_ALREADY_EXISTS'));
       mockInboxReportService.findByUidAndDate.mockResolvedValue(mockReports[0]);
 
@@ -314,6 +357,22 @@ describe('InboxReportController', () => {
     });
 
     it('should trim whitespace from date', async () => {
+      const aiReportData = {
+        content: '# Report',
+        summary: {
+          topics: [],
+          mistakes: [],
+          actions: [],
+          totalInbox: 0,
+          newInbox: 0,
+          processedInbox: 0,
+          deletedInbox: 0,
+          categoryBreakdown: [],
+          sourceBreakdown: [],
+          insights: [],
+        },
+      };
+
       const newReport = {
         inboxReportId: 'ir_new',
         uid: 'test-user-uid',
@@ -325,19 +384,35 @@ describe('InboxReportController', () => {
         updatedAt: new Date(),
       };
 
+      mockInboxAiService.generateDailyReport.mockResolvedValue(aiReportData);
       mockInboxReportService.create.mockResolvedValue(newReport);
 
       await controller.generateReport(mockUser, { date: '  2026-03-17  ' });
 
-      expect(mockInboxReportService.create).toHaveBeenCalledWith(
-        mockUser.uid,
-        expect.objectContaining({
-          date: '2026-03-17',
-        })
-      );
+      expect(mockInboxAiService.generateDailyReport).toHaveBeenCalledWith({
+        uid: mockUser.uid,
+        date: '2026-03-17',
+      });
     });
 
     it('should handle database errors', async () => {
+      const aiReportData = {
+        content: '# Report',
+        summary: {
+          topics: [],
+          mistakes: [],
+          actions: [],
+          totalInbox: 0,
+          newInbox: 0,
+          processedInbox: 0,
+          deletedInbox: 0,
+          categoryBreakdown: [],
+          sourceBreakdown: [],
+          insights: [],
+        },
+      };
+
+      mockInboxAiService.generateDailyReport.mockResolvedValue(aiReportData);
       mockInboxReportService.create.mockRejectedValue(new Error('Database error'));
 
       const result = await controller.generateReport(mockUser, { date: '2026-03-17' });

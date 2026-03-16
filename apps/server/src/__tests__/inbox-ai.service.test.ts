@@ -551,4 +551,176 @@ describe('InboxAiService', () => {
       expect(result.reason).toContain('AI organize failed');
     });
   });
+
+  describe('generateDailyReport', () => {
+    it('should generate AI report with 30-day memory and evidence', async () => {
+      const targetDate = '2026-03-16';
+      const dailyInboxItems = [
+        {
+          inboxId: 'i1',
+          uid: 'test-uid',
+          front: 'Question 1',
+          back: 'Answer 1',
+          category: 'backend',
+          source: 'manual',
+          isRead: 0,
+          deletedAt: null,
+          createdAt: new Date('2026-03-16T10:00:00Z'),
+          updatedAt: new Date('2026-03-16T10:00:00Z'),
+        },
+        {
+          inboxId: 'i2',
+          uid: 'test-uid',
+          front: 'Question 2',
+          back: 'Answer 2',
+          category: 'frontend',
+          source: 'api',
+          isRead: 1,
+          deletedAt: null,
+          createdAt: new Date('2026-03-16T11:00:00Z'),
+          updatedAt: new Date('2026-03-16T11:00:00Z'),
+        },
+      ];
+
+      const reportSummaries = [
+        {
+          inboxReportId: 'ir1',
+          uid: 'test-uid',
+          date: '2026-03-10',
+          content: 'Report 1',
+          summary: JSON.stringify({ actions: ['action1'] }),
+          deletedAt: null,
+          createdAt: new Date('2026-03-10'),
+          updatedAt: new Date('2026-03-10'),
+        },
+      ];
+
+      const aiResponse = {
+        text: JSON.stringify({
+          topics: ['backend', 'frontend'],
+          mistakes: ['mistake1'],
+          actions: ['action2'],
+          insights: [
+            {
+              text: 'Insight about backend',
+              evidenceIds: ['i1'],
+            },
+          ],
+          reportContent: '# Daily Report\n\nAI-generated content',
+        }),
+      };
+
+      // Mock database queries using stateful approach
+      let orderByCallCount = 0;
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockImplementation(() => {
+          orderByCallCount++;
+          if (orderByCallCount === 1) {
+            // First orderBy: daily inbox items query (returns directly, no limit)
+            return Promise.resolve(dailyInboxItems);
+          } else if (orderByCallCount === 2) {
+            // Second orderBy: report summaries query (has limit chained)
+            return {
+              limit: jest.fn().mockResolvedValue(reportSummaries),
+            };
+          }
+          return Promise.resolve([]);
+        }),
+      } as any);
+
+      // Mock AI generation
+      const { generateText } = await import('ai');
+      (generateText as jest.Mock).mockResolvedValue(aiResponse);
+
+      const result = await service.generateDailyReport({
+        uid: 'test-uid',
+        date: targetDate,
+      });
+
+      expect(result.content).toBe('# Daily Report\n\nAI-generated content');
+      expect(result.summary.topics).toEqual(['backend', 'frontend']);
+      expect(result.summary.mistakes).toEqual(['mistake1']);
+      expect(result.summary.actions).toEqual(['action2']);
+      expect(result.summary.insights).toHaveLength(1);
+      expect(result.summary.insights[0].evidenceIds).toEqual(['i1']);
+      expect(result.summary.totalInbox).toBe(2);
+      expect(result.summary.newInbox).toBe(1);
+      expect(result.summary.processedInbox).toBe(1);
+      expect(result.summary.categoryBreakdown).toEqual([
+        { category: 'backend', count: 1 },
+        { category: 'frontend', count: 1 },
+      ]);
+    });
+
+    it('should return fallback report when AI fails', async () => {
+      const targetDate = '2026-03-16';
+      const dailyInboxItems = [
+        {
+          inboxId: 'i1',
+          uid: 'test-uid',
+          front: 'Question 1',
+          back: 'Answer 1',
+          category: 'backend',
+          source: 'manual',
+          isRead: 0,
+          deletedAt: null,
+          createdAt: new Date('2026-03-16T10:00:00Z'),
+          updatedAt: new Date('2026-03-16T10:00:00Z'),
+        },
+      ];
+
+      // Mock database queries - both for AI attempt and fallback
+      let orderByCallCount = 0;
+      let whereCallCount = 0;
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockImplementation(() => {
+          whereCallCount++;
+          if (whereCallCount === 3) {
+            // Third where: fallback query (no orderBy, returns directly)
+            return Promise.resolve(dailyInboxItems);
+          }
+          // For other where calls, return this to continue chaining
+          return {
+            orderBy: jest.fn().mockImplementation(() => {
+              orderByCallCount++;
+              if (orderByCallCount === 1) {
+                // First orderBy: daily inbox items query for AI attempt
+                return Promise.resolve(dailyInboxItems);
+              } else if (orderByCallCount === 2) {
+                // Second orderBy: report summaries query (has limit chained)
+                return {
+                  limit: jest.fn().mockResolvedValue([]),
+                };
+              }
+              return Promise.resolve([]);
+            }),
+          };
+        }),
+      } as any);
+
+      // Mock AI generation failure
+      const { generateText } = await import('ai');
+      (generateText as jest.Mock).mockRejectedValue(new Error('AI service error'));
+
+      const result = await service.generateDailyReport({
+        uid: 'test-uid',
+        date: targetDate,
+      });
+
+      // Should return fallback report with basic statistics
+      expect(result.content).toContain('Daily Inbox Report - 2026-03-16');
+      expect(result.content).toContain('AI-generated insights unavailable');
+      expect(result.summary.totalInbox).toBe(1);
+      expect(result.summary.newInbox).toBe(1);
+      expect(result.summary.topics).toEqual([]);
+      expect(result.summary.mistakes).toEqual([]);
+      expect(result.summary.actions).toEqual([]);
+      expect(result.summary.insights).toEqual([]);
+    });
+  });
 });

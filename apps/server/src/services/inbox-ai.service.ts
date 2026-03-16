@@ -464,6 +464,318 @@ export class InboxAiService {
   }
 
   /**
+   * Generate daily inbox report with AI using 30-day memory and evidence
+   * Implements US-016: Implement report AI pipeline with 30-day memory and evidence
+   */
+  async generateDailyReport(params: {
+    uid: string;
+    date: string; // YYYY-MM-DD
+  }): Promise<{
+    content: string;
+    summary: {
+      topics: string[];
+      mistakes: string[];
+      actions: string[];
+      totalInbox: number;
+      newInbox: number;
+      processedInbox: number;
+      deletedInbox: number;
+      categoryBreakdown: { category: string; count: number }[];
+      sourceBreakdown: { source: string; count: number }[];
+      insights: { text: string; evidenceIds: string[] }[];
+    };
+  }> {
+    const { uid, date } = params;
+
+    try {
+      const db = getDatabase();
+
+      // Get inbox items for the target date (using createdAt)
+      const targetDate = dayjs(date);
+      const startOfDay = targetDate.startOf('day').toDate();
+      const endOfDay = targetDate.endOf('day').toDate();
+
+      const dailyInboxItems = await db
+        .select()
+        .from(inbox)
+        .where(
+          and(
+            eq(inbox.uid, uid),
+            gte(inbox.createdAt, startOfDay),
+            lte(inbox.createdAt, endOfDay)
+          )
+        )
+        .orderBy(desc(inbox.createdAt));
+
+      // Get 30-day report summaries for context (L2 context)
+      const thirtyDaysAgo = targetDate.subtract(30, 'day').format('YYYY-MM-DD');
+      const reportSummaries = await db
+        .select()
+        .from(inboxReport)
+        .where(
+          and(
+            eq(inboxReport.uid, uid),
+            isNull(inboxReport.deletedAt),
+            gte(inboxReport.date, thirtyDaysAgo),
+            lt(inboxReport.date, date) // Exclude current date
+          )
+        )
+        .orderBy(desc(inboxReport.date))
+        .limit(30);
+
+      // Get last 7 days of summaries for repeat suggestion detection
+      const sevenDaysAgo = targetDate.subtract(7, 'day').format('YYYY-MM-DD');
+      const recentReportSummaries = reportSummaries.filter(
+        (report: InboxReport) => report.date >= sevenDaysAgo
+      );
+
+      // Calculate daily statistics
+      const totalInbox = dailyInboxItems.length;
+      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
+      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
+      const deletedInbox = dailyInboxItems.filter((item: Inbox) => item.deletedAt !== null).length;
+
+      // Category breakdown
+      const categoryMap = new Map<string, number>();
+      dailyInboxItems.forEach((item: Inbox) => {
+        const category = item.category || 'uncategorized';
+        categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+      });
+      const categoryBreakdown = Array.from(categoryMap.entries()).map(([category, count]) => ({
+        category,
+        count,
+      }));
+
+      // Source breakdown
+      const sourceMap = new Map<string, number>();
+      dailyInboxItems.forEach((item: Inbox) => {
+        const source = item.source || 'unknown';
+        sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+      });
+      const sourceBreakdown = Array.from(sourceMap.entries()).map(([source, count]) => ({
+        source,
+        count,
+      }));
+
+      // Build AI prompt for report generation
+      const dailyFacts = dailyInboxItems
+        .map((item: Inbox, idx: number) => {
+          return `[${idx + 1}] ID:${item.inboxId} [${item.category}] (${item.source})\nQ: ${item.front}\nA: ${item.back}\nRead: ${item.isRead === 1 ? 'Yes' : 'No'}`;
+        })
+        .join('\n\n');
+
+      const memoryContext = reportSummaries
+        .map((report: InboxReport) => {
+          return `Date: ${report.date}\nSummary: ${report.summary || 'No summary'}`;
+        })
+        .join('\n\n');
+
+      const recentSuggestions = recentReportSummaries
+        .map((report: InboxReport) => {
+          try {
+            const summaryObj = JSON.parse(report.summary || '{}');
+            return summaryObj.actions || [];
+          } catch {
+            return [];
+          }
+        })
+        .flat();
+
+      // Define output schema using Zod
+      const reportSchema = z.object({
+        topics: z.array(z.string()).describe('Main topics covered in today\'s inbox'),
+        mistakes: z.array(z.string()).describe('Common mistakes or issues identified'),
+        actions: z
+          .array(z.string())
+          .describe('Actionable suggestions (avoid repeating recent suggestions)'),
+        insights: z
+          .array(
+            z.object({
+              text: z.string().describe('Insight text'),
+              evidenceIds: z
+                .array(z.string())
+                .describe('Inbox IDs that support this insight'),
+            })
+          )
+          .describe('Key insights with evidence references'),
+        reportContent: z.string().describe('Full markdown report content'),
+      });
+
+      // Initialize OpenAI provider
+      const openaiProvider = createOpenAI({
+        apiKey: config.openai.apiKey,
+        baseURL: config.openai.baseURL,
+      });
+
+      // Call AI model with timeout (30s for report generation)
+      const result = await generateText({
+        model: openaiProvider(config.openai.model),
+        temperature: 0.3, // Slightly higher for more creative insights
+        maxTokens: 4000,
+        abortSignal: AbortSignal.timeout(30000), // 30s timeout
+        system: `You are an AI assistant that generates daily inbox reports for knowledge workers.
+
+Your task is to analyze today's inbox items and generate a comprehensive report with insights, patterns, and actionable suggestions.
+
+Guidelines:
+1. Identify main topics and themes from today's inbox
+2. Highlight common mistakes or issues that need attention
+3. Provide actionable suggestions for improvement
+4. Ground insights in specific inbox items (include evidenceIds)
+5. Avoid repeating suggestions from the last 7 days
+6. Use markdown format for the report content
+7. Be concise but thorough
+
+Context provided:
+- Daily facts: Today's inbox items with IDs
+- 30-day memory: Summaries from the last 30 days
+- Recent suggestions: Actions suggested in the last 7 days (avoid repeating these)
+
+Your response must be valid JSON matching this schema:
+{
+  "topics": ["topic1", "topic2", ...],
+  "mistakes": ["mistake1", "mistake2", ...],
+  "actions": ["action1", "action2", ...],
+  "insights": [
+    {
+      "text": "insight text",
+      "evidenceIds": ["inboxId1", "inboxId2"]
+    }
+  ],
+  "reportContent": "# Daily Report\\n\\n..."
+}`,
+        prompt: `Generate a daily inbox report for ${date}.
+
+Statistics:
+- Total inbox items: ${totalInbox}
+- New (unread): ${newInbox}
+- Processed (read): ${processedInbox}
+- Deleted: ${deletedInbox}
+- Categories: ${JSON.stringify(categoryBreakdown)}
+- Sources: ${JSON.stringify(sourceBreakdown)}
+
+Daily Facts (Today's Inbox Items):
+${dailyFacts || 'No inbox items for today'}
+
+30-Day Memory Context:
+${memoryContext || 'No recent reports'}
+
+Recent Suggestions (Last 7 Days - DO NOT REPEAT):
+${JSON.stringify(recentSuggestions)}
+
+Please generate a comprehensive daily report with topics, mistakes, actions, and insights with evidence.`,
+      });
+
+      // Parse and validate AI response
+      const parsed = JSON.parse(result.text);
+      const validated = reportSchema.parse(parsed);
+
+      logger.info('AI report generation succeeded', {
+        date,
+        uid,
+        topicsCount: validated.topics.length,
+        insightsCount: validated.insights.length,
+      });
+
+      return {
+        content: validated.reportContent,
+        summary: {
+          topics: validated.topics,
+          mistakes: validated.mistakes,
+          actions: validated.actions,
+          totalInbox,
+          newInbox,
+          processedInbox,
+          deletedInbox,
+          categoryBreakdown,
+          sourceBreakdown,
+          insights: validated.insights,
+        },
+      };
+    } catch (error) {
+      // Fallback: Generate basic report without AI
+      logger.error('AI report generation failed, using fallback', {
+        date,
+        uid,
+        error,
+      });
+
+      const db = getDatabase();
+      const targetDate = dayjs(date);
+      const startOfDay = targetDate.startOf('day').toDate();
+      const endOfDay = targetDate.endOf('day').toDate();
+
+      const dailyInboxItems = await db
+        .select()
+        .from(inbox)
+        .where(
+          and(
+            eq(inbox.uid, uid),
+            gte(inbox.createdAt, startOfDay),
+            lte(inbox.createdAt, endOfDay)
+          )
+        );
+
+      const totalInbox = dailyInboxItems.length;
+      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
+      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
+      const deletedInbox = dailyInboxItems.filter((item: Inbox) => item.deletedAt !== null).length;
+
+      const categoryMap = new Map<string, number>();
+      dailyInboxItems.forEach((item: Inbox) => {
+        const category = item.category || 'uncategorized';
+        categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+      });
+      const categoryBreakdown = Array.from(categoryMap.entries()).map(([category, count]) => ({
+        category,
+        count,
+      }));
+
+      const sourceMap = new Map<string, number>();
+      dailyInboxItems.forEach((item: Inbox) => {
+        const source = item.source || 'unknown';
+        sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+      });
+      const sourceBreakdown = Array.from(sourceMap.entries()).map(([source, count]) => ({
+        source,
+        count,
+      }));
+
+      const fallbackContent = `# Daily Inbox Report - ${date}
+
+## Summary
+- Total inbox items: ${totalInbox}
+- New (unread): ${newInbox}
+- Processed (read): ${processedInbox}
+- Deleted: ${deletedInbox}
+
+## Category Breakdown
+${categoryBreakdown.map((c) => `- ${c.category}: ${c.count}`).join('\n')}
+
+## Source Breakdown
+${sourceBreakdown.map((s) => `- ${s.source}: ${s.count}`).join('\n')}
+
+*Note: AI-generated insights unavailable. This is a basic statistical report.*`;
+
+      return {
+        content: fallbackContent,
+        summary: {
+          topics: [],
+          mistakes: [],
+          actions: [],
+          totalInbox,
+          newInbox,
+          processedInbox,
+          deletedInbox,
+          categoryBreakdown,
+          sourceBreakdown,
+          insights: [],
+        },
+      };
+    }
+  }
+
+  /**
    * Execute AI organize with validation and fallback
    * Implements US-014: AI organize execution validation and fallback
    */

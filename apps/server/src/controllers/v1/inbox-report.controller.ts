@@ -11,6 +11,7 @@ import {
 import { Service } from 'typedi';
 
 import { InboxReportService } from '../../services/inbox-report.service.js';
+import { InboxAiService } from '../../services/inbox-ai.service.js';
 import { ResponseUtil } from '../../utils/response.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 import { logger } from '../../utils/logger.js';
@@ -30,7 +31,10 @@ interface GenerateReportBody {
 @Service()
 @JsonController('/api/v1/inbox/reports')
 export class InboxReportController {
-  constructor(private inboxReportService: InboxReportService) {}
+  constructor(
+    private inboxReportService: InboxReportService,
+    private inboxAiService: InboxAiService
+  ) {}
 
   /**
    * GET /api/v1/inbox/reports
@@ -157,23 +161,16 @@ export class InboxReportController {
     }
 
     try {
-      // TODO: Implement AI report generation logic here
-      // For now, create a placeholder report
-      const content = `# Daily Inbox Report - ${date}\n\nReport generated for ${user.uid}`;
-      const summary = JSON.stringify({
-        totalInbox: 0,
-        newInbox: 0,
-        processedInbox: 0,
-        deletedInbox: 0,
-        categoryBreakdown: [],
-        sourceBreakdown: [],
-        insights: [],
+      // Generate AI report with 30-day memory and evidence
+      const reportData = await this.inboxAiService.generateDailyReport({
+        uid: user.uid,
+        date,
       });
 
       const report = await this.inboxReportService.create(user.uid, {
         date,
-        content,
-        summary,
+        content: reportData.content,
+        summary: JSON.stringify(reportData.summary),
       });
 
       const reportDto: InboxReportDto = {
