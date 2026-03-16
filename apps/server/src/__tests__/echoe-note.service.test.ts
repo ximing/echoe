@@ -922,6 +922,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
       const tx = {
         insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
         delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }) }),
       };
       return cb(tx);
     });
@@ -984,7 +985,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     buildDeleteNoteDbMock([{ id: 10 }], cards);
 
     const txInsertValues: any[] = [];
-    const txDeleteCalls: number[] = [];
+    const txUpdateCalls: number[] = [];
 
     mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
       let callOrder = 0;
@@ -995,10 +996,12 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
             return Promise.resolve();
           }),
         }),
-        delete: jest.fn().mockReturnValue({
-          where: jest.fn().mockImplementation(() => {
-            txDeleteCalls.push(++callOrder);
-            return Promise.resolve();
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockImplementation(() => {
+              txUpdateCalls.push(++callOrder);
+              return Promise.resolve();
+            }),
           }),
         }),
       };
@@ -1016,7 +1019,7 @@ describe('EchoeNoteService.deleteNote - transaction protection', () => {
     expect(noteGraves).toHaveLength(1);
     expect(noteGraves[0].oid).toBe('en_010');
 
-    // Three delete calls: revlogs, cards, then note (FR-3 cascade)
-    expect(txDeleteCalls).toHaveLength(3);
+    // Three soft delete (update) calls: revlogs, cards, then note (FR-3 cascade)
+    expect(txUpdateCalls).toHaveLength(3);
   });
 });

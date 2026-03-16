@@ -598,12 +598,14 @@ export class EchoeDeckService {
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
     return withTransaction(async (tx) => {
-      const now = Math.floor(Date.now() / 1000);
+      const now = Date.now(); // Millisecond timestamp for soft delete
 
       if (deleteCards) {
-        // Delete revlogs for all cards (cascade from cards, FR-3)
+        // Soft delete revlogs for all cards (cascade from cards, FR-3)
         if (cardIds.length > 0) {
-          await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
+          await tx.update(echoeRevlog)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
         }
 
         if (noteIds.length > 0) {
@@ -612,11 +614,15 @@ export class EchoeDeckService {
             await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: nid, type: 1 });
           }
 
-          // Delete cards
-          await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+          // Soft delete cards
+          await tx.update(echoeCards)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.did, deckIds)));
 
-          // Delete notes
-          await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
+          // Soft delete notes
+          await tx.update(echoeNotes)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), inArray(echoeNotes.noteId, noteIds)));
         }
 
         // Set templates.did to null for child decks being deleted
@@ -626,8 +632,10 @@ export class EchoeDeckService {
             .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.did, deckIds.slice(1))));
         }
 
-        // Delete sub-decks
-        await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.deckId, deckIds.slice(1))));
+        // Soft delete sub-decks
+        await tx.update(echoeDecks)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), inArray(echoeDecks.deckId, deckIds.slice(1))));
       }
 
       // Add deck to graves
@@ -638,8 +646,10 @@ export class EchoeDeckService {
         .set({ did: null })
         .where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.did, id)));
 
-      // Delete deck
-      await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
+      // Soft delete deck
+      await tx.update(echoeDecks)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), eq(echoeDecks.deckId, id)));
 
       return true;
     });

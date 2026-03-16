@@ -372,15 +372,17 @@ export class EchoeNoteService {
     // Get cards for this note (read before transaction to avoid holding read locks longer than necessary)
     const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = Date.now(); // Millisecond timestamp for soft delete
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
     // Cascade: note -> cards -> revlogs (FR-3)
     return withTransaction(async (tx) => {
-      // Delete revlogs for all cards (cascade from cards)
+      // Soft delete revlogs for all cards (cascade from cards)
       if (cards.length > 0) {
         const cardIds = cards.map((c: EchoeCards) => c.cardId);
-        await tx.delete(echoeRevlog).where(and(eq(echoeRevlog.uid, uid), inArray(echoeRevlog.cid, cardIds)));
+        await tx.update(echoeRevlog)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
       }
 
       // Add cards to graves
@@ -391,11 +393,15 @@ export class EchoeNoteService {
       // Add note to graves
       await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 1 });
 
-      // Delete cards
-      await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
+      // Soft delete cards
+      await tx.update(echoeCards)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), eq(echoeCards.nid, id)));
 
-      // Delete note
-      await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id)));
+      // Soft delete note
+      await tx.update(echoeNotes)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), eq(echoeNotes.noteId, id)));
 
       return true;
     });

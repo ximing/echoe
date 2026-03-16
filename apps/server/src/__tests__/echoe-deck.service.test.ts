@@ -173,7 +173,7 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     buildDeleteDeckDbMock([{ id: 'ed_mydeck', name: 'MyDeck' }]);
 
     const txInsertValues: any[] = [];
-    const txDeleteCalls: number[] = [];
+    const txUpdateCalls: number[] = [];
 
     mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
       let callOrder = 0;
@@ -184,15 +184,12 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
             return Promise.resolve();
           }),
         }),
-        delete: jest.fn().mockReturnValue({
-          where: jest.fn().mockImplementation(() => {
-            txDeleteCalls.push(++callOrder);
-            return Promise.resolve();
-          }),
-        }),
         update: jest.fn().mockReturnValue({
           set: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue(undefined),
+            where: jest.fn().mockImplementation(() => {
+              txUpdateCalls.push(++callOrder);
+              return Promise.resolve();
+            }),
           }),
         }),
       };
@@ -207,8 +204,8 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     expect(txInsertValues[0].type).toBe(0);
     expect(txInsertValues[0].oid).toBe('ed_mydeck');
 
-    // 1 delete call (deck itself)
-    expect(txDeleteCalls).toHaveLength(1);
+    // 2 update calls: 1 for templates.did=null + 1 for soft delete deck itself
+    expect(txUpdateCalls).toHaveLength(2);
   });
 
   it('should set templates.did to null before deleting deck (deleteCards=false)', async () => {
@@ -220,9 +217,6 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
       const tx = {
         insert: jest.fn().mockReturnValue({
           values: jest.fn().mockResolvedValue(undefined),
-        }),
-        delete: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue(undefined),
         }),
         update: jest.fn().mockImplementation((table: any) => {
           return {
@@ -243,9 +237,10 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     const svc = new EchoeDeckService();
     await svc.deleteDeck('uid-d', 'ed_mydeck', false);
 
-    // Should have 1 update call to set templates.did = null
-    expect(txUpdateCalls).toHaveLength(1);
+    // Should have 2 update calls: 1 for templates.did = null, 1 for soft delete deck
+    expect(txUpdateCalls).toHaveLength(2);
     expect(txUpdateCalls[0].setData).toEqual({ did: null });
+    expect(txUpdateCalls[1].setData).toHaveProperty('deletedAt');
   });
 
   it('should set templates.did to null for both main deck and child decks (deleteCards=true)', async () => {
@@ -262,9 +257,6 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
       const tx = {
         insert: jest.fn().mockReturnValue({
           values: jest.fn().mockResolvedValue(undefined),
-        }),
-        delete: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue(undefined),
         }),
         update: jest.fn().mockImplementation((table: any) => {
           return {
@@ -303,12 +295,16 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
 
     await svc.deleteDeck('uid-d', 'ed_parent', true);
 
-    // Should have 2 update calls:
+    // Should have 4 update calls:
     // 1. Set templates.did = null for child decks (ed_child1, ed_child2)
-    // 2. Set templates.did = null for main deck (ed_parent)
-    expect(txUpdateCalls).toHaveLength(2);
-    expect(txUpdateCalls[0].setData).toEqual({ did: null });
-    expect(txUpdateCalls[1].setData).toEqual({ did: null });
+    // 2. Soft delete sub-decks
+    // 3. Set templates.did = null for main deck (ed_parent)
+    // 4. Soft delete main deck
+    expect(txUpdateCalls).toHaveLength(4);
+    const setNullCalls = txUpdateCalls.filter(c => c.setData.did === null);
+    const softDeleteCalls = txUpdateCalls.filter(c => c.setData.deletedAt !== undefined);
+    expect(setNullCalls).toHaveLength(2);
+    expect(softDeleteCalls).toHaveLength(2);
   });
 
   it('should delete revlogs before deleting cards when deleteCards=true (FR-3)', async () => {
@@ -319,25 +315,22 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     const svc = new EchoeDeckService();
     jest.spyOn(svc as any, 'getDeckAndSubdeckIds').mockResolvedValue(['ed_deck']);
 
-    // Track all transaction delete operations in order
-    const txDeleteTables: any[] = [];
+    // Track all transaction update operations (soft deletes) in order
+    const txUpdateTables: any[] = [];
 
     mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
       const tx = {
         insert: jest.fn().mockReturnValue({
           values: jest.fn().mockResolvedValue(undefined),
         }),
-        delete: jest.fn().mockImplementation((table: any) => {
-          // Capture the table object being deleted
-          txDeleteTables.push(table);
+        update: jest.fn().mockImplementation((table: any) => {
+          // Capture the table object being updated (soft deleted)
+          txUpdateTables.push(table);
           return {
-            where: jest.fn().mockResolvedValue(undefined),
+            set: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
           };
-        }),
-        update: jest.fn().mockReturnValue({
-          set: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue(undefined),
-          }),
         }),
       };
       return cb(tx);
@@ -371,17 +364,17 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
 
     await svc.deleteDeck('uid-d', 'ed_deck', true);
 
-    // Verify delete operations occurred
-    expect(txDeleteTables.length).toBeGreaterThan(0);
+    // Verify update (soft delete) operations occurred
+    expect(txUpdateTables.length).toBeGreaterThan(0);
 
-    // Find indices of revlog and cards deletes
-    const revlogDeleteIndex = txDeleteTables.indexOf(echoeRevlog);
-    const cardsDeleteIndex = txDeleteTables.indexOf(echoeCards);
+    // Find indices of revlog and cards soft deletes
+    const revlogUpdateIndex = txUpdateTables.indexOf(echoeRevlog);
+    const cardsUpdateIndex = txUpdateTables.indexOf(echoeCards);
 
-    // Verify revlogs are deleted before cards (FR-3 cascade requirement)
-    expect(revlogDeleteIndex).toBeGreaterThanOrEqual(0);
-    expect(cardsDeleteIndex).toBeGreaterThanOrEqual(0);
-    expect(revlogDeleteIndex).toBeLessThan(cardsDeleteIndex);
+    // Verify revlogs are soft deleted before cards (FR-3 cascade requirement)
+    expect(revlogUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(cardsUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(revlogUpdateIndex).toBeLessThan(cardsUpdateIndex);
   });
 });
 
