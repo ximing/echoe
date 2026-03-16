@@ -650,3 +650,47 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Loading states: Use isLoading flag with spinner animation and disabled buttons
   - Empty states: Show icon + message when no data (Key icon with "暂无 API Token")
 ---
+## 2026-03-16 22:30 - US-024
+- Implemented inbox page UI with comprehensive CRUD operations and AI actions
+- Created InboxService for reactive state management:
+  - Observable list state with pagination (items, total, page, limit, totalPages)
+  - CRUD methods: loadInboxItems, createInboxItem, updateInboxItem, deleteInboxItem
+  - Read state management: markAsRead, markAllAsRead with update count feedback
+  - AI actions: organizeInboxItem with fallback detection, convertToCard with AI recommendation flag
+  - Filter management: setFilters, clearFilters, setPage with automatic reload
+- Built InboxPage component with full UI:
+  - List view with unread/read status badges, category badges, source indicators
+  - Action buttons: mark-read, AI organize, convert-to-card, edit, delete
+  - Create dialog with front/back content fields and category dropdown
+  - Edit dialog with pre-filled values
+  - Delete confirmation dialog with two-step flow
+  - Convert-to-card dialog with AI recommendation option
+  - Empty state with helpful message
+  - Pagination controls with page numbers
+- Added category and isRead filters with dropdown controls and clear button
+- Integrated toast notifications for all actions (success, error, warning)
+- Fixed API response handling: extract data from ApiResponseDto wrapper (.data property)
+- Registered InboxService in main.tsx and added /inbox route to App.tsx
+- Browser verified: Successfully tested create, list, filters, and UI interactions
+- Typecheck passes successfully
+- Commit: df8efc4
+- Files changed:
+  - apps/web/src/services/inbox.service.ts (new, 170 lines)
+  - apps/web/src/pages/inbox/inbox-page.tsx (new, 730 lines)
+  - apps/web/src/App.tsx (added /inbox route)
+  - apps/web/src/main.tsx (registered InboxService)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - API response pattern: Backend returns ApiResponseDto<T>, frontend must access .data property
+  - Type imports: Use `import type` for interfaces/types, regular import for enums (runtime values)
+  - Service pattern: Extend Service from @rabjs/react, use observable properties for reactive state
+  - Component pattern: Use view() wrapper and useService() hook for dependency injection
+  - Dialog pattern: Fixed inset-0 with bg-black/50 backdrop, z-50 for top layer
+  - Toast pattern: Use project's toast service (toast.success/error/warning) not external sonner
+  - DTO package: Must rebuild (@echoe/dto build) after adding new DTOs before frontend can import
+  - Browser testing: Use MCP chrome-devtools tools for navigation, snapshot, and interaction testing
+  - Empty state pattern: Show icon + message when no data with helpful call-to-action
+  - Badge pattern: Use color-coded badges for status (blue=unread, gray=read, purple=category)
+  - Form validation: Disable submit button until required fields are filled
+  - Loading states: Show spinner during async operations, disable buttons to prevent double-submit
+---

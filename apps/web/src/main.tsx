@@ -16,6 +16,7 @@ import { ToastService } from './services/toast.service';
 import { UserModelService } from './services/user-model.service';
 import { ApiTokenService } from './services/api-token.service';
 import { InboxService } from './services/inbox.service';
+import { InboxReportService } from './services/inbox-report.service';
 
 /**
  * Register services globally
@@ -28,6 +29,7 @@ register(ToastService);
 register(UserModelService);
 register(ApiTokenService);
 register(InboxService);
+register(InboxReportService);
 register(EchoeDeckService);
 register(EchoeNoteService);
 register(EchoeStatsService);

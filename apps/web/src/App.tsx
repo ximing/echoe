@@ -27,6 +27,8 @@ import { DataSettings } from './pages/settings/components/data-settings';
 import { PresetSettings } from './pages/settings/components/preset-settings';
 import DashboardPage from './pages/dashboard';
 import { InboxPage } from './pages/inbox/inbox-page';
+import { InboxReportsPage } from './pages/inbox/inbox-reports-page';
+import { InboxReportDetailPage } from './pages/inbox/inbox-report-detail-page';
 import NotFoundPage from './pages/not-found';
 import { ProtectedRoute } from './components/protected-route';
 import { Layout } from './components/layout';
@@ -80,6 +82,26 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <InboxPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inbox/reports"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <InboxReportsPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inbox/reports/:reportId"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <InboxReportDetailPage />
               </Layout>
             </ProtectedRoute>
           }
