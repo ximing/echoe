@@ -16,6 +16,7 @@ import { EchoeTagController } from './v1/echoe-tag.controller.js';
 import { EchoeCsvImportController } from './v1/echoe-csv-import.controller.js';
 import { EchoeDuplicateController } from './v1/echoe-duplicate.controller.js';
 import { InboxController } from './v1/inbox.controller.js';
+import { InboxReportController } from './v1/inbox-report.controller.js';
 
 // Note: StaticController import should stay last to avoid catching API routes
 export const controllers = [
@@ -35,5 +36,6 @@ export const controllers = [
   EchoeCsvImportController,
   EchoeDuplicateController,
   InboxController,
+  InboxReportController,
   // StaticController,
 ];
