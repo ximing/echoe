@@ -21,7 +21,7 @@ export const inbox = mysqlTable(
     inboxId: varchar('inbox_id', { length: 191 }).notNull(), // Business ID (nanoid with 'i' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this inbox item)
     front: text('front').notNull().$type<string>(), // Front side/question content
-    back: text('back').notNull().$type<string>(), // Back side/answer content
+    back: text('back'), // Back side/answer content
     source: varchar('source', { length: 255 }).notNull().default('manual'), // Source of the item (e.g., 'manual', 'web', 'api')
     category: varchar('category', { length: 255 }).notNull().default('backend'), // Category/tag for organizing (e.g., 'backend', 'frontend', 'design')
     isRead: boolean('is_read').default(false).notNull(), // Read state (false = unread, true = read)

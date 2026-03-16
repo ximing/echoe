@@ -1,0 +1,1 @@
+ALTER TABLE `inbox` MODIFY COLUMN `back` text;
