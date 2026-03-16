@@ -1157,8 +1157,10 @@ export class EchoeNoteService {
 
   /**
    * Delete a note type (soft delete - archives instead of deleting)
-   * Sets decks.mid = null for associated decks as per FR-3
-   * Preserves all notes, cards, revlogs, and templates (no cascade delete)
+   * Implements full FR-3 cascade soft-delete chain:
+   * - Soft-deletes templates
+   * - Soft-deletes notes (and cascades to cards/revlogs)
+   * - Sets decks.mid = null for associated decks
    */
   async deleteNoteType(uid: string, id: string): Promise<{ success: boolean; message?: string }> {
     const db = getDatabase();
@@ -1174,21 +1176,70 @@ export class EchoeNoteService {
       return { success: false, message: 'Note type not found or already deleted' };
     }
 
-    // Use transaction for atomicity
+    // Get related notes before transaction (to identify cards for revlog cascade)
+    const notes = await db
+      .select()
+      .from(echoeNotes)
+      .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id), eq(echoeNotes.deletedAt, 0)));
+
+    // Get cards for all notes (needed for revlog cascade)
+    let cardIds: string[] = [];
+    if (notes.length > 0) {
+      const noteIds = notes.map((n: { noteId: string }) => n.noteId);
+      const cards = await db
+        .select()
+        .from(echoeCards)
+        .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.nid, noteIds)));
+      cardIds = cards.map((c: { cardId: string }) => c.cardId);
+    }
+
+    // Use transaction for atomicity - implements full FR-3 cascade chain
     return withTransaction(async (tx) => {
       const now = Date.now();
 
-      // 1. Mark notetype as deleted (soft delete)
-      await tx
-        .update(echoeNotetypes)
-        .set({ deletedAt: now })
-        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
-
-      // 2. Set decks.mid = null for associated decks (as per FR-3)
+      // 1. Set decks.mid = null for associated decks (FR-3: set null)
       await tx
         .update(echoeDecks)
         .set({ mid: null })
         .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.mid, id)));
+
+      // 2. Cascade soft-delete revlogs (deepest level first)
+      if (cardIds.length > 0) {
+        await tx
+          .update(echoeRevlog)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
+      }
+
+      // 3. Cascade soft-delete cards
+      if (notes.length > 0) {
+        const noteIds = notes.map((n: { noteId: string }) => n.noteId);
+        await tx
+          .update(echoeCards)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.nid, noteIds)));
+      }
+
+      // 4. Cascade soft-delete notes
+      if (notes.length > 0) {
+        const noteIds = notes.map((n: { noteId: string }) => n.noteId);
+        await tx
+          .update(echoeNotes)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), inArray(echoeNotes.noteId, noteIds)));
+      }
+
+      // 5. Cascade soft-delete templates (FR-3: cascade)
+      await tx
+        .update(echoeTemplates)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.deletedAt, 0), eq(echoeTemplates.ntid, id)));
+
+      // 6. Finally, mark notetype as deleted (soft delete root object last)
+      await tx
+        .update(echoeNotetypes)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id), eq(echoeNotetypes.deletedAt, 0)));
 
       return { success: true };
     });
