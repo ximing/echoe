@@ -182,6 +182,13 @@ export class EchoeNoteService {
       throw new Error(`Invalid relation: Note type '${dto.notetypeId}' not found for field 'mid' (notetypeId)`);
     }
 
+    // Validate deck ownership (outside transaction - read only)
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, dto.deckId))).limit(1);
+
+    if (deck.length === 0) {
+      throw new Error(`Invalid relation: Deck '${dto.deckId}' not found for field 'did' (deckId)`);
+    }
+
     // Parse templates and extract ordered field names from notetype definition
     const templates = JSON.parse(notetype[0].tmpls) as Array<{ ord: number; name: string }>;
     const notetypeFieldDefs = JSON.parse(notetype[0].flds) as Array<{ name: string; ord?: number }>;

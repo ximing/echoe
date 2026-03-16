@@ -801,6 +801,118 @@ describe('EchoeNoteService.updateNoteType - fldRenames migrates existing notes f
   });
 });
 
+describe('EchoeNoteService.createNote - deckId validation (Refs #54)', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+    mockedWithTransaction.mockReset();
+  });
+
+  const buildCreateNoteDbMock = (notetypeRows: any[], deckRows: any[]) => {
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        // First call: notetype validation
+        const limitMock = jest.fn().mockResolvedValue(notetypeRows);
+        const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+        const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+        return { from: fromMock };
+      }
+      // Second call: deck validation
+      const limitMock = jest.fn().mockResolvedValue(deckRows);
+      const whereMock = jest.fn().mockReturnValue({ limit: limitMock });
+      const fromMock = jest.fn().mockReturnValue({ where: whereMock });
+      return { from: fromMock };
+    });
+
+    mockedGetDatabase.mockReturnValue({ select: selectMock } as any);
+    return { selectMock };
+  };
+
+  it('should reject note creation when deckId does not belong to current uid', async () => {
+    // Notetype exists, but deck belongs to another user (empty result)
+    const notetype = [{ id: 1, uid: 'user-A', noteTypeId: 'ent_type_001', tmpls: '[]', flds: '[]' }];
+    buildCreateNoteDbMock(notetype, []);
+
+    const service = new EchoeNoteService({} as any, {} as any);
+
+    await expect(
+      service.createNote('user-A', {
+        notetypeId: 'ent_type_001',
+        deckId: 'ed_9999',
+        fields: {},
+      } as any)
+    ).rejects.toThrow(`Invalid relation: Deck 'ed_9999' not found for field 'did' (deckId)`);
+  });
+
+  it('should reject note creation when deckId belongs to different uid (cross-tenant)', async () => {
+    // Notetype exists for user-A, but deck check returns empty (deck belongs to user-B)
+    const notetype = [{ id: 1, uid: 'user-A', noteTypeId: 'ent_type_001', tmpls: '[]', flds: '[]' }];
+    buildCreateNoteDbMock(notetype, []);
+
+    const service = new EchoeNoteService({} as any, {} as any);
+
+    await expect(
+      service.createNote('user-A', {
+        notetypeId: 'ent_type_001',
+        deckId: 'ed_user_B_deck',
+        fields: {},
+      } as any)
+    ).rejects.toThrow(`Invalid relation: Deck 'ed_user_B_deck' not found for field 'did' (deckId)`);
+  });
+
+  it('should NOT enter transaction when deckId validation fails', async () => {
+    const notetype = [{ id: 1, uid: 'user-A', noteTypeId: 'ent_type_001', tmpls: '[]', flds: '[]' }];
+    buildCreateNoteDbMock(notetype, []);
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
+      };
+      return cb(tx);
+    });
+
+    const service = new EchoeNoteService({} as any, {} as any);
+
+    await expect(
+      service.createNote('user-A', {
+        notetypeId: 'ent_type_001',
+        deckId: 'ed_invalid',
+        fields: {},
+      } as any)
+    ).rejects.toThrow();
+
+    // Transaction should never be entered when validation fails
+    expect(mockedWithTransaction).not.toHaveBeenCalled();
+  });
+
+  it('should include error message with field name and target ID when deckId not found', async () => {
+    const notetype = [{ id: 1, uid: 'user-A', noteTypeId: 'ent_type_001', tmpls: '[]', flds: '[]' }];
+    buildCreateNoteDbMock(notetype, []);
+
+    const service = new EchoeNoteService({} as any, {} as any);
+
+    await expect(
+      service.createNote('user-A', {
+        notetypeId: 'ent_type_001',
+        deckId: 'ed_nonexistent',
+        fields: {},
+      } as any)
+    ).rejects.toThrow(/Deck 'ed_nonexistent'/);
+
+    // Rebuild the mock for second assertion to avoid mock state issues
+    buildCreateNoteDbMock(notetype, []);
+
+    await expect(
+      service.createNote('user-A', {
+        notetypeId: 'ent_type_001',
+        deckId: 'ed_nonexistent',
+        fields: {},
+      } as any)
+    ).rejects.toThrow(/field 'did'/);
+  });
+});
+
 describe('EchoeNoteService.deleteNote - transaction protection', () => {
   beforeEach(() => {
     mockedGetDatabase.mockReset();
