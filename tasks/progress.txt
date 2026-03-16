@@ -147,3 +147,40 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Service decorated with @Service() for TypeDI auto-registration
   - Uses @echoe/logger for structured logging (logger.info, logger.error)
 ---
+## 2026-03-16 18:50 - US-009
+- Verified API token authentication middleware implementation (already completed in previous iteration)
+- Middleware parses Authorization: Bearer <token> header and validates token hash via ApiTokenService
+- Sets authenticated user on request context (request.user and request.apiTokenId)
+- Implements Token > JWT priority:
+  - apiTokenAuthMiddleware runs BEFORE authHandler in app.ts middleware chain
+  - authHandler checks if request.user is already set and skips JWT validation if present
+  - When both Bearer token and JWT cookie are present, Bearer token takes precedence
+- Invalid token handling:
+  - Returns 401 when user is not found or soft-deleted
+  - Returns 401 on any authentication errors
+  - Gracefully skips to next middleware for missing/invalid Bearer format
+- All 10 tests pass successfully covering:
+  - No Authorization header (skip to next)
+  - Invalid Bearer format (skip to next)
+  - Invalid token (skip to next)
+  - User not found (401)
+  - Soft-deleted user (401)
+  - Valid token authentication
+  - Token > JWT priority verification
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/middlewares/api-token-auth.middleware.ts (already implemented)
+  - apps/server/src/middlewares/auth-handler.ts (already has priority check)
+  - apps/server/src/app.ts (middleware order already correct)
+  - apps/server/src/__tests__/api-token-auth.middleware.test.ts (already implemented)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Middleware order matters: apiTokenAuthMiddleware must run BEFORE authHandler
+  - Token > JWT priority implemented by checking if request.user is already set
+  - Middleware should be lenient: skip to next() for missing/invalid Bearer format (let JWT handle it)
+  - Only return 401 for valid Bearer token with authentication failures
+  - Container.get() used to access services in middleware (TypeDI dependency injection)
+  - Extends Express Request type with apiTokenId field for audit trail
+  - Logger.debug for successful auth, logger.error for failures
+  - Soft-deleted users (deletedAt > 0) should return 401 even if token is valid
+---
