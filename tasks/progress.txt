@@ -184,3 +184,40 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Logger.debug for successful auth, logger.error for failures
   - Soft-deleted users (deletedAt > 0) should return 401 even if token is valid
 ---
+## 2026-03-16 18:50 - US-010
+- Verified API token controller implementation (already completed in previous iteration, commit ebf65d2)
+- Controller implements all three required endpoints:
+  - GET /api/v1/api-tokens: List all active tokens for authenticated user
+  - POST /api/v1/api-tokens: Create new token, returns plaintext once
+  - DELETE /api/v1/api-tokens/:tokenId: Soft-delete token by business ID
+- Token management endpoints enforce JWT-only authentication:
+  - Checks request.apiTokenId to detect API token auth
+  - Returns 403 FORBIDDEN when API token auth is detected
+  - Prevents token self-management lockout scenarios
+- DELETE endpoint uses tokenId business ID (not numeric auto-increment id)
+- Create response includes plaintext token with warning message
+- All 16 controller tests pass successfully covering:
+  - JWT authentication requirement for all endpoints
+  - API token auth rejection for all endpoints
+  - Token listing with empty results
+  - Token creation with validation (name required, max 255 chars, trimming)
+  - Token deletion with validation (tokenId required, not found handling, trimming)
+  - Unauthorized handling for unauthenticated requests
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/controllers/v1/api-token.controller.ts (already committed in ebf65d2)
+  - apps/server/src/__tests__/api-token.controller.test.ts (already committed in ebf65d2)
+  - apps/server/src/controllers/index.ts (already updated in ebf65d2)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Controller pattern: @JsonController('/api/v1/resource') for base route
+  - Method decorators: @Get(), @Post(), @Delete('/:param') for HTTP methods
+  - Parameter decorators: @CurrentUser() for authenticated user, @Body() for request body, @Param() for path params, @Req() for raw request
+  - JWT-only enforcement: Check request.apiTokenId to detect API token auth and reject with 403
+  - Token self-management prevention: API tokens cannot manage themselves (prevents lockout)
+  - Business ID usage: DELETE uses tokenId (business ID) not numeric id
+  - Plaintext token security: Return only at creation time with explicit warning message
+  - Error handling: Use ErrorCode constants and ResponseUtility.error/success wrappers
+  - Input validation: Trim whitespace, check length, validate required fields
+  - Service injection: Constructor injection via TypeDI (constructor(private service: Service) {})
+---
