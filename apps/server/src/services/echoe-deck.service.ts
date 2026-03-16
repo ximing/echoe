@@ -10,6 +10,7 @@ import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
+import { echoeTemplates } from '../db/schema/echoe-templates.js';
 import { logger } from '../utils/logger.js';
 import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
 import { generateTypeId } from '../utils/id.js';
@@ -582,12 +583,24 @@ export class EchoeDeckService {
           await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
         }
 
+        // Set templates.did to null for child decks being deleted
+        if (deckIds.length > 1) {
+          await tx.update(echoeTemplates)
+            .set({ did: null })
+            .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.did, deckIds.slice(1))));
+        }
+
         // Delete sub-decks
         await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.deckId, deckIds.slice(1))));
       }
 
       // Add deck to graves
       await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 0 });
+
+      // Set templates.did to null for the main deck being deleted
+      await tx.update(echoeTemplates)
+        .set({ did: null })
+        .where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.did, id)));
 
       // Delete deck
       await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
