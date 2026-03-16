@@ -36,11 +36,19 @@ const requiresAuth = (path: string): boolean => {
 /**
  * Authentication middleware that validates the echoe_token from cookies or headers
  * and adds user information to the request context
+ *
+ * Priority: If request.user is already set (by ApiTokenAuthMiddleware),
+ * this middleware will skip JWT authentication and use the existing user.
  */
 export const authHandler = async (request: Request, res: Response, next: NextFunction) => {
   try {
     // Check if path requires authentication
     if (!requiresAuth(request.path)) {
+      return next();
+    }
+
+    // If user is already set by ApiTokenAuthMiddleware (Token > JWT priority), skip JWT
+    if (request.user) {
       return next();
     }
 

@@ -1,6 +1,7 @@
 /* eslint-disable import/order */
 import { AuthV1Controller } from './v1/auth.controller.js';
 import { UserV1Controller } from './v1/user.controller.js';
+import { ApiTokenController } from './v1/api-token.controller.js';
 import { SystemController } from './v1/system.controller.js';
 // import { StaticController } from './static.controller.js';
 import { EchoeDeckController } from './v1/echoe-deck.controller.js';
@@ -14,11 +15,13 @@ import { EchoeConfigController } from './v1/echoe-config.controller.js';
 import { EchoeTagController } from './v1/echoe-tag.controller.js';
 import { EchoeCsvImportController } from './v1/echoe-csv-import.controller.js';
 import { EchoeDuplicateController } from './v1/echoe-duplicate.controller.js';
+import { InboxController } from './v1/inbox.controller.js';
 
 // Note: StaticController import should stay last to avoid catching API routes
 export const controllers = [
   AuthV1Controller,
   UserV1Controller,
+  ApiTokenController,
   SystemController,
   EchoeDeckController,
   EchoeNoteController,
@@ -31,5 +34,6 @@ export const controllers = [
   EchoeTagController,
   EchoeCsvImportController,
   EchoeDuplicateController,
+  InboxController,
   // StaticController,
 ];

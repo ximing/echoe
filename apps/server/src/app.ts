@@ -21,6 +21,7 @@ import { EchoeSeedService } from './services/echoe-seed.service.js';
 import { EchoeStudyService } from './services/echoe-study.service.js';
 import { initIOC } from './ioc.js';
 import { authHandler } from './middlewares/auth-handler.js';
+import { apiTokenAuthMiddleware } from './middlewares/api-token-auth.middleware.js';
 import { ensureUserWorkspace } from './middlewares/ensure-user-workspace.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { logger } from './utils/logger.js';
@@ -121,6 +122,8 @@ export async function createApp() {
   app.use(morgan('dev'));
   app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({ extended: true }));
+  // API Token auth runs BEFORE JWT auth to implement Token > JWT priority
+  app.use(apiTokenAuthMiddleware);
   app.use(authHandler);
   app.use(ensureUserWorkspace);
 
