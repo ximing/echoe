@@ -19,3 +19,21 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - All schemas must be exported from schema/index.ts with .js extension (e.g., './api-token.js')
   - Soft delete pattern uses deletedAt timestamp field with dedicated index
 ---
+## 2026-03-16 18:35 - US-003
+- Verified inbox schema implementation (already completed in previous iteration)
+- Schema includes all required fields: inbox_id (PK), uid, front, back, source, category, is_read, deleted_at, created_at, updated_at
+- Indexes created for: inbox_id (unique), uid, category, is_read, uid+is_read, uid+category, deleted_at
+- Source defaults to 'manual', category defaults to 'backend'
+- Schema properly exported from apps/server/src/db/schema/index.ts
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/db/schema/inbox.ts (already implemented)
+  - apps/server/src/db/schema/index.ts (already exported)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Inbox schema uses camelCase field names (inboxId, isRead) but MySQL columns use snake_case (inbox_id, is_read)
+  - Drizzle automatically maps between camelCase and snake_case
+  - Composite indexes (uid+is_read, uid+category) improve query performance for common filter combinations
+  - Text columns use `.notNull().$type<string>()` pattern for proper type inference
+  - tinyint(1) is used for boolean flags (is_read: 0 = unread, 1 = read)
+---
