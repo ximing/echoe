@@ -17,12 +17,24 @@ jest.mock('../services/inbox.service.js', () => ({
   },
 }));
 
+// Mock the InboxQueueService
+jest.mock('../services/inbox-queue.service.js', () => ({
+  InboxQueueService: class MockInboxQueueService {
+    enqueue = jest.fn();
+    executeSync = jest.fn();
+    getQueueSize = jest.fn();
+    getPendingCount = jest.fn();
+  },
+}));
+
 // Import after mock
 import { InboxService } from '../services/inbox.service.js';
+import { InboxQueueService } from '../services/inbox-queue.service.js';
 
 describe('InboxController', () => {
   let controller: InboxController;
   let mockInboxService: jest.Mocked<InboxService>;
+  let mockInboxQueueService: jest.Mocked<InboxQueueService>;
 
   // Mock user data
   const mockUser = {
@@ -71,8 +83,15 @@ describe('InboxController', () => {
       findByIdAndUid: jest.fn(),
     } as unknown as jest.Mocked<InboxService>;
 
-    // Create controller with mock service
-    controller = new InboxController(mockInboxService);
+    mockInboxQueueService = {
+      enqueue: jest.fn(),
+      executeSync: jest.fn(),
+      getQueueSize: jest.fn(),
+      getPendingCount: jest.fn(),
+    } as unknown as jest.Mocked<InboxQueueService>;
+
+    // Create controller with mock services
+    controller = new InboxController(mockInboxService, mockInboxQueueService);
   });
 
   afterEach(() => {

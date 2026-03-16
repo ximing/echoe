@@ -12,6 +12,7 @@ import { Service } from 'typedi';
 
 import { InboxReportService } from '../../services/inbox-report.service.js';
 import { InboxAiService } from '../../services/inbox-ai.service.js';
+import { InboxQueueService, InboxJobType } from '../../services/inbox-queue.service.js';
 import { ResponseUtil } from '../../utils/response.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 import { logger } from '../../utils/logger.js';
@@ -26,6 +27,7 @@ import type {
 interface GenerateReportBody {
   date: string; // YYYY-MM-DD format
   timezone?: string; // User timezone (e.g., 'Asia/Shanghai')
+  async?: boolean; // Whether to enqueue job for async execution (default: false for sync)
 }
 
 @Service()
@@ -33,7 +35,8 @@ interface GenerateReportBody {
 export class InboxReportController {
   constructor(
     private inboxReportService: InboxReportService,
-    private inboxAiService: InboxAiService
+    private inboxAiService: InboxAiService,
+    private inboxQueueService: InboxQueueService
   ) {}
 
   /**
@@ -161,17 +164,49 @@ export class InboxReportController {
     }
 
     try {
-      // Generate AI report with 30-day memory and evidence
-      const reportData = await this.inboxAiService.generateDailyReport({
-        uid: user.uid,
-        date,
-      });
+      // Check if report already exists (idempotency)
+      const existingReport = await this.inboxReportService.findByUidAndDate(user.uid, date);
+      if (existingReport) {
+        return {
+          code: ErrorCode.CONFLICT,
+          msg: 'Report already exists for this date',
+          data: {
+            inboxReportId: existingReport.inboxReportId,
+            date: existingReport.date,
+          },
+        };
+      }
 
-      const report = await this.inboxReportService.create(user.uid, {
-        date,
-        content: reportData.content,
-        summary: JSON.stringify(reportData.summary),
-      });
+      // Choose execution path: async (queued) or sync (immediate)
+      const useAsync = body.async === true;
+
+      let report: any;
+
+      if (useAsync) {
+        // Enqueue job for async execution
+        logger.info('Enqueuing report generation job', {
+          event: 'inbox_report_enqueue',
+          uid: user.uid,
+          date,
+        });
+
+        report = await this.inboxQueueService.enqueue(InboxJobType.GENERATE_REPORT, {
+          uid: user.uid,
+          date,
+        });
+      } else {
+        // Execute synchronously (fast path)
+        const reportData = await this.inboxAiService.generateDailyReport({
+          uid: user.uid,
+          date,
+        });
+
+        report = await this.inboxReportService.create(user.uid, {
+          date,
+          content: reportData.content,
+          summary: JSON.stringify(reportData.summary),
+        });
+      }
 
       const reportDto: InboxReportDto = {
         inboxReportId: report.inboxReportId,

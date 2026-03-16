@@ -368,7 +368,77 @@ describe('InboxToCardController', () => {
       // Verify aiRecommended flag is present in response
       expect(result.code).toBe(ErrorCode.SUCCESS);
       expect(result.data).toHaveProperty('aiRecommended');
-      expect(result.data.aiRecommended).toBe(false); // Explicit deck/notetype provided
+      expect(result.data?.aiRecommended).toBe(false); // Explicit deck/notetype provided
+    });
+
+    it('should preserve user-provided deckId when only notetypeId is missing', async () => {
+      // Mock getAllDecks for AI recommendation
+      mockEchoeDeckService.getAllDecks = jest.fn().mockResolvedValue([
+        { deckId: 'ai-deck-id', name: 'AI Recommended Deck' },
+      ]);
+      
+      // Mock getAllNotetypes for AI recommendation
+      const mockGetAllNotetypes = jest.fn().mockResolvedValue([
+        { noteTypeId: 'ai-notetype-id', name: 'AI Recommended Notetype', type: 0 },
+      ]);
+      (controller as any).getAllNotetypes = mockGetAllNotetypes;
+
+      mockInboxService.findByIdAndUid.mockResolvedValue(mockInboxItem);
+      // User's deck should be validated, not AI's
+      mockEchoeDeckService.getDeckById.mockResolvedValue(mockDeck);
+      mockEchoeNoteService.getNoteTypeById.mockResolvedValue(mockNotetype);
+      mockEchoeNoteService.createNote.mockResolvedValue(mockNoteWithCards);
+
+      // User provides deckId but not notetypeId
+      const dtoWithOnlyDeckId = {
+        inboxId: 'i1234567890',
+        deckId: 'd1234567890', // User's explicit deckId
+        // notetypeId is missing - should use AI recommendation
+      };
+
+      const result = await controller.convertInboxToCard('i1234567890', dtoWithOnlyDeckId, mockUser);
+
+      // Verify user's deckId was preserved (not AI's)
+      expect(result.code).toBe(ErrorCode.SUCCESS);
+      expect(mockEchoeDeckService.getDeckById).toHaveBeenCalledWith('test-user-uid', 'd1234567890');
+      expect(mockEchoeNoteService.createNote).toHaveBeenCalledWith('test-user-uid', expect.objectContaining({
+        deckId: 'd1234567890', // User's deckId preserved
+      }));
+    });
+
+    it('should preserve user-provided notetypeId when only deckId is missing', async () => {
+      // Mock getAllDecks for AI recommendation
+      mockEchoeDeckService.getAllDecks = jest.fn().mockResolvedValue([
+        { deckId: 'ai-deck-id', name: 'AI Recommended Deck' },
+      ]);
+      
+      // Mock getAllNotetypes for AI recommendation
+      const mockGetAllNotetypes = jest.fn().mockResolvedValue([
+        { noteTypeId: 'ai-notetype-id', name: 'AI Recommended Notetype', type: 0 },
+      ]);
+      (controller as any).getAllNotetypes = mockGetAllNotetypes;
+
+      mockInboxService.findByIdAndUid.mockResolvedValue(mockInboxItem);
+      mockEchoeDeckService.getDeckById.mockResolvedValue(mockDeck);
+      // User's notetype should be validated
+      mockEchoeNoteService.getNoteTypeById.mockResolvedValue(mockNotetype);
+      mockEchoeNoteService.createNote.mockResolvedValue(mockNoteWithCards);
+
+      // User provides notetypeId but not deckId
+      const dtoWithOnlyNotetypeId = {
+        inboxId: 'i1234567890',
+        // deckId is missing - should use AI recommendation
+        notetypeId: 'nt1234567890', // User's explicit notetypeId
+      };
+
+      const result = await controller.convertInboxToCard('i1234567890', dtoWithOnlyNotetypeId, mockUser);
+
+      // Verify user's notetypeId was preserved
+      expect(result.code).toBe(ErrorCode.SUCCESS);
+      expect(mockEchoeNoteService.getNoteTypeById).toHaveBeenCalledWith('test-user-uid', 'nt1234567890');
+      expect(mockEchoeNoteService.createNote).toHaveBeenCalledWith('test-user-uid', expect.objectContaining({
+        notetypeId: 'nt1234567890', // User's notetypeId preserved
+      }));
     });
   });
 });

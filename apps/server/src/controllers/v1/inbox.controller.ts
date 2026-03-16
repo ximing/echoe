@@ -3,6 +3,7 @@ import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
 import { InboxService } from '../../services/inbox.service.js';
+import { InboxQueueService, InboxJobType } from '../../services/inbox-queue.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
@@ -18,7 +19,10 @@ import type {
 @Service()
 @JsonController('/api/v1/inbox')
 export class InboxController {
-  constructor(private inboxService: InboxService) {}
+  constructor(
+    private inboxService: InboxService,
+    private inboxQueueService: InboxQueueService
+  ) {}
 
   /**
    * GET /api/v1/inbox
@@ -186,6 +190,67 @@ export class InboxController {
     } catch (error) {
       logger.error('Mark all inbox items as read error:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * POST /api/v1/inbox/:inboxId/organize
+   * AI organize single inbox item
+   * Supports both sync (default) and async execution via ?async=true query param
+   */
+  @Post('/:inboxId/organize')
+  async organizeInbox(
+    @Param('inboxId') inboxId: string,
+    @QueryParam('async') asyncExec?: boolean,
+    @CurrentUser() userDto?: UserInfoDto
+  ) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      if (!inboxId || !inboxId.trim()) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'Inbox ID is required');
+      }
+
+      // Verify inbox item exists and belongs to user
+      const inboxItem = await this.inboxService.findByIdAndUid(userDto.uid, inboxId.trim());
+      if (!inboxItem) {
+        return ResponseUtil.error(ErrorCode.NOT_FOUND, 'Inbox item not found');
+      }
+
+      // Choose execution path: async (queued) or sync (immediate)
+      const useAsync = asyncExec === true;
+
+      let result: any;
+
+      if (useAsync) {
+        // Enqueue job for async execution
+        logger.info('Enqueuing organize job', {
+          event: 'inbox_organize_enqueue',
+          uid: userDto.uid,
+          inboxId,
+        });
+
+        result = await this.inboxQueueService.enqueue(InboxJobType.ORGANIZE_INBOX, {
+          uid: userDto.uid,
+          inboxId: inboxId.trim(),
+        });
+      } else {
+        // Execute synchronously (fast path)
+        result = await this.inboxQueueService.executeSync(InboxJobType.ORGANIZE_INBOX, {
+          uid: userDto.uid,
+          inboxId: inboxId.trim(),
+        });
+      }
+
+      return ResponseUtil.success(result);
+    } catch (error) {
+      logger.error('Organize inbox item error:', error);
+      if (error instanceof Error && error.message.includes('not found')) {
+        return ResponseUtil.error(ErrorCode.NOT_FOUND);
+      }
+      return ResponseUtil.error(ErrorCode.DB_ERROR, 'Failed to organize inbox item');
     }
   }
 }
