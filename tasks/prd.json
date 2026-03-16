@@ -1,15 +1,15 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/echoe-id-refactor-big-bang",
-  "description": "Echoe ID 重构（Big Bang）：将业务关联 ID 从数值迁移为基于 generateTypeId 的 nanoid 字符串，并统一使用业务 ID 字段做关联。",
+  "branchName": "ralph/inbox-api-token-ai-workflow",
+  "description": "收件箱与开放 API Token 功能：支持手动/API 推入、AI 整理、日报生成与卡片化。",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add Echoe OBJECT_TYPE constants",
-      "description": "As a backend developer, I want dedicated Echoe object types so every domain entity can generate prefixed string IDs consistently.",
+      "title": "Add Inbox object types and ID generators",
+      "description": "As a backend developer, I want dedicated object types and centralized ID helpers so API token/inbox/report entities use consistent business IDs.",
       "acceptanceCriteria": [
-        "Add OBJECT_TYPE entries: ECHOE_CARD, ECHOE_NOTE, ECHOE_DECK, ECHOE_NOTETYPE, ECHOE_TEMPLATE, ECHOE_REVLOG, ECHOE_COL, ECHOE_DECK_CONFIG, ECHOE_GRAVE, ECHOE_MEDIA",
-        "All new constants are exported from apps/server/src/models/constant/type.ts and referenced without ts-ignore",
+        "Add OBJECT_TYPE entries: API_TOKEN, INBOX, INBOX_REPORT in apps/server/src/models/constant/type.ts",
+        "Add generateApiTokenId(), generateInboxId(), generateInboxReportId() in apps/server/src/utils/id.ts based on generateTypeId",
         "Typecheck passes"
       ],
       "priority": 1,
@@ -18,11 +18,12 @@
     },
     {
       "id": "US-002",
-      "title": "Extend generateTypeId for Echoe prefixes",
-      "description": "As a backend developer, I want generateTypeId to cover all Echoe entities so string ID generation is centralized.",
+      "title": "Create api_token schema and indexes",
+      "description": "As a backend developer, I want an api_token table so users can create and revoke API credentials safely.",
       "acceptanceCriteria": [
-        "Add generateTypeId switch cases for all Echoe OBJECT_TYPE values in apps/server/src/utils/id.ts",
-        "Prefix mapping matches PRD: ec/en/ed/ent/et/erl/ecol/edc/eg/em",
+        "Add apps/server/src/db/schema/api-token.ts with fields token_id, uid, name, token_hash, deleted_at, created_at, updated_at",
+        "Ensure token_id is unique and add indexes for uid and token_hash",
+        "Export api_token schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 2,
@@ -31,337 +32,377 @@
     },
     {
       "id": "US-003",
-      "title": "Refactor notes and cards schema to business IDs",
-      "description": "As a backend developer, I want notes and cards tables to use string business IDs so core note-card relationships no longer depend on numeric IDs.",
+      "title": "Create inbox schema and indexes",
+      "description": "As a backend developer, I want an inbox table so users can store captured content with read state and source metadata.",
       "acceptanceCriteria": [
-        "In echoe_notes, keep auto-increment primary id and add unique note_id varchar(191)",
-        "In echoe_cards, keep auto-increment primary id and add unique card_id varchar(191)",
-        "Convert relation fields mid/nid/did/odid from numeric to varchar(191) where required by PRD",
-        "Update related indexes in echoe_notes.ts and echoe-cards.ts",
+        "Add apps/server/src/db/schema/inbox.ts with business field inbox_id and content fields front/back/source/category/is_read",
+        "Ensure source default manual, category default backend, and soft-delete field deleted_at",
+        "Add indexes for inbox_id(unique), uid, category, is_read",
+        "Export inbox schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Schema changes complete. Service type errors are expected and will be resolved in US-013+"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Refactor decks/notetypes/templates schema",
-      "description": "As a backend developer, I want deck, notetype, and template schemas to use business IDs so downstream relationships are string-based.",
+      "title": "Create inbox_report schema with summary memory",
+      "description": "As a backend developer, I want inbox reports to store both markdown content and structured summary for later AI retrieval.",
       "acceptanceCriteria": [
-        "In echoe_decks add deck_id and convert conf/mid to varchar(191)",
-        "In echoe_notetypes add note_type_id and convert did to varchar(191)",
-        "In echoe_templates add template_id and convert ntid/did to varchar(191)",
-        "Keep numeric auto-increment primary key id for each table",
+        "Add apps/server/src/db/schema/inbox-report.ts with fields inbox_report_id, date, content, summary, deleted_at",
+        "Add unique constraint on uid+date to prevent duplicate daily reports",
+        "Add indexes for inbox_report_id(unique), uid, date",
+        "Export inbox_report schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Schema changes complete. Service type errors expected."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Refactor revlog/col/deck-config schema",
-      "description": "As a backend developer, I want revlog, collection, and deck config schemas to use business IDs so scheduling and config references are consistent.",
+      "title": "Generate migration for inbox and token tables",
+      "description": "As a release engineer, I want deterministic migration artifacts so new tables and indexes can be applied safely.",
       "acceptanceCriteria": [
-        "In echoe_revlog add revlog_id and convert cid to varchar(191)",
-        "In echoe_col add col_id and keep uid unique behavior unchanged",
-        "In echoe_deck_config add deck_config_id and keep existing config payload fields intact",
-        "Keep numeric auto-increment primary key id where applicable",
+        "Run pnpm --filter @echoe/server build before migration generation",
+        "Run pnpm --filter @echoe/server migrate:generate and produce migration SQL for api_token/inbox/inbox_report",
+        "Migration includes uid+date unique constraint for inbox_report and required indexes",
+        "Drizzle meta files are updated consistently",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Schema changes complete. Service type errors expected."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Refactor graves/media schema and index alignment",
-      "description": "As a backend developer, I want graves and media tables aligned with business IDs so deletion tracking and media metadata follow the same ID model.",
+      "title": "Add DTO contracts for token inbox report and card conversion",
+      "description": "As a shared package maintainer, I want typed DTO contracts so backend and frontend use the same API payload shape.",
       "acceptanceCriteria": [
-        "In echoe_graves add grave_id and convert oid to varchar(191)",
-        "In echoe_media add media_id with unique constraint",
-        "Keep echoe_config as composite key (uid, key) without adding config_id",
-        "Update affected indexes and unique constraints to match string ID columns",
+        "Add DTO files for API token, inbox, inbox report, and inbox-to-card in packages/dto/src",
+        "Define enums and response DTOs including AiOrganizeResponse fields optimizedFront optimizedBack reason confidence fallback",
+        "Export all new DTOs from packages/dto/src/index.ts",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Schema changes complete. echoe_config kept as-is per PRD."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Finalize schema exports and build input",
-      "description": "As a release engineer, I want schema exports and compiled output ready so migration generation reads the correct final model.",
+      "title": "Build DTO package and align consumers",
+      "description": "As a maintainer, I want dto build output refreshed so server and web can compile against new inbox/token contracts.",
       "acceptanceCriteria": [
-        "Update apps/server/src/db/schema/index.ts exports for all changed tables",
-        "Run pnpm --filter @echoe/server build successfully before migration generation",
-        "Compiled schema in dist matches source-level final schema changes",
+        "Run pnpm --filter @echoe/dto build successfully",
+        "Server and web imports resolve new DTO exports without missing-symbol errors",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "Build succeeded with temporary @ts-nocheck in 7 service files. These will be removed in US-013+"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Generate migration for ID refactor",
-      "description": "As a release engineer, I want a deterministic migration script so Big Bang ID schema changes can be applied in one controlled step.",
+      "title": "Implement API token service core logic",
+      "description": "As a backend developer, I want token create/list/delete logic so users can manage API tokens with secure storage.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/server migrate:generate after server build",
-        "Generated SQL includes business ID columns, string foreign key columns, and expected indexes",
-        "Migration artifacts are updated consistently in apps/server/drizzle and drizzle/meta",
+        "Implement token creation that returns plaintext token once and stores only SHA256 hash",
+        "Implement list and delete operations scoped by uid with soft-delete semantics",
+        "Use generateApiTokenId for token business ID generation",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Run migration and verify constraints",
-      "description": "As a release engineer, I want to execute migration and validate schema so runtime code can rely on new ID constraints safely.",
+      "title": "Implement ApiTokenAuth middleware and precedence",
+      "description": "As a backend developer, I want bearer token authentication integrated so API clients can access protected APIs without JWT cookies.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/server migrate successfully on test/dev database",
-        "Verify each target table has expected *_id unique column and string relation columns",
-        "Verify key indexes for uid + business relation fields exist after migration",
+        "Add ApiTokenAuthMiddleware to parse Authorization Bearer token and validate token hash",
+        "Set authenticated user identity on request context after token validation",
+        "Authentication chain enforces precedence Token > JWT when both credentials are present",
+        "Invalid token returns explicit 401 response",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-010",
-      "title": "Convert core DTO entity ID types to string",
-      "description": "As a shared package maintainer, I want core DTO entities to use string IDs so backend and frontend contracts are consistent.",
+      "title": "Expose API token management endpoints",
+      "description": "As an authenticated user, I want to create view and delete my API tokens from dedicated endpoints.",
       "acceptanceCriteria": [
-        "Update entity DTOs in packages/dto/src/echoe.ts (Deck/DeckConfig/NoteType/Template/Note/Card/CardListItem/StudyQueueItem/Media) from number IDs to string IDs",
-        "Update related relation fields nid/did/mid/cid/ntid/conf/oid to string where they represent business IDs",
-        "No ID field in these core entity DTOs remains typed as number unless it is non-business numeric data",
+        "Implement GET /api/v1/api-tokens, POST /api/v1/api-tokens, DELETE /api/v1/api-tokens/:tokenId",
+        "DELETE endpoint uses tokenId business ID (not numeric auto-increment id)",
+        "Token management endpoints require JWT auth and reject token-auth self-management",
+        "Create response returns plaintext token only at creation time",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-011",
-      "title": "Convert DTO command and query payload IDs",
-      "description": "As a shared package maintainer, I want DTO input/query payloads to use string IDs so APIs accept business IDs end-to-end.",
+      "title": "Implement inbox CRUD and read-state service",
+      "description": "As a backend developer, I want inbox business logic so users can create edit read and soft-delete inbox items.",
       "acceptanceCriteria": [
-        "Update Create/Update/Bulk/Review/Csv/Duplicate payload DTOs with ID fields from number to string",
-        "Update query DTOs that include deckId/noteId/cardId/notetypeId to string",
-        "Preserve numeric typing for non-ID numeric fields (time, counts, intervals, rating values)",
+        "Implement create/list/update/delete with uid scoping and deleted_at filtering",
+        "List supports pagination and filters for category and isRead",
+        "Implement mark-read and read-all with updatedCount response for read-all",
+        "Use generateInboxId for inbox business IDs",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "Completed together with US-010 - all command and query payload IDs already converted"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-012",
-      "title": "Build DTO package after ID contract changes",
-      "description": "As a shared package maintainer, I want DTO package build output refreshed so downstream apps consume the new string ID contracts.",
+      "title": "Expose inbox CRUD and read-state endpoints",
+      "description": "As an authenticated user, I want REST endpoints for inbox operations so the web app and API clients can manage captured content.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/dto build with success",
-        "Generated dist declaration files reflect string ID definitions",
-        "No stale number-based ID declaration remains in DTO dist output",
+        "Implement routes: GET/POST /api/v1/inbox, PUT/DELETE /api/v1/inbox/:inboxId, POST /api/v1/inbox/:inboxId/read, POST /api/v1/inbox/read-all",
+        "Request and query payloads are validated with DTOs",
+        "Not-found and validation failures return consistent 4xx codes",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-013",
-      "title": "Refactor note service to string business IDs",
-      "description": "As a backend developer, I want note-domain service logic to use string business IDs so note and card operations stop converting IDs to numbers.",
+      "title": "Build AI organize context retrieval pipeline",
+      "description": "As a backend developer, I want organized context assembly so AI can rewrite inbox content using relevant short and mid-term memory.",
       "acceptanceCriteria": [
-        "Update apps/server/src/services/echoe-note.service.ts to query and mutate by business ID columns",
-        "Remove Number()/parseInt() usage for note/card/deck/notetype ID conversions in this service",
-        "Ensure grave writes and mapping DTO outputs use string business IDs",
+        "Context assembly includes L0 current inbox item, L1 related inbox items from last 7 days (top 10), and L2 30-day report summaries",
+        "When context exceeds token budget, trim by similarity then recency then diversity",
+        "Prompt input payload follows PRD task/currentInput/retrievedContext/constraints structure",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-014",
-      "title": "Refactor deck service to string business IDs",
-      "description": "As a backend developer, I want deck-domain service logic to use string business IDs so deck CRUD and filtered-deck behavior remain consistent.",
+      "title": "Implement AI organize execution validation and fallback",
+      "description": "As an end user, I want reliable AI organize results so failures do not block inbox editing and output format remains machine-readable.",
       "acceptanceCriteria": [
-        "Update apps/server/src/services/echoe-deck.service.ts to use deck_id and deck_config_id for business relations",
-        "Remove numeric ID conversions in deck service logic and response mapping",
-        "Ensure deck hierarchy and filtered-deck query paths still work with string IDs",
+        "Call model with organize-specific parameters and timeout policy from PRD",
+        "Validate AI output schema includes optimizedFront optimizedBack reason confidence",
+        "On timeout or parse failure return original front/back with fallback=true",
+        "Record failure reason for observability",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": true,
-      "notes": "Deck service fully refactored. Type errors in controllers/study service are expected."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-015",
-      "title": "Refactor study and stats services to string IDs",
-      "description": "As a backend developer, I want study and stats services to use string business IDs so scheduling and statistics remain correct after migration.",
+      "title": "Implement inbox report CRUD and idempotent generate",
+      "description": "As a backend developer, I want daily report APIs so users can list view and generate one report per day.",
       "acceptanceCriteria": [
-        "Update apps/server/src/services/echoe-study.service.ts and echoe-stats.service.ts for string card/note/deck/revlog IDs",
-        "Keep due/interval/time computations numeric while ID fields remain string",
-        "Remove ID-related Number()/parseInt() conversions from both services",
+        "Implement GET /api/v1/inbox/reports and GET /api/v1/inbox/reports/:reportId",
+        "Implement POST /api/v1/inbox/reports/generate using user timezone day window",
+        "Duplicate generate request for same uid+date returns 409 with existing report reference",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 15,
-      "passes": true,
-      "notes": "Study and stats services fully refactored. Type errors in controllers/tests are expected (US-019+)."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-016",
-      "title": "Refactor import/export services for string IDs",
-      "description": "As a backend developer, I want import and export services to map business IDs correctly so import/export pipelines stay functional.",
+      "title": "Implement report AI pipeline with 30-day memory and evidence",
+      "description": "As a user, I want report insights grounded in recent history so suggestions are relevant and traceable.",
       "acceptanceCriteria": [
-        "Update apps/server/src/services/echoe-import.service.ts and echoe-export.service.ts for string business IDs",
-        "When importing, generate new business IDs via generateTypeId for created entities",
-        "Ensure export payload generation reads string business IDs without numeric casts",
+        "Report generation uses daily facts plus 30-day summary memory including weekly aggregates",
+        "Persist both markdown report content and summary JSON fields topics mistakes actions",
+        "Key insights in generated report include evidenceIds references",
+        "Repeat suggestions against last 7 days are replaced by alternative suggestions",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 16,
-      "passes": true,
-      "notes": "Services refactored with business ID generation. Temporary String() conversions used for foreign keys until full ID mapping implemented."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-017",
-      "title": "Refactor remaining Echoe services to string IDs",
-      "description": "As a backend developer, I want remaining Echoe services to align with string IDs so no isolated service still relies on numeric business IDs.",
+      "title": "Implement inbox-to-card manual conversion",
+      "description": "As a user, I want to convert an inbox item into a card using selected deck and note type.",
       "acceptanceCriteria": [
-        "Update echoe-csv-import.service.ts, echoe-duplicate.service.ts, echoe-media.service.ts, echoe-config.service.ts, and echoe-tag.service.ts for string ID usage",
-        "Replace ID-related numeric casts in service internals and DTO mappings",
-        "Ensure service signatures and call sites remain consistent after type changes",
+        "Implement POST /api/v1/inbox/:inboxId/to-card with deckId and notetypeId path",
+        "Validate selected deck/notetype ownership and required field mapping before creation",
+        "Create note and card entities and return noteId cardId deckId notetypeId",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 17,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-018",
-      "title": "Remove legacy numeric Echoe ID generator usage",
-      "description": "As a maintainer, I want legacy numeric ID generators removed so new code cannot regress to numeric business IDs.",
+      "title": "Implement AI-assisted inbox-to-card recommendation",
+      "description": "As a user, I want optional AI deck/notetype recommendation so I can convert inbox content quickly without manual configuration.",
       "acceptanceCriteria": [
-        "Delete generateDeckId/generateNoteId/generateCardId/generateNoteTypeId/generateRevlogId from apps/server/src/utils/id.ts",
-        "Replace all remaining call sites with generateTypeId-based business ID creation",
-        "Search for Date.now()-based Echoe ID generation no longer returns active business-ID code paths",
+        "When deckId/notetypeId is absent, choose target deck/notetype based on AI analysis and user preference memory",
+        "If AI recommendation fails, fallback to deterministic default mapping path",
+        "Response includes aiRecommended flag and chosen deck/notetype info",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 18,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-019",
-      "title": "Refactor core Echoe controllers for string ID params",
-      "description": "As an API developer, I want core Echoe controllers to accept string IDs so controller-service contracts match the new DTO and schema model.",
+      "title": "Add async queue jobs for AI-heavy inbox tasks",
+      "description": "As a backend developer, I want queued execution for expensive AI jobs so retries and timeout policies are centrally managed.",
       "acceptanceCriteria": [
-        "Update echoe-note.controller.ts, echoe-deck.controller.ts, echoe-study.controller.ts, and echoe-config.controller.ts ID params from number to string",
-        "Remove parseInt/Number conversion logic for route and query ID params in these controllers",
-        "Ensure controller method signatures align with updated service method signatures",
+        "Add queue definitions for generate_report organize_inbox and to_card_ai jobs",
+        "Configure retry and timeout values matching PRD task schedule table",
+        "Expose service hooks to run sync fast path or enqueue async path",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 19,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-020",
-      "title": "Refactor edge Echoe controllers for string ID params",
-      "description": "As an API developer, I want edge Echoe controllers to accept string IDs so all endpoints consistently use business IDs.",
+      "title": "Add scheduled jobs for weekly summary and cleanup",
+      "description": "As an operator, I want scheduled maintenance so AI memory stays fresh and deleted data does not accumulate indefinitely.",
       "acceptanceCriteria": [
-        "Update echoe-stats.controller.ts, echoe-tag.controller.ts, echoe-media.controller.ts, echoe-import.controller.ts, echoe-export.controller.ts, echoe-csv-import.controller.ts, and echoe-duplicate.controller.ts for string ID params",
-        "Remove parseInt/Number conversion logic for IDs in these controllers",
-        "All controller call sites compile against updated services and DTOs",
+        "Add weekly-summary-aggregation cron at 0 2 * * 0",
+        "Add cleanup-deleted-records cron at 0 3 * * * for records soft-deleted over 30 days",
+        "Scheduled jobs are idempotent and uid-safe",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 20,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-021",
-      "title": "Update web API client signatures to string IDs",
-      "description": "As a frontend developer, I want web API wrappers to use string IDs so requests match backend contracts without ID casting.",
+      "title": "Add metrics and structured logs for inbox AI flows",
+      "description": "As a maintainer, I want observable metrics and logs so token auth AI calls and report generation health can be monitored.",
       "acceptanceCriteria": [
-        "Update apps/web/src/api/echoe.ts method signatures from number IDs to string IDs",
-        "Remove .toString() conversions that were only needed for numeric IDs",
-        "Ensure request params/body fields still use expected server key names",
+        "Emit metrics for success rate and latency aligned with PRD 10.6 indicator names",
+        "Use @echoe/logger for all new logs and avoid console logging",
+        "Track AI fallback count and report generation conflicts as measurable events",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 21,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-022",
-      "title": "Update web services ID state types",
-      "description": "As a frontend developer, I want web service layer state to use string IDs so UI state and API contracts are consistent.",
+      "title": "Add web API clients for token inbox and report endpoints",
+      "description": "As a frontend developer, I want typed API modules so pages can consume inbox/token/report features consistently.",
       "acceptanceCriteria": [
-        "Update echoe-deck.service.ts, echoe-note.service.ts, echoe-study.service.ts, echoe-stats.service.ts, echoe-csv-import.service.ts, and related services to string ID types",
-        "Replace Set<number> and number-based ID fields with Set<string> and string fields",
-        "Ensure service method signatures and internal caches compile with updated DTO types",
+        "Add typed API functions in apps/web/src/api for token, inbox, report, organize, and to-card endpoints",
+        "Use shared DTO contracts from @echoe/dto for request and response typing",
+        "Handle 409 daily-report conflict and 503 AI unavailable responses explicitly in API layer",
         "Typecheck passes"
       ],
       "priority": 22,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-023",
-      "title": "Update cards pages for string ID routing and actions",
-      "description": "As a frontend developer, I want cards page logic to stop numeric ID parsing so UI actions work with string business IDs.",
+      "title": "Implement settings API token management UI",
+      "description": "As a user, I want a settings page for token management so I can create view and revoke API tokens safely.",
       "acceptanceCriteria": [
-        "Update apps/web/src/pages/cards/** to remove parseInt/Number usage for deckId/noteId/cardId",
-        "Update route param handling and event handlers to pass string IDs directly",
-        "Selection and expansion state uses string IDs consistently",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Implement /settings/api-tokens page with token list, create, and delete actions",
+        "Show plaintext token only once immediately after creation with clear copy affordance",
+        "Register page-level service once and consume in child components via Domain pattern",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
       ],
       "priority": 23,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-024",
-      "title": "Add and update tests for string-ID migration behavior",
-      "description": "As a QA-focused developer, I want automated tests covering string-ID flows so regressions are detected before merge.",
+      "title": "Implement inbox page UI with AI actions",
+      "description": "As a user, I want an inbox page where I can manage captures and trigger AI organize or card conversion actions.",
       "acceptanceCriteria": [
-        "Add or update backend unit/integration tests for note/deck/study/import/export paths using string business IDs",
-        "Add or update tests that cover ID generation and relation integrity for migrated schema contracts",
-        "Tests pass",
+        "Implement /inbox page with list add edit delete mark-read read-all",
+        "Support filters for category/isRead and paginated list loading",
+        "Expose organize and to-card actions with success and error feedback",
+        "Verify in browser using dev-browser skill",
         "Typecheck passes"
       ],
       "priority": 24,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-025",
-      "title": "Run mandatory migration quality gates",
-      "description": "As a release engineer, I want mandatory quality gate commands to pass so the Big Bang migration is safe to merge.",
+      "title": "Implement inbox reports UI",
+      "description": "As a user, I want report pages to generate browse and inspect daily inbox reports.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/server test with exit code 0",
-        "Run pnpm --filter @echoe/dto test with exit code 0",
-        "Run pnpm lint with exit code 0",
-        "Run pnpm --filter @echoe/server typecheck, pnpm --filter @echoe/web typecheck, and pnpm --filter @echoe/dto typecheck with exit code 0",
+        "Implement /inbox/reports list and detail page rendering markdown report content",
+        "Implement generate button flow with explicit handling of 409 already-generated response",
+        "Display report summary fields topics mistakes actions in detail view",
+        "Verify in browser using dev-browser skill",
         "Typecheck passes"
       ],
       "priority": 25,
-      "passes": true,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Add backend tests for token inbox and AI reliability",
+      "description": "As a backend developer, I want test coverage on critical flows so auth behavior and AI fallback logic remain stable.",
+      "acceptanceCriteria": [
+        "Add or update tests covering token precedence over JWT, inbox CRUD filters, organize fallback, and report generate idempotency",
+        "Keep tests scoped by uid to prevent cross-tenant behavior regressions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Add frontend tests and run full quality gates",
+      "description": "As a release engineer, I want frontend validation and global quality checks so inbox and token features are safe to ship.",
+      "acceptanceCriteria": [
+        "Add or update frontend tests for token page workflows, inbox actions, and report generation interactions",
+        "Run project quality checks for changed packages with no new failures",
+        "Tests pass",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": false,
       "notes": ""
     }
   ]
