@@ -2,6 +2,19 @@
 Started: 2026年 3月16日 星期一 15时33分24秒 CST
 ---
 
+## Codebase Patterns
+- Frontend service pattern: Extend Service from @rabjs/react, use observable properties, register in main.tsx with register()
+- Frontend component pattern: Use view() wrapper and useService() hook for reactive dependency injection
+- Settings routing: Nested routes under /settings with Outlet in SettingsPage, add menu items to settings-menu.tsx
+- API client pattern: Use request helper from utils/request, wrap in try-catch, throw errors for controller handling
+- Modal dialog pattern: Use fixed inset-0 with bg-black/50 backdrop, z-50 for top layer
+- Backend service pattern: @Service() decorator for TypeDI, inject via constructor, use @echoe/logger for structured logging
+- Backend controller pattern: @JsonController('/api/v1/resource'), @CurrentUser() for auth, @Body/@Param/@QueryParam for inputs
+- Database queries: Always filter by uid AND isNull(deletedAt) for tenant isolation and soft-delete
+- Drizzle schema pattern: varchar(191) for primary keys, timestamp with fsp:3, export from schema/index.ts with .js extension
+- DTO pattern: Shared types in @echoe/dto package, build before consumers can import, use for type safety across frontend/backend
+---
+
 ## 2026-03-16 16:00 - US-002
 - Verified api_token schema implementation (already completed in previous iteration)
 - Schema includes all required fields: token_id (PK), uid, name, token_hash, deleted_at, created_at, updated_at
@@ -596,4 +609,44 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - DTO imports: Import all required types from @echoe/dto for type safety across frontend/backend
   - Query params: Pass as { params } in request.get() second argument
   - API endpoints follow REST conventions: GET/POST/PUT/DELETE with resource IDs in path
+---
+## 2026-03-16 22:15 - US-023
+- Implemented settings API token management UI at /settings/api-tokens
+- Created ApiTokenService for state management:
+  - loadTokens(): Fetches all API tokens for current user
+  - createToken(name): Creates new token, returns plaintext once
+  - deleteToken(tokenId): Soft-deletes token by business ID
+  - Observable state: tokens, isLoading, error
+- Created ApiTokenSettings component with full CRUD UI:
+  - Token list view with name, creation date, and token ID
+  - Create dialog with name input and validation (max 255 chars)
+  - Delete confirmation flow (two-step: confirm button → actual delete)
+  - Created token dialog shows plaintext token only once with copy button
+  - Warning message: "请立即复制并保存此 Token，关闭后将无法再次查看"
+- Added API Token menu item to settings sidebar with Key icon (lucide-react)
+- Registered ApiTokenService globally in main.tsx with register()
+- Added /settings/api-tokens route in App.tsx as nested route under /settings
+- All typecheck passes successfully
+- Commit: f9c3177
+- Files changed:
+  - apps/web/src/services/api-token.service.ts (new)
+  - apps/web/src/pages/settings/components/api-token-settings.tsx (new)
+  - apps/web/src/pages/settings/components/settings-menu.tsx (added Key icon and menu item)
+  - apps/web/src/main.tsx (registered ApiTokenService)
+  - apps/web/src/App.tsx (added route)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Service pattern: Extend Service class from @rabjs/react, use observable properties for reactive state
+  - Component pattern: Use view() wrapper and useService() hook for dependency injection
+  - Dialog pattern: Use fixed inset-0 with bg-black/50 backdrop for modal dialogs
+  - Token security: Show plaintext token only once in modal dialog, cannot retrieve again after closing
+  - Copy to clipboard: Use navigator.clipboard.writeText() with toast feedback
+  - Delete confirmation: Two-step flow (confirm button → actual delete) to prevent accidental deletion
+  - Settings routing: Nested routes under /settings with Outlet in SettingsPage
+  - Service registration: Must register service in main.tsx before using in components
+  - Menu icons: Import from lucide-react, use consistent w-5 h-5 sizing
+  - TailwindCSS dark mode: Use dark: prefix for dark theme styles (dark:bg-dark-800, dark:text-gray-50)
+  - Form validation: Trim whitespace, check length, show toast warnings for validation errors
+  - Loading states: Use isLoading flag with spinner animation and disabled buttons
+  - Empty states: Show icon + message when no data (Key icon with "暂无 API Token")
 ---

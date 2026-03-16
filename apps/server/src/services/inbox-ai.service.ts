@@ -714,6 +714,7 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
         .where(
           and(
             eq(inbox.uid, uid),
+            isNull(inbox.deletedAt),
             gte(inbox.createdAt, startOfDay),
             lte(inbox.createdAt, endOfDay)
           )
@@ -722,7 +723,9 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
       const totalInbox = dailyInboxItems.length;
       const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
       const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
-      const deletedInbox = dailyInboxItems.filter((item: Inbox) => item.deletedAt !== null).length;
+      // Note: Since we filter by isNull(deletedAt), deletedInbox will always be 0
+      // This is intentional - deleted items are excluded from the report
+      const deletedInbox = 0;
 
       const categoryMap = new Map<string, number>();
       dailyInboxItems.forEach((item: Inbox) => {
