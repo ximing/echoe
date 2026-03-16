@@ -1,3 +1,31 @@
 # Ralph Progress Log
-Started: 2026年 3月16日 星期一 15时33分24秒 CST
+Started: Mon Mar 16 18:25:16 CST 2026
+---
+
+## Codebase Patterns
+- Database schemas use Drizzle ORM with VARCHAR(191) for primary/foreign keys (MySQL utf8mb4 index limit)
+- Timestamps use `timestamp('field_name', { mode: 'date', fsp: 3 })` for millisecond precision
+- All schemas must be exported from `apps/server/src/db/schema/index.ts`
+- Soft deletes use `deleted_at` timestamp field with nullable type
+- Business IDs follow pattern: type prefix + nanoid (e.g., 'at' for api_token)
+- Always run `pnpm build` before generating migrations (drizzle-kit reads from dist/)
+- Index naming convention: `{field}_idx` for single-field indexes
+
+## Sun Mar 16 18:30:00 CST 2026 - US-002
+- Verified api_token schema implementation
+- Schema includes all required fields: token_id, uid, name, token_hash, deleted_at, created_at, updated_at
+- token_id is primary key (unique constraint)
+- Indexes added for uid, token_hash, and deleted_at (extra index for query optimization)
+- Schema properly exported from apps/server/src/db/schema/index.ts
+- Typecheck passes successfully
+
+**Files changed:**
+- apps/server/src/db/schema/api-token.ts (already existed, verified)
+- apps/server/src/db/schema/index.ts (already exported, verified)
+
+**Learnings for future iterations:**
+- The api_token schema follows the standard pattern: business ID as primary key, soft delete support, and proper indexing
+- An additional index on deleted_at was added beyond requirements for better query performance when filtering soft-deleted records
+- Drizzle ORM patterns: use `primaryKey()` for uniqueness, `index()` for query optimization, and `.$onUpdate()` for automatic timestamp updates
+- Schema verification requires checking both the schema file AND the export in index.ts
 ---
