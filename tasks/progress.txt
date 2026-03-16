@@ -252,3 +252,39 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Error handling: Throw descriptive errors ('Inbox item not found'), let controller handle HTTP status
   - Logger usage: logger.info for success operations, logger.error for failures
 ---
+## 2026-03-16 18:57 - US-012
+- Verified inbox controller implementation (already completed in previous iteration)
+- Controller implements all required endpoints:
+  - GET /api/v1/inbox: List inbox items with pagination (page, limit) and filters (category, isRead)
+  - GET /api/v1/inbox/:inboxId: Get single inbox item by ID
+  - POST /api/v1/inbox: Create new inbox item with validation (front and back required)
+  - PUT /api/v1/inbox/:inboxId: Update inbox item with ownership verification
+  - DELETE /api/v1/inbox/:inboxId: Soft-delete inbox item
+  - POST /api/v1/inbox/:inboxId/read: Mark single inbox item as read
+  - POST /api/v1/inbox/read-all: Mark all unread items as read, returns { updatedCount }
+- All endpoints use DTOs from @echoe/dto for request/response typing
+- Error handling returns consistent 4xx codes:
+  - 401 UNAUTHORIZED for unauthenticated requests
+  - 404 NOT_FOUND for missing inbox items
+  - 400 PARAMS_ERROR for validation failures
+- All 25 controller tests pass successfully covering:
+  - List operations with filters and pagination
+  - CRUD operations with validation
+  - Read state management (single and bulk)
+  - Error handling for not-found and unauthorized cases
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/controllers/v1/inbox.controller.ts (already implemented)
+  - apps/server/src/__tests__/inbox.controller.test.ts (already implemented with 25 tests)
+  - apps/server/src/controllers/index.ts (already exported)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Controller route pattern: @JsonController('/api/v1/resource') for base route, method decorators for HTTP verbs
+  - Query parameter pattern: @QueryParam('name') for individual params, map to service call params
+  - Pagination defaults: page=1, limit=20 when not provided
+  - Validation pattern: Check required fields in controller, return PARAMS_ERROR before calling service
+  - Error mapping: Catch service errors and map to appropriate HTTP status codes (NOT_FOUND, DB_ERROR)
+  - Service injection: Constructor injection via TypeDI for clean dependency management
+  - DTO usage: Import from @echoe/dto for type safety across frontend/backend boundary
+  - GET /api/v1/inbox/:inboxId added for single item retrieval (bonus endpoint for frontend convenience)
+---
