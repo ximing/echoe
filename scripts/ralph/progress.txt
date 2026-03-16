@@ -51,3 +51,23 @@ Started: Mon Mar 16 18:25:16 CST 2026
 - The unique() constraint on inbox_id is redundant with primaryKey() but makes intent explicit
 - Content fields use `.$type<string>()` for explicit type annotation
 ---
+
+## Sun Mar 16 18:40:00 CST 2026 - US-004
+- Verified inbox_report schema implementation
+- Schema includes all required fields: inbox_report_id, uid, date, content, summary, deleted_at, created_at, updated_at
+- Critical uid+date unique constraint present (uidDateUnique) to prevent duplicate daily reports
+- All required indexes present: inbox_report_id(unique), uid, date
+- Schema properly exported from apps/server/src/db/schema/index.ts
+- Typecheck passes successfully
+
+**Files changed:**
+- apps/server/src/db/schema/inbox-report.ts (already existed, verified)
+- apps/server/src/db/schema/index.ts (already exported, verified)
+
+**Learnings for future iterations:**
+- Date field uses VARCHAR(10) for YYYY-MM-DD format (simpler than date type for daily reports)
+- Summary field is TEXT with nullable type, allowing JSON string storage for structured AI data
+- The uid+date unique constraint is essential for idempotent report generation
+- Both content (markdown) and summary (JSON) fields support AI retrieval with different use cases
+- Date index enables efficient time-range queries across users
+---
