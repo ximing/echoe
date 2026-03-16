@@ -117,3 +117,33 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - dist/ folder is gitignored - only source files are committed, build happens in CI/CD
   - The @echoe/dto package is symlinked in node_modules via pnpm workspace protocol
 ---
+## 2026-03-16 18:46 - US-008
+- Verified API token service implementation (already completed in previous iteration)
+- Service includes all required methods:
+  - createToken(): Generates plaintext token (40 hex chars), stores SHA256 hash, returns token once
+  - listTokens(): Returns active tokens for user (filters by uid and deleted_at)
+  - deleteToken(): Soft-deletes token by setting deleted_at timestamp
+  - validateToken(): Validates plaintext token against stored hash for authentication
+  - findTokenByIdAndUid(): Helper for ownership verification
+- Uses generateApiTokenId() for business ID generation (prefix: 'at')
+- All 10 tests pass successfully covering:
+  - Token creation with unique plaintext generation
+  - List operations with uid scoping
+  - Soft-delete semantics
+  - Token validation with SHA256 hashing
+  - Error handling for not-found tokens
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/api-token.service.ts (already implemented in ebf65d2)
+  - apps/server/src/__tests__/api-token.service.test.ts (already implemented)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - API token service uses crypto.randomBytes(20).toString('hex') for 40-character hex tokens
+  - SHA256 hashing via crypto.createHash('sha256').update(token).digest('hex')
+  - Plaintext token returned only once at creation - never stored or retrievable again
+  - Token validation queries by tokenHash index for performance
+  - Soft-delete pattern: set deletedAt timestamp, filter with isNull(deletedAt) in queries
+  - All database queries scoped by uid to prevent cross-tenant access
+  - Service decorated with @Service() for TypeDI auto-registration
+  - Uses @echoe/logger for structured logging (logger.info, logger.error)
+---
