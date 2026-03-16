@@ -21,7 +21,7 @@ export const inboxReport = mysqlTable(
     inboxReportId: varchar('inbox_report_id', { length: 191 })
       .notNull(), // Business ID (nanoid with 'ir' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this report)
-    date: varchar('date', { length: 10 }).notNull(), // Report date (YYYY-MM-DD format)
+    date: varchar('date', { length: 20 }).notNull(), // Report date (YYYY-MM-DD format)
     content: text('content').notNull().$type<string>(), // Markdown content of the report
     summary: text('summary').$type<string>(), // Structured AI summary (JSON string)
     deletedAt: bigint('deleted_at', { mode: 'number' }).default(0).notNull(), // Soft delete timestamp (0 = not deleted, >0 = deleted)

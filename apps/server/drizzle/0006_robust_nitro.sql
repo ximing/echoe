@@ -1,0 +1,1 @@
+ALTER TABLE `inbox_report` MODIFY COLUMN `date` varchar(20) NOT NULL;
