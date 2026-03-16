@@ -1,450 +1,141 @@
-## 2026-03-12 - US-003
-- Modified apps/server/src/services/echoe-study.service.ts to persist FSRS state on review
-- Added stability, difficulty, and lastReview fields to the card update in answerCard
-- stability: schedulingResult.stability (from FSRS output)
-- difficulty: schedulingResult.difficulty (from FSRS output)
-- lastReview: now.getTime() (current timestamp)
-- All 58 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/echoe-study.service.ts (added FSRS fields to card update)
-- **Learnings for future iterations:**
-  - The schedulingResult from fsrsService.scheduleCard() contains stability and difficulty as decimal values
-  - The card's factor field stores stability as permille (stability * 1000), but the FSRS column stores the actual decimal
-  - lastReview should be stored as a Unix timestamp in milliseconds (not seconds)
----
-
-## 2026-03-12 - US-008
-- Modified apps/server/src/services/echoe-note.service.ts to use normalizeNoteFields in updateNote
-- updateNote now fetches the notetype (via note[0].mid) to get ordered field names
-- Calls normalizeNoteFields({ notetypeFields, fields, richTextFields }) when fields or richTextFields are provided
-- Writes normalized.flds, normalized.sfld, normalized.csum, normalized.fldNames, normalized.fieldsJson to DB
-- Removed manual flds join (Object.values(dto.fields).join('\x1f')), cleanSortField, calculateChecksum from update path
-- Removed now-unused private methods cleanSortField() and calculateChecksum() from the service class
-- All 56 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/echoe-note.service.ts (modified updateNote method, removed unused private methods)
-- **Learnings for future iterations:**
-  - When updating a note, fetch notetype via note[0].mid (the note's mid column stores the notetype ID)
-  - normalizeNoteFields handles both plain fields and richTextFields — pass both from dto when available
-  - richTextFields update should be inside the fields/richTextFields branch (only set when those are provided)
-  - After US-008, cleanSortField and calculateChecksum have been fully removed from the service
----
-
-# Ralph Progress Log
-Started: 2026年 2月15日 星期日 23时33分46秒 CST
----
-
-## 2026-03-12 - US-007
-- Modified apps/server/src/services/echoe-note.service.ts to use normalizeNoteFields in createNote
-- Added imports: normalizeNoteFields from lib/note-field-normalizer.js, RichTextFields from types/note-fields.js
-- createNote now parses notetypeFieldDefs from notetype.flds JSON to get ordered field names
-- Calls normalizeNoteFields({ notetypeFields, fields, richTextFields }) to produce normalized output
-- Writes normalized.flds, normalized.sfld, normalized.csum, normalized.fldNames, normalized.fieldsJson to DB
-- Removed manual flds join (Object.values(dto.fields).join('\x1f')), cleanSortField, calculateChecksum from create path
-- All 56 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/echoe-note.service.ts (modified createNote method)
-- **Learnings for future iterations:**
-  - notetype.flds is a JSON string array of field definition objects: [{name, ord, sticky, ...}] — extract names with .map(f => f.name)
-  - dto.richTextFields in the DTO is typed as Record<string, Record<string, any>>, must cast to RichTextFields when passing to normalizeNoteFields
-  - normalizeNoteFields handles both plain-text fields and richTextFields, merging richText (via HTML conversion) over plain fields
-  - After US-007, cleanSortField and calculateChecksum remain in service (still used by updateNote — to be cleaned up in US-008)
----
-
-## 2026-03-12 - US-005
-- Created apps/server/scripts/backfill-fields-json.ts
-- Script reads all echoe_notes, parses flds (\x1f-separated) and fldNames (JSON array from json column)
-- Combines them into Record<string, string> and writes to fields_json
-- Skips notes where fields_json is already non-empty (idempotent)
-- Handles edge cases: null fldNames, string fldNames fallback, no field names but has field values (uses generic field_N keys)
-- Outputs summary: total, succeeded, skipped, failed counts
-- Exits with code 1 if any failures, 0 otherwise
-- All 45 tests pass, typecheck passes
-- Files changed:
-  - apps/server/scripts/backfill-fields-json.ts (new)
-- **Learnings for future iterations:**
-  - Scripts in apps/server/scripts/ use `pnpm tsx scripts/filename.ts` pattern (same as validate-data-integrity.ts)
-  - Drizzle json() columns return parsed objects directly (not strings) — no need to JSON.parse when reading
-  - Still add string fallback in case column returns raw string (defensive coding for backfill scripts)
-  - For backfill scripts, always check if data is already populated before updating (idempotency)
-  - Use `sql\`${table.column} = ${value}\`` for WHERE clause in update when eq() may have type issues
----
-
-## 2026-03-08 - SR US-009
-- Added `getDueCardsForAllSREnabledUsers()` to SpacedRepetitionService: queries all SR-enabled users, fetches their due cards (nextReviewAt <= now), groups by userId with srDailyLimit
-- Added `registerSpacedRepetitionPushTask()` to SchedulerService: registers daily 08:00 cron task
-- Added `sendSpacedRepetitionPush()` to SchedulerService: processes due cards per user, sends via external channels (Feishu/Meow) if push rules configured, always creates in-app notifications (type='spaced_repetition')
-- Push content format: `📚 复习提醒：《{memo.title}》\n{memo.content前100字}\n查看笔记：{appBaseUrl}/review`
-- All 30 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/spaced-repetition.service.ts (added getDueCardsForAllSREnabledUsers)
-  - apps/server/src/services/scheduler.service.ts (added SR push task + sendSpacedRepetitionPush)
-- **Learnings for future iterations:**
-  - `inArray()` from drizzle-orm is used for `WHERE col IN (...)` queries — import from 'drizzle-orm'
-  - When DB query returns a column with ambiguous type, use explicit `Map<string, number>` typing + `as number` cast
-  - SchedulerService injects services via `@Inject()` decorator — add new services to constructor params
-  - The appBaseUrl for push links comes from `config.cors.origin[0]`
-  - Push rules are fetched per-user via `pushRuleService.findByUid(userId)` — filter by `enabled` flag
----
-
-## 2026-03-08 - SR US-008
-- Created apps/server/src/services/notification.service.ts with NotificationService (@Service() decorated)
-- Implemented getNotifications(userId): returns 50 most recent notifications, sorted by createdAt desc
-- Implemented markAsRead(notificationId, userId): verifies ownership, updates isRead=true, returns false if not found
-- Implemented getUnreadCount(userId): uses sql<number>`count(*)` aggregate query
-- Implemented createNotification(params): generates `notif` prefix ID, inserts and returns new record
-- Created apps/server/src/controllers/v1/notification.controller.ts with 3 endpoints
-- Added NOTIFICATION to OBJECT_TYPE constant and generateTypeId (generates `notif` prefix IDs)
-- Registered NotificationController in controllers/index.ts
-- All 30 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/notification.service.ts (new)
-  - apps/server/src/controllers/v1/notification.controller.ts (new)
-  - apps/server/src/controllers/index.ts (added NotificationController)
-  - apps/server/src/models/constant/type.ts (added NOTIFICATION)
-  - apps/server/src/utils/id.ts (added NOTIFICATION case generating `notif` prefix)
-- **Learnings for future iterations:**
-  - Notification IDs use `notif` prefix (e.g., `notif` + 23-char nanoid)
-  - GET /unread-count must be registered BEFORE /:id/read route to avoid route conflict (routing-controllers resolves routes in order)
-  - sql<number>`count(*)` template returns a string from MySQL — wrap with Number() for correct type
-  - Ownership check pattern: SELECT first, then UPDATE — avoids updating wrong user's records
----
-
-## 2026-03-08 - SR US-007
-- Created apps/server/src/db/schema/in-app-notifications.ts with inAppNotifications table
-- Table fields: notificationId (PK), userId, type, title, body (TEXT), memoId (nullable), isRead (BOOLEAN DEFAULT false), createdAt
-- Added indexes: ian_user_id_idx on userId, ian_user_created_at_idx on (userId, createdAt)
-- Exported from apps/server/src/db/schema/index.ts
-- Generated migration: drizzle/0008_jazzy_stick.sql
-- Build and typecheck pass
-- Files changed:
-  - apps/server/src/db/schema/in-app-notifications.ts (new)
-  - apps/server/src/db/schema/index.ts (added export)
-  - apps/server/drizzle/0008_jazzy_stick.sql (generated migration)
-  - apps/server/drizzle/meta/_journal.json (updated)
-  - apps/server/drizzle/meta/0008_snapshot.json (new)
-- **Learnings for future iterations:**
-  - Index naming: use table prefix abbreviations (e.g., `ian_` for in_app_notifications) to avoid conflicts across tables
-  - TEXT columns use `text('col_name')` in Drizzle (no length parameter needed)
-  - Nullable columns: simply omit `.notNull()` — Drizzle treats columns as nullable by default
----
-
-## 2026-03-08 - SR US-006
-- Added GET /api/v1/spaced-repetition/due endpoint to SpacedRepetitionController
-- Added POST /api/v1/spaced-repetition/cards/:cardId/review endpoint
-- Due cards endpoint fetches memo content inline (title from first line, content truncated to 200 chars)
-- Review endpoint maps quality strings (mastered/remembered/fuzzy/forgot/skip) to SM-2 numeric values
-- Skip returns current card unchanged; other qualities update via calculateNextReview + updateCardAfterReview
-- Cards whose memos have been deleted are filtered out from due list
-- All 30 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/controllers/v1/spaced-repetition.controller.ts (added 2 endpoints + imports)
-- **Learnings for future iterations:**
-  - Memo title is derived from first line of content (truncated to 50 chars) — no dedicated title field in memos table
-  - Due cards endpoint fetches memo data inline with Promise.all for parallel DB queries
-  - Quality string→number mapping: mastered=5, remembered=4, fuzzy=3, forgot=1
-  - Skip quality returns card as-is without any DB update
----
-
-## 2026-03-08 - SR US-005
-- Created apps/server/src/controllers/v1/spaced-repetition.controller.ts with 5 endpoints
-- Added settings and rules management methods to SpacedRepetitionService
-- Added SR_RULE type to OBJECT_TYPE constant and generateTypeId (generates `srr` prefix IDs)
-- Registered SpacedRepetitionController in controllers/index.ts
-- All 30 tests pass, build and typecheck pass
-- Files changed:
-  - apps/server/src/controllers/v1/spaced-repetition.controller.ts (new)
-  - apps/server/src/controllers/index.ts (added SpacedRepetitionController)
-  - apps/server/src/services/spaced-repetition.service.ts (added getSettings, updateSettings, getRules, createRule, deleteRule)
-  - apps/server/src/models/constant/type.ts (added SR_RULE)
-  - apps/server/src/utils/id.ts (added SR_RULE case generating `srr` prefix)
-- **Learnings for future iterations:**
-  - SR settings live directly in the users table (srEnabled, srDailyLimit) — update via users table
-  - When adding new OBJECT_TYPE, also add a case in generateTypeId() in utils/id.ts
-  - Controller routes: use @Get('/settings') and @Put('/settings') within @JsonController('/api/v1/spaced-repetition')
-  - The `users` table import in spaced-repetition.service.ts comes from '../db/schema/users.js'
----
-
-## 2026-03-08 - SR US-004
-- Extended SpacedRepetitionService with card lifecycle methods: createCardIfEligible, reevaluateCard, deleteCardsByMemo, getCardById, getDueCards, updateCardAfterReview
-- isMemoEligible: checks filter rules (exclude > include, no rules = all eligible), resolves tag names from tagIds
-- Hooked createCardIfEligible into MemoService.createMemo (fire-and-forget after memo created)
-- Hooked reevaluateCard into MemoService.updateMemo when categoryId or tags change
-- Hooked deleteCardsByMemo into MemoService.deleteMemo before soft-deleting memo
-- Added SpacedRepetitionService to MemoService constructor (TypeDI injection)
-- Updated test file to mock DB dependencies (getDatabase, config) so pure SM-2 tests still pass
-- All 30 tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/spaced-repetition.service.ts (extended)
-  - apps/server/src/services/memo.service.ts (added SR hooks)
-  - apps/server/src/__tests__/spaced-repetition.service.test.ts (added DB mocks)
-- **Learnings for future iterations:**
-  - When adding DB dependencies to a service that was previously pure computation, update tests to mock DB modules
-  - Fire-and-forget pattern: call async side effects with `.catch()` to avoid blocking the main operation
-  - TypeDI auto-injects services in constructor — just add the parameter and TypeDI handles the rest
-  - Filter rule logic: exclude rules take priority over include rules; no rules = all eligible
-  - Tag filtering requires resolving tagIds → tag names since rules store tag names
----
-
 ## Codebase Patterns
-- LanceDB table schemas are defined in `apps/server/src/models/db/schema.ts` using Apache Arrow types
-- Migrations are created in `apps/server/src/migrations/scripts/` and registered in `index.ts`
-- Table schemas use `new Schema([...])` with `new Field(name, type, nullable)` definitions
-- TypeScript types for records are exported alongside schemas
-- Migration version numbers must be unique per table
-- Export new types from `lancedb.ts` for service layer access
-- LanceDB Query API: sorting is done in JavaScript via `.sort()` after `.toArray()`, not via `.orderBy()`
-- LanceDB `update()` takes `{ where: string, values: Record }` object format
-- TypeDI services are auto-injected into controllers via constructor injection
-- Table names use snake_case (e.g., `ai_conversations`)
-- Primary key fields use full name + Id (e.g., `conversationId`, not just `id`)
-- MySQL Drizzle schemas use `mysqlTable()` in `apps/server/src/db/schema/` — one file per table, exported from `schema/index.ts`
-- UserInfoDto uses `uid` (not `id`) for user identifier — always use `userDto.uid` in controllers
-- ErrorCode in `apps/server/src/constants/error-codes.ts` — add new codes there when needed
-- Always `pnpm build` in `apps/server` before `pnpm migrate:generate` (drizzle-kit reads from dist/)
-- Timestamps in Drizzle: `timestamp('col', { mode: 'date', fsp: 3 }).notNull().defaultNow()`
-- VARCHAR(191) for PK/FK columns (MySQL utf8mb4 index limit)
+- Always run `pnpm build` before `pnpm migrate:generate` - drizzle-kit reads from dist/ not src/
+- For idempotent MySQL migrations, use information_schema.TABLE_CONSTRAINTS to check existence
+- Drizzle migrations are in apps/server/drizzle/ with meta files in drizzle/meta/
+- All Echoe relation fields use varchar(191) for business IDs (not numeric IDs)
+- Typecheck must pass before committing: `pnpm typecheck`
 
-## 2026-03-08 - SR US-002
-- Added srEnabled (BOOLEAN DEFAULT false) and srDailyLimit (INT DEFAULT 5) to the users table
-- Built server and generated migration: drizzle/0007_abnormal_black_crow.sql
-- Typecheck passes
-- Files changed:
-  - apps/server/src/db/schema/users.ts (added srEnabled, srDailyLimit fields + boolean import)
-  - apps/server/drizzle/0007_abnormal_black_crow.sql (generated migration)
-  - apps/server/drizzle/meta/_journal.json (updated)
-  - apps/server/drizzle/meta/0006_snapshot.json (new)
-  - apps/server/drizzle/meta/0007_snapshot.json (new)
-- **Learnings for future iterations:**
-  - SR settings live in the `users` table (no separate user_settings table exists)
-  - Use `boolean()` from drizzle-orm/mysql-core for BOOLEAN columns
-  - Adding fields to existing tables generates ALTER TABLE statements in migrations
+## 2026-03-15 19:00 - US-001
+- Removed all .references() calls from Echoe schema files (echoe-notes.ts, echoe-cards.ts, echoe-revlog.ts, echoe-decks.ts, echoe-templates.ts)
+- Relation columns remain as varchar(191) business ID fields
+- All indexes preserved for relation lookups
+- Files changed: 5 schema files in apps/server/src/db/schema/
+- Commit: c6ecc4f
+
+**Learnings for future iterations:**
+- The project uses Drizzle ORM with `.references()` for foreign key definitions
+- All Echoe relation fields use varchar(191) for business IDs (not numeric auto-increment IDs)
+- Indexes are defined separately in the table's second parameter (index definitions)
+- Removing `.references()` doesn't remove the column or indexes - only the FK constraint
+- Typecheck must pass before committing (run `cd apps/server && pnpm typecheck`)
+- Schema files are in apps/server/src/db/schema/ and must be exported from schema/index.ts
 ---
+## 2026-03-15 23:56 - US-002
+- Created idempotent migration 0001_drop_echoe_foreign_keys.sql
+- Migration uses information_schema.TABLE_CONSTRAINTS to check FK existence before dropping
+- Covers all 8 Echoe foreign key relations:
+  1. echoe_notes.mid → echoe_notetypes.note_type_id
+  2. echoe_cards.nid → echoe_notes.note_id
+  3. echoe_cards.did → echoe_decks.deck_id
+  4. echoe_revlog.cid → echoe_cards.card_id
+  5. echoe_decks.conf → echoe_deck_config.deck_config_id
+  6. echoe_decks.mid → echoe_notetypes.note_type_id
+  7. echoe_templates.ntid → echoe_notetypes.note_type_id
+  8. echoe_templates.did → echoe_decks.deck_id
+- Uses prepared statements with IF() for idempotency
+- Updated drizzle meta files (_journal.json and 0001_snapshot.json)
+- Files changed: apps/server/drizzle/0001_drop_echoe_foreign_keys.sql, drizzle/meta/_journal.json, drizzle/meta/0001_snapshot.json
+- Commit: 39fa3c3
 
-## 2026-03-08 - SR US-001
-- Created spaced_repetition_cards and spaced_repetition_rules MySQL tables via Drizzle ORM
-- Fixed pre-existing TypeScript errors in user-model.controller.ts (userDto.id → userDto.uid) and added EXTERNAL_SERVICE_ERROR to ErrorCode
-- Files changed:
-  - apps/server/src/db/schema/spaced-repetition-cards.ts (new)
-  - apps/server/src/db/schema/spaced-repetition-rules.ts (new)
-  - apps/server/src/db/schema/index.ts (added exports)
-  - apps/server/drizzle/0006_salty_firestar.sql (generated migration)
-  - apps/server/src/constants/error-codes.ts (added EXTERNAL_SERVICE_ERROR)
-  - apps/server/src/controllers/v1/user-model.controller.ts (fixed userDto.uid)
-- **Learnings for future iterations:**
-  - UserInfoDto uses `uid` not `id` — use `userDto.uid` in controllers
-  - EXTERNAL_SERVICE_ERROR (5000) added to ErrorCode for external API failures
-  - Drizzle schema pattern: mysqlTable() with column types from drizzle-orm/mysql-core
-  - Index naming: use descriptive names like `user_id_idx`, `user_memo_idx`
-  - Float columns use `float('col_name')` not `decimal` for ease factor
+**Learnings for future iterations:**
+- Drizzle migrations are stored in apps/server/drizzle/ directory (not project root)
+- Drizzle meta files need to be updated when manually creating migrations
+- For idempotent FK drops, use information_schema.TABLE_CONSTRAINTS to check existence
+- MySQL prepared statements with IF() allow conditional DDL execution
+- The snapshot JSON needs foreignKeys sections emptied for affected tables
+- Always run `pnpm build` before `pnpm migrate:generate` as drizzle-kit reads from dist/
 ---
+## 2026-03-16 00:00 - US-003
+- Implemented note service relation validation for mid (notetypeId) field
+- Updated error messages in createNote and updateNote to be explicit about relation field context
+- Error format: "Invalid relation: Note type '{id}' not found for field 'mid' (notetypeId)"
+- Controller catches these errors and returns PARAMS_ERROR (4xx) with the error message
+- Files changed: apps/server/src/services/echoe-note.service.ts
+- Commit: a978fd5
 
-## 2026-02-20 11:50:00 - US-001
-- Created ai_conversations and ai_messages table schemas in schema.ts
-- Created migration script 006-add-ai-conversations.ts
-- Registered migrations in migration index
-- Exported new types from lancedb.ts
-- Files changed:
-  - apps/server/src/models/db/schema.ts
-  - apps/server/src/migrations/scripts/006-add-ai-conversations.ts
-  - apps/server/src/migrations/scripts/index.ts
-  - apps/server/src/sources/lancedb.ts
-- **Learnings for future iterations:**
-  - Table names use snake_case (e.g., ai_conversations)
-  - Primary key fields use full name + Id (e.g., conversationId, not just id)
-  - Foreign keys reference parent table (e.g., conversationId in ai_messages)
-  - List/Struct types for complex fields like sources need proper Apache Arrow definitions
-  - Timestamps use `new Timestamp(TimeUnit.MILLISECOND)`
-  - Migrations use version 6 (following existing v1-v5 pattern)
+**Learnings for future iterations:**
+- The codebase uses Error throwing in services, caught by controllers that return ResponseUtil.error()
+- Error messages with "not found" are caught by controllers and returned as PARAMS_ERROR (4xx)
+- Relation validation is already present in createNote - just needed more explicit error messages
+- The mid field is immutable in notes (not in UpdateEchoeNoteDto), so update validation is defensive only
+- All tests pass without changes - the validation logic was already correct
 ---
+## 2026-03-16 00:05 - US-004
+- Implemented deck service relation validation for conf (deckConfigId) field during creation
+- Added validation in createDeck to check conf exists in echoeDeckConfig table within the same uid
+- Error format: "Invalid relation: Deck config '{id}' not found for field 'conf' (deckConfigId)"
+- mid field is not in CreateEchoeDeckDto or UpdateEchoeDeckDto - it's set to null during creation and updated internally
+- Files changed: apps/server/src/services/echoe-deck.service.ts
 
-## 2026-02-20 14:35:00 - US-002
-- Implemented backend API for conversation CRUD operations
-- Added conversation and message DTOs to packages/dto/src/explore.ts:
-  - AIMessageSourceDto, AIMessageDto, AIConversationDto, AIConversationDetailDto
-  - CreateConversationDto, UpdateConversationDto, AddMessageDto
-  - ConversationListResponseDto, ConversationListQueryDto
-- Created AIConversationService with methods:
-  - getConversations(uid) - sorted by updatedAt desc
-  - getConversation(id, uid) - with all messages
-  - createConversation(uid, data)
-  - updateConversation(id, uid, data) - rename title
-  - deleteConversation(id, uid) - also deletes all messages
-  - addMessage(conversationId, uid, data)
-  - getMostRecentConversation(uid)
-- Added REST endpoints to ExploreController:
-  - GET /api/v1/explore/conversations
-  - GET /api/v1/explore/conversations/:id
-  - POST /api/v1/explore/conversations
-  - PUT /api/v1/explore/conversations/:id
-  - DELETE /api/v1/explore/conversations/:id
-  - POST /api/v1/explore/conversations/:id/messages
-- Files changed:
-  - apps/server/src/services/ai-conversation.service.ts (new)
-  - apps/server/src/controllers/v1/explore.controller.ts
-  - packages/dto/src/explore.ts
-- **Learnings for future iterations:**
-  - LanceDB Query API doesn't support `.orderBy()` - sorting must be done in JavaScript after `.toArray()`
-  - LanceDB `update()` takes an object with `{ where: string, values: Record }` not positional args
-  - Use `.sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt))` for timestamp sorting
-  - When adding messages, also update the conversation's updatedAt timestamp
-  - DTOs should extend base types (AIConversationDetailDto extends AIConversationDto)
-  - TypeDI services are auto-injected into controllers when declared in constructor
+**Learnings for future iterations:**
+- Deck conf field is optional in CreateEchoeDeckDto but defaults to empty string in the schema
+- Deck mid field is nullable and not user-settable via DTOs - only updated internally by the system
+- UpdateEchoeDeckDto only allows updating name and desc - conf and mid are immutable after creation
+- All 186 tests pass without modification - the validation is backward compatible
 ---
+## 2026-03-16 00:40 - US-005
+- Implemented config-domain relation validation for notetype cloneFrom field
+- Added validation in createNoteType to check cloneFrom (source notetype) exists within the same uid
+- Error format: "Invalid relation: Note type '{id}' not found for field 'cloneFrom' (source notetype)"
+- Template ntid validation is implicitly satisfied (templates always created with valid notetype ID)
+- Template did and notetype did are not user-settable via current DTOs (always set to empty string)
+- Files changed: apps/server/src/services/echoe-note.service.ts
+- Commit: 6f86b26
 
-## 2026-02-20 16:15:00 - US-003
-- Created explore-conversation.ts API module with all conversation endpoints:
-  - getConversations, getConversation, createConversation, updateConversation, deleteConversation, addMessage
-- Refactored ExploreService to use backend API instead of localStorage:
-  - Added conversations array for storing conversation list
-  - Added currentConversationId for tracking selected conversation
-  - Added conversationsLoading and isOnline state
-  - Implemented loadConversations() to fetch list from API
-  - Implemented loadConversation() to fetch messages from API
-  - Implemented ensureConversation() to auto-create conversation on first message
-  - Implemented updateConversationTitle() to auto-generate title from first message
-  - Added conversation management methods: selectConversation, deleteConversation, renameConversation, refreshConversations
-  - Modified sendQuery() to persist messages to backend via addMessage API
-  - Modified newConversation() to create conversation via API
-- Added network error handling with isOnline flag
-- Maintained reactive state with @rabjs/react Service class
-- Files changed:
-  - apps/web/src/api/explore-conversation.ts (new)
-  - apps/web/src/services/explore.service.ts (refactored)
-- Build and lint pass successfully
-- **Learnings for future iterations:**
-  - When refactoring from localStorage to API, maintain the same reactive state interface to minimize UI changes
-  - Use private helper methods (ensureConversation, rebuildContext) to encapsulate complex logic
-  - Keep error handling consistent - set isOnline false on network errors, provide user-friendly error messages
-  - The Service class from @rabjs/react auto-triggers re-renders when observable properties change
-  - When converting API types to UI types, map carefully (e.g., AIMessageSourceDto -> ExploreSourceDto)
-  - Auto-generating conversation titles from first message provides better UX than default titles
+**Learnings for future iterations:**
+- Templates and notetypes are managed in echoe-note.service.ts, not echoe-config.service.ts
+- Template ntid is always set to the notetype being created/updated, so it's implicitly valid
+- Template did and notetype did fields exist in schema but are not exposed via DTOs (always empty string)
+- The PRD's "config-domain" refers to configuration tables (notetypes, templates, deck_config), not the service name
+- All 186 tests pass without modification - the validation is backward compatible
 ---
+## 2026-03-16 00:45 - US-006
+- Implemented study service relation validation for card ID (cid) field
+- Updated error messages in submitReview and getOptions to be explicit about relation field context
+- Error format: "Invalid relation: Card '{id}' not found for field 'cid' (cardId)"
+- Updated controllers to return PARAMS_ERROR (4xx) instead of NOT_FOUND for invalid relations
+- Files changed: apps/server/src/services/echoe-study.service.ts, apps/server/src/controllers/v1/echoe-study.controller.ts
+- Commit: a423895
 
-## 2026-02-20 18:30:00 - US-004, US-005, US-007, US-008, US-009
-- Completely refactored AI Explore page layout:
-  - Removed top header from ai-explore.tsx
-  - Created left sidebar (280px fixed width) with conversation list
-  - Moved "AI 探索" title and Sparkles icon to sidebar header
-  - Added "返回首页" back button in sidebar
-  - Main content now takes full remaining width with no top padding
-- Implemented conversation list in sidebar (US-005):
-  - Displays conversations sorted by updatedAt (already sorted from API)
-  - Shows title and relative time (e.g., "2小时前")
-  - Highlights selected conversation with primary color background
-  - Click to switch conversations
-  - Added ChevronRight icon on hover for visual feedback
-- Added new topic button in sidebar (US-007):
-  - Plus icon button next to title
-  - Creates new conversation via API
-  - Auto-focuses input after creation
-- Implemented floating input box (US-008):
-  - Fixed at bottom with gradient fade background
-  - White background with shadow for visual separation
-  - Max-width constrained to match message area
-  - Added pb-32 to messages area to prevent content being hidden
-  - Uses left-[350px] to position correctly relative to sidebar (70px nav + 280px sidebar)
-- Added empty and loading states (US-009):
-  - Skeleton loading state for conversation list (3 placeholder items)
-  - Empty state with MessageSquare icon when no conversations
-  - Welcome screen when no conversation selected (with suggestion cards)
-  - Welcome state inside conversation when no messages yet
-- Added formatRelativeTime helper for displaying relative timestamps
-- Files changed:
-  - apps/web/src/pages/ai-explore/ai-explore.tsx (complete rewrite of layout)
-- Build and lint pass successfully
-- **Learnings for future iterations:**
-  - When using fixed positioning for the input area, account for the left sidebar width (350px = 70px nav + 280px sidebar)
-  - Use `pb-32` (padding-bottom) on scrollable content area to ensure content isn't hidden behind fixed input
-  - Gradient fade from background color helps blend fixed input with scrollable content
-  - For relative timestamps, use a simple helper function with time difference calculations
-  - The Layout component already provides a 70px left nav, so the sidebar is additional to that
-  - `min-w-0` on flex children prevents overflow issues with long content
+**Learnings for future iterations:**
+- Study service already validates card IDs in submitReview, buryCards, and forgetCards methods
+- All card operations query with both uid and cardId, ensuring same-uid scope validation
+- Revlog creation happens inside submitReview after card validation, so cid is always valid
+- buryCards and forgetCards silently skip non-existent cards (no error thrown)
+- Controller error handling pattern: catch "not found" errors and return PARAMS_ERROR with message
+- All 186 tests pass without modification - the validation logic was already correct
 ---
+## 2026-03-16 00:48 - US-007
+- Implemented relation validation in import services for same-uid integrity checks
+- Added validation in importNotesRows: validates mid (notetype) exists in database within uid scope before importing
+- Added validation in importCardsRows: validates both nid (note) and did (deck) exist in database within uid scope
+- Added validation in importRevlogRows: validates cid (card) exists in database within uid scope (skips silently if not)
+- Added validation in importDecks: validates mid (notetype) exists when deck references a notetype, sets to null with error if invalid
+- Updated test mock createImportDbMock to return inserted rows for validation queries
+- CSV import service already uses noteService.createNote() which has built-in validation, so no changes needed
+- Files changed: apps/server/src/services/echoe-import.service.ts, apps/server/src/__tests__/echoe-import.service.test.ts
 
-## 2026-02-20 19:45:00 - US-006
-- Implemented conversation management features:
-  - Added hover menu (MoreVertical icon) that appears on conversation item hover
-  - Created dropdown menu with rename and delete options
-  - Implemented rename modal with input field and keyboard shortcuts (Enter to submit, Escape to cancel)
-  - Implemented delete confirmation modal with warning styling
-  - Delete automatically switches to the most recent conversation after deletion
-  - Rename updates the conversation list immediately after success
-- Used existing ExploreService methods (renameConversation, deleteConversation)
-- Added new state management for modals:
-  - activeMenuId: tracks which conversation's menu is open
-  - isRenameModalOpen, isDeleteModalOpen: modal visibility
-  - editingConversationId, editingTitle: form state
-- Files changed:
-  - apps/web/src/pages/ai-explore/ai-explore.tsx
-- Build and lint pass successfully
-- **Learnings for future iterations:**
-  - For hover menus, use a combination of `opacity-0 group-hover:opacity-100` with proper `z-index` management
-  - Click-outside handling for dropdowns can use a fixed overlay with `z-10` behind the menu
-  - Use `stopPropagation()` on menu buttons to prevent triggering the parent button click
-  - Keyboard shortcuts in modals: Enter to submit, Escape to cancel for better UX
-  - Position dropdown menus with `absolute right-0 top-full mt-1` for proper alignment
+**Learnings for future iterations:**
+- Import service uses referenceMap to track source ID → business ID mappings during import
+- Import order is: notetypes → decks → notes → cards → revlogs (each depends on previous)
+- Validation must query the database, not just check referenceMap, because upstream imports can fail
+- Test mocks need to return inserted data for validation queries to work correctly
+- echoe-csv-import.service.ts delegates to noteService.createNote() which already validates relations
+- All 186 tests pass - validation is backward compatible and catches invalid references
 ---
+## 2026-03-16 00:52 - US-008
+- Implemented note owner delete transaction with explicit cascade to revlogs
+- Updated deleteNote in echoe-note.service.ts to delete revlogs for all cards before deleting cards
+- Cascade order: revlogs -> cards -> note (all within single transaction)
+- Used inArray() to delete all revlogs for card IDs in one query
+- Updated test expectation from 2 to 3 delete calls (revlogs, cards, note)
+- Files changed: apps/server/src/services/echoe-note.service.ts, apps/server/src/__tests__/echoe-note.service.test.ts
+- Commit: 061b67b
 
-## 2026-03-08 - SR US-003
-- Created apps/server/src/services/spaced-repetition.service.ts with SpacedRepetitionService (@Service() decorated)
-- Implemented calculateNextReview(card, quality: 1|3|4|5) following SM-2 algorithm spec
-- Created apps/server/src/__tests__/spaced-repetition.service.test.ts with 21 tests covering all quality levels
-- All tests pass, typecheck passes
-- Files changed:
-  - apps/server/src/services/spaced-repetition.service.ts (new)
-  - apps/server/src/__tests__/spaced-repetition.service.test.ts (new)
-- **Learnings for future iterations:**
-  - SM-2 special rule: after repetitions reset (forgot), 1st=1day, 2nd=6days, then formula — this applies to ALL quality levels (3/4/5), not just after "forgot"
-  - The service has no external dependencies (no DB, no config) — it's pure computation, making it easy to test without mocks
-  - SpacedRepetitionService exported interfaces: SRCardState (input), SRNextReview (output) — import these for type safety in US-004+
----
-
-## 2026-03-11 - US-001
-- Wrapped all /cards/* and /settings routes with Layout component in App.tsx
-- Imported Layout component and added to all protected routes
-- Layout component already uses useLocation() for navigation highlighting (isCardsPage, isSettingsPage)
-- TypeScript typecheck passes
-- ESLint passes for App.tsx (pre-existing lint errors in other files)
-- Files changed:
-  - apps/web/src/App.tsx (added Layout wrapper to all /cards/* and /settings routes)
-- **Learnings for future iterations:**
-  - Layout component already supports path-based navigation highlighting via location.pathname.startsWith() checks
-  - The Layout provides a 70px left sidebar that wraps the main content area
-  - ProtectedRoute wraps Layout, not the other way around (order: ProtectedRoute > Layout > Page)
----
-
-## 2026-03-11 - US-002
-- Added Browse Cards navigation item to sidebar in Layout component
-- Sidebar now contains: Study/Review (Zap), My Decks (Layers), Browse Cards (Search)
-- Updated route detection: isStudyPage, isMyDecksPage, isBrowseCardsPage
-- Removed unused handleMemoClick function (no /home route exists)
-- TypeScript typecheck passes, build passes
-- Files changed:
-  - apps/web/src/components/layout.tsx (modified)
-- **Learnings for future iterations:**
-  - The sidebar navigation uses route-based highlighting with location.pathname.startsWith()
-  - isMyDecksPage specifically checks for exact '/cards' path, not startsWith('/cards')
-  - Browse Cards route is '/cards/browser' which is a separate page from My Decks
-  - No /home route exists in App.tsx - /cards serves as the main entry point
----
-
-## 2026-03-12 - US-004
-- Updated echoe-notes.ts schema: changed `richTextFields` from `text().$type<string>()` to `json().$type<RichTextFields>()`, and `fldNames` from `text().$type<string>()` to `json().$type<string[]>()`
-- Generated Drizzle migration 0003_careless_cerise.sql with data conversion UPDATEs (JSON_VALID checks) before ALTER TABLE statements
-- Updated echoe-note.service.ts: removed JSON.stringify/parse calls for richTextFields and fldNames (Drizzle now handles JSON serialization automatically)
-- Updated echoe-study.service.ts: updated parseFieldValues and parseNoteFields to accept `string[] | string | null` for fldNames parameter
-- All 45 tests pass, typecheck passes, migration runs successfully
-- Files changed:
-  - apps/server/src/db/schema/echoe-notes.ts (text → json for richTextFields and fldNames)
-  - apps/server/drizzle/0003_careless_cerise.sql (new migration with data conversion logic)
-  - apps/server/drizzle/meta/_journal.json (updated)
-  - apps/server/drizzle/meta/0003_snapshot.json (new)
-  - apps/server/src/services/echoe-note.service.ts (removed JSON.stringify/parse for json columns)
-  - apps/server/src/services/echoe-study.service.ts (updated fldNames type handling)
-- **Learnings for future iterations:**
-  - When changing a Drizzle column from `text` to `json`, Drizzle auto-handles JSON serialization/deserialization — remove all manual JSON.stringify/parse for those fields in service layer
-  - The generated migration only has ALTER TABLE; manually prepend UPDATE statements with JSON_VALID() checks for data conversion before the ALTER
-  - Drizzle migrator is inherently idempotent via __drizzle_migrations table — each migration runs exactly once
-  - After changing column type, update all method signatures that pass the column value to accept the new type (e.g., `string[] | string | null` for backward compat during transition)
+**Learnings for future iterations:**
+- Revlog cascade must happen BEFORE card deletion (delete child records first)
+- Use inArray() for bulk deletion when you have multiple IDs to delete
+- Transaction already existed - just needed to add revlog deletion step
+- Test mocks track delete call count - update expectations when adding new delete operations
+- All 186 tests pass - cascade logic is backward compatible with existing tests
 ---

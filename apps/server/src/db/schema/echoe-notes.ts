@@ -4,6 +4,7 @@ import {
   varchar,
   text,
   json,
+  bigint,
   index,
   unique,
 } from 'drizzle-orm/mysql-core';
@@ -21,9 +22,7 @@ export const echoeNotes = mysqlTable(
     noteId: varchar('note_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
     guid: varchar('guid', { length: 191 }).notNull(), // Globally unique ID for sync (40 char hex string)
-    mid: varchar('mid', { length: 191 })
-      .notNull()
-      .references(() => echoeNotetypes.noteTypeId, { onDelete: 'cascade' }), // Model ID (note type ID) - now business ID string
+    mid: varchar('mid', { length: 191 }).notNull(), // Model ID (note type ID) - business ID string
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
     tags: text('tags').notNull().$type<string>(), // JSON array of tags
@@ -35,6 +34,7 @@ export const echoeNotes = mysqlTable(
     richTextFields: json('rich_text_fields').$type<RichTextFields>(), // Rich text JSON for fields (keyed by field name → ProseMirror doc)
     fldNames: json('fld_names').$type<string[]>(), // JSON array of field names for mapping fields to values
     fieldsJson: json('fields_json').$type<CanonicalFields>().notNull().default({}), // Primary structured field storage (field name → plain text value)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     guidIdx: index('guid_idx').on(table.guid),
@@ -46,6 +46,7 @@ export const echoeNotes = mysqlTable(
     uidMidIdx: index('uid_mid_idx').on(table.uid, table.mid),
     uidSfldIdx: index('uid_sfld_idx').on(table.uid, table.sfld),
     uidModIdx: index('uid_mod_idx').on(table.uid, table.mod),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

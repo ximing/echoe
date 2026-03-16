@@ -21,12 +21,8 @@ export const echoeCards = mysqlTable(
     id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     cardId: varchar('card_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID for tenant isolation
-    nid: varchar('nid', { length: 191 })
-      .notNull()
-      .references(() => echoeNotes.noteId, { onDelete: 'cascade' }), // Note ID - now business ID string
-    did: varchar('did', { length: 191 })
-      .notNull()
-      .references(() => echoeDecks.deckId, { onDelete: 'cascade' }), // Deck ID - now business ID string
+    nid: varchar('nid', { length: 191 }).notNull(), // Note ID - business ID string
+    did: varchar('did', { length: 191 }).notNull(), // Deck ID - business ID string
     ord: int('ord').notNull(), // Template ordinal (which template generates this card)
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
@@ -46,6 +42,7 @@ export const echoeCards = mysqlTable(
     stability: double('stability').notNull().default(0), // Stability (days) - represents how well the card is remembered
     difficulty: double('difficulty').notNull().default(0), // FSRS difficulty (ts-fsrs raw scale, not a probability)
     lastReview: bigint('last_review', { mode: 'number' }).notNull().default(0), // Last review timestamp (Unix ms)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     nidIdx: index('nid_idx').on(table.nid),
@@ -62,6 +59,7 @@ export const echoeCards = mysqlTable(
     uidNidIdx: index('uid_nid_idx').on(table.uid, table.nid),
     uidDidQueueDueIdx: index('uid_did_queue_due_idx').on(table.uid, table.did, table.queue, table.due),
     uidLastReviewIdx: index('uid_last_review_idx').on(table.uid, table.lastReview),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

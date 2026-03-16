@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "cb925004-fadf-42d4-aaed-5e615914ed0f",
-  "prevId": "4ebd97c0-e529-44da-acbc-de151a2ccfe4",
+  "id": "39a821e2-7c2a-4efb-913a-8529989fb396",
+  "prevId": "8e73a7f1-9bee-4336-b7a8-8bac6c38061e",
   "tables": {
     "users": {
       "name": "users",
@@ -184,7 +184,21 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "col_id": {
+          "name": "col_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -281,6 +295,14 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_col_id_idx": {
+          "name": "uid_col_id_idx",
+          "columns": [
+            "uid",
+            "col_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -292,7 +314,20 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_col_col_id_unique": {
+          "name": "echoe_col_col_id_unique",
+          "columns": [
+            "col_id"
+          ]
+        },
+        "echoe_col_uid_unique": {
+          "name": "echoe_col_uid_unique",
+          "columns": [
+            "uid"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_notes": {
@@ -300,7 +335,21 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "note_id": {
+          "name": "note_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -314,7 +363,7 @@
         },
         "mid": {
           "name": "mid",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -356,7 +405,7 @@
         },
         "csum": {
           "name": "csum",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -397,6 +446,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "('{}')"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -427,6 +484,45 @@
             "sfld"
           ],
           "isUnique": false
+        },
+        "uid_note_id_idx": {
+          "name": "uid_note_id_idx",
+          "columns": [
+            "uid",
+            "note_id"
+          ],
+          "isUnique": false
+        },
+        "uid_mid_idx": {
+          "name": "uid_mid_idx",
+          "columns": [
+            "uid",
+            "mid"
+          ],
+          "isUnique": false
+        },
+        "uid_sfld_idx": {
+          "name": "uid_sfld_idx",
+          "columns": [
+            "uid",
+            "sfld"
+          ],
+          "isUnique": false
+        },
+        "uid_mod_idx": {
+          "name": "uid_mod_idx",
+          "columns": [
+            "uid",
+            "mod"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -438,7 +534,21 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_notes_note_id_unique": {
+          "name": "echoe_notes_note_id_unique",
+          "columns": [
+            "note_id"
+          ]
+        },
+        "uid_guid_unique": {
+          "name": "uid_guid_unique",
+          "columns": [
+            "uid",
+            "guid"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_cards": {
@@ -446,21 +556,35 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "card_id": {
+          "name": "card_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "nid": {
           "name": "nid",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "did": {
           "name": "did",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -560,11 +684,11 @@
         },
         "odid": {
           "name": "odid",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": "''"
         },
         "flags": {
           "name": "flags",
@@ -580,6 +704,38 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "stability": {
+          "name": "stability",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_review": {
+          "name": "last_review",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -617,6 +773,72 @@
             "due"
           ],
           "isUnique": false
+        },
+        "did_queue_due_idx": {
+          "name": "did_queue_due_idx",
+          "columns": [
+            "did",
+            "queue",
+            "due"
+          ],
+          "isUnique": false
+        },
+        "did_last_review_idx": {
+          "name": "did_last_review_idx",
+          "columns": [
+            "did",
+            "last_review"
+          ],
+          "isUnique": false
+        },
+        "did_stability_idx": {
+          "name": "did_stability_idx",
+          "columns": [
+            "did",
+            "stability"
+          ],
+          "isUnique": false
+        },
+        "uid_card_id_idx": {
+          "name": "uid_card_id_idx",
+          "columns": [
+            "uid",
+            "card_id"
+          ],
+          "isUnique": false
+        },
+        "uid_nid_idx": {
+          "name": "uid_nid_idx",
+          "columns": [
+            "uid",
+            "nid"
+          ],
+          "isUnique": false
+        },
+        "uid_did_queue_due_idx": {
+          "name": "uid_did_queue_due_idx",
+          "columns": [
+            "uid",
+            "did",
+            "queue",
+            "due"
+          ],
+          "isUnique": false
+        },
+        "uid_last_review_idx": {
+          "name": "uid_last_review_idx",
+          "columns": [
+            "uid",
+            "last_review"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -628,7 +850,14 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_cards_card_id_unique": {
+          "name": "echoe_cards_card_id_unique",
+          "columns": [
+            "card_id"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_revlog": {
@@ -636,14 +865,35 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "revlog_id": {
+          "name": "revlog_id",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
+        "source_revlog_id": {
+          "name": "source_revlog_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "cid": {
           "name": "cid",
-          "type": "bigint",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -696,6 +946,126 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "stability": {
+          "name": "stability",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_review": {
+          "name": "last_review",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_due": {
+          "name": "pre_due",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_ivl": {
+          "name": "pre_ivl",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_factor": {
+          "name": "pre_factor",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_reps": {
+          "name": "pre_reps",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_lapses": {
+          "name": "pre_lapses",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_left": {
+          "name": "pre_left",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_type": {
+          "name": "pre_type",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_queue": {
+          "name": "pre_queue",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_stability": {
+          "name": "pre_stability",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_difficulty": {
+          "name": "pre_difficulty",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pre_last_review": {
+          "name": "pre_last_review",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -712,6 +1082,44 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_idx": {
+          "name": "uid_idx",
+          "columns": [
+            "uid"
+          ],
+          "isUnique": false
+        },
+        "uid_revlog_id_idx": {
+          "name": "uid_revlog_id_idx",
+          "columns": [
+            "uid",
+            "revlog_id"
+          ],
+          "isUnique": false
+        },
+        "uid_cid_idx": {
+          "name": "uid_cid_idx",
+          "columns": [
+            "uid",
+            "cid"
+          ],
+          "isUnique": false
+        },
+        "uid_source_revlog_id_idx": {
+          "name": "uid_source_revlog_id_idx",
+          "columns": [
+            "uid",
+            "source_revlog_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -723,7 +1131,14 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_revlog_revlog_id_unique": {
+          "name": "echoe_revlog_revlog_id_unique",
+          "columns": [
+            "revlog_id"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_decks": {
@@ -731,7 +1146,21 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "deck_id": {
+          "name": "deck_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -745,11 +1174,10 @@
         },
         "conf": {
           "name": "conf",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "autoincrement": false
         },
         "extend_new": {
           "name": "extend_new",
@@ -814,6 +1242,13 @@
         },
         "mid": {
           "name": "mid",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
           "type": "bigint",
           "primaryKey": false,
           "notNull": true,
@@ -835,6 +1270,21 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_deck_id_idx": {
+          "name": "uid_deck_id_idx",
+          "columns": [
+            "uid",
+            "deck_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -846,7 +1296,21 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_decks_deck_id_unique": {
+          "name": "echoe_decks_deck_id_unique",
+          "columns": [
+            "deck_id"
+          ]
+        },
+        "uid_name_unique": {
+          "name": "uid_name_unique",
+          "columns": [
+            "uid",
+            "name"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_deck_config": {
@@ -854,7 +1318,21 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "deck_config_id": {
+          "name": "deck_config_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -940,6 +1418,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -956,6 +1442,21 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_deck_config_id_idx": {
+          "name": "uid_deck_config_id_idx",
+          "columns": [
+            "uid",
+            "deck_config_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -967,7 +1468,21 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_deck_config_deck_config_id_unique": {
+          "name": "echoe_deck_config_deck_config_id_unique",
+          "columns": [
+            "deck_config_id"
+          ]
+        },
+        "uid_name_unique": {
+          "name": "uid_name_unique",
+          "columns": [
+            "uid",
+            "name"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_notetypes": {
@@ -975,7 +1490,21 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "note_type_id": {
+          "name": "note_type_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1011,11 +1540,11 @@
         },
         "did": {
           "name": "did",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": "''"
         },
         "tmpls": {
           "name": "tmpls",
@@ -1066,6 +1595,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1082,6 +1619,21 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_note_type_id_idx": {
+          "name": "uid_note_type_id_idx",
+          "columns": [
+            "uid",
+            "note_type_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1093,7 +1645,21 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_notetypes_note_type_id_unique": {
+          "name": "echoe_notetypes_note_type_id_unique",
+          "columns": [
+            "note_type_id"
+          ]
+        },
+        "uid_name_unique": {
+          "name": "uid_name_unique",
+          "columns": [
+            "uid",
+            "name"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_templates": {
@@ -1101,14 +1667,28 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "bigint",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "ntid": {
           "name": "ntid",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1157,11 +1737,10 @@
         },
         "did": {
           "name": "did",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "mod": {
           "name": "mod",
@@ -1176,6 +1755,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1199,6 +1786,21 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_template_id_idx": {
+          "name": "uid_template_id_idx",
+          "columns": [
+            "uid",
+            "template_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1210,7 +1812,22 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_templates_template_id_unique": {
+          "name": "echoe_templates_template_id_unique",
+          "columns": [
+            "template_id"
+          ]
+        },
+        "uid_ntid_ord_unique": {
+          "name": "uid_ntid_ord_unique",
+          "columns": [
+            "uid",
+            "ntid",
+            "ord"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_media": {
@@ -1222,6 +1839,20 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": true
+        },
+        "media_id": {
+          "name": "media_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         },
         "filename": {
           "name": "filename",
@@ -1288,6 +1919,14 @@
             "hash"
           ],
           "isUnique": false
+        },
+        "uid_media_id_idx": {
+          "name": "uid_media_id_idx",
+          "columns": [
+            "uid",
+            "media_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1299,7 +1938,21 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_media_media_id_unique": {
+          "name": "echoe_media_media_id_unique",
+          "columns": [
+            "media_id"
+          ]
+        },
+        "uid_filename_unique": {
+          "name": "uid_filename_unique",
+          "columns": [
+            "uid",
+            "filename"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_graves": {
@@ -1312,6 +1965,20 @@
           "notNull": true,
           "autoincrement": true
         },
+        "grave_id": {
+          "name": "grave_id",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "usn": {
           "name": "usn",
           "type": "int",
@@ -1321,7 +1988,7 @@
         },
         "oid": {
           "name": "oid",
-          "type": "bigint",
+          "type": "varchar(191)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1355,6 +2022,23 @@
             "usn"
           ],
           "isUnique": false
+        },
+        "uid_grave_id_idx": {
+          "name": "uid_grave_id_idx",
+          "columns": [
+            "uid",
+            "grave_id"
+          ],
+          "isUnique": false
+        },
+        "uid_oid_type_idx": {
+          "name": "uid_oid_type_idx",
+          "columns": [
+            "uid",
+            "oid",
+            "type"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -1366,12 +2050,26 @@
           ]
         }
       },
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "echoe_graves_grave_id_unique": {
+          "name": "echoe_graves_grave_id_unique",
+          "columns": [
+            "grave_id"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "echoe_config": {
       "name": "echoe_config",
       "columns": {
+        "uid": {
+          "name": "uid",
+          "type": "varchar(191)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "key": {
           "name": "key",
           "type": "varchar(191)",
@@ -1390,9 +2088,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "echoe_config_key": {
-          "name": "echoe_config_key",
+        "echoe_config_uid_key_pk": {
+          "name": "echoe_config_uid_key_pk",
           "columns": [
+            "uid",
             "key"
           ]
         }

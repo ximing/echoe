@@ -170,7 +170,10 @@ export class EchoeDuplicateService {
     }
 
     // Get field definitions from notetypes to find field index
-    const notetypes = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, notetypeId)));
+    const notetypes = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, notetypeId), eq(echoeNotetypes.deletedAt, 0)));
 
     if (notetypes.length === 0) {
       return [];
@@ -200,6 +203,7 @@ export class EchoeDuplicateService {
     const { getDatabase } = await import('../db/connection.js');
     const { echoeNotes } = await import('../db/schema/echoe-notes.js');
     const { echoeCards } = await import('../db/schema/echoe-cards.js');
+    const { echoeRevlog } = await import('../db/schema/echoe-revlog.js');
     const { echoeGraves } = await import('../db/schema/echoe-graves.js');
     const { logger } = await import('../utils/logger.js');
     const { generateTypeId } = await import('../utils/id.js');
@@ -208,12 +212,22 @@ export class EchoeDuplicateService {
 
     const db = getDatabase();
     const { keepId, deleteIds } = dto;
+    const now = Date.now(); // Millisecond timestamp for soft delete
 
     // Get all cards for notes to be deleted
     const cardsToDelete = await db
       .select()
       .from(echoeCards)
-      .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, deleteIds)));
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.nid, deleteIds)));
+
+    const cardIds = cardsToDelete.map((c: { cardId: string }) => c.cardId);
+
+    // Soft delete revlogs for all cards (cascade from cards)
+    if (cardIds.length > 0) {
+      await db.update(echoeRevlog)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
+    }
 
     // Add deleted notes to graves table
     for (const deleteId of deleteIds) {
@@ -237,11 +251,15 @@ export class EchoeDuplicateService {
       });
     }
 
-    // Delete cards belonging to deleted notes
-    await db.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, deleteIds)));
+    // Soft delete cards belonging to deleted notes
+    await db.update(echoeCards)
+      .set({ deletedAt: now })
+      .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.nid, deleteIds)));
 
-    // Delete notes
-    await db.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, deleteIds)));
+    // Soft delete notes
+    await db.update(echoeNotes)
+      .set({ deletedAt: now })
+      .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), inArray(echoeNotes.noteId, deleteIds)));
 
     logger.info(`Merged duplicates: kept note ${keepId}, deleted ${deleteIds.length} notes`);
   }

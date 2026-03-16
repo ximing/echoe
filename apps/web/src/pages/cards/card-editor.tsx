@@ -48,6 +48,7 @@ const [tags, setTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [previewSide, setPreviewSide] = useState<'front' | 'back'>('front');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -94,39 +95,58 @@ const [tags, setTags] = useState<string[]>([]);
           setSelectedDeck(deck);
         }
       }
+      setIsInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteService.currentNote, noteService.noteTypes, noteId, cardId]);
 
-  // Set default notetype on first load
+  // Set default notetype and deck on first load (new card mode only)
   useEffect(() => {
-    if (!isEditMode && noteService.noteTypes.length > 0 && !selectedNotetype) {
+    if (!isEditMode && !isInitialized && isDataLoaded && noteService.noteTypes.length > 0 && deckService.decks.length > 0) {
+      // Set default notetype
       const defaultNt = noteService.noteTypes.find((nt) => nt.name === 'Basic') || noteService.noteTypes[0];
       setSelectedNotetype(defaultNt);
-      setFields({});
-      setTags([]);
-    }
-  }, [noteService.noteTypes, isEditMode, selectedNotetype]);
 
-  // Set default deck on first load
-  useEffect(() => {
-    if (!isEditMode && deckService.decks.length > 0 && !selectedDeck) {
+      // Initialize fields for default notetype
+      const initialFields: Record<string, string> = {};
+      if (defaultNt?.flds) {
+        defaultNt.flds.forEach((fld) => {
+          initialFields[fld.name] = '';
+        });
+      }
+      setFields(initialFields);
+      setTags([]);
+
+      // Set default deck
       const defaultDeck = deckService.decks.find((d) => d.name === 'Default') || deckService.decks[0];
       setSelectedDeck(defaultDeck);
-    }
-  }, [deckService.decks, isEditMode, selectedDeck]);
 
-  // Update fields when notetype changes
-  useEffect(() => {
-    if (selectedNotetype && selectedNotetype.flds) {
-      const newFields: Record<string, string> = {};
-      selectedNotetype.flds.forEach((fld) => {
-        newFields[fld.name] = fields[fld.name] || '';
-      });
-      setFields(newFields);
+      setIsInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNotetype?.id]);
+  }, [isEditMode, isInitialized, isDataLoaded, noteService.noteTypes.length, deckService.decks.length]);
+
+  // Update fields when notetype changes (only after initialization, and only if field structure changed)
+  useEffect(() => {
+    if (isInitialized && selectedNotetype && selectedNotetype.flds) {
+      // Check if field structure actually changed (compare field names)
+      const currentFieldNames = Object.keys(fields).sort();
+      const notetypeFieldNames = selectedNotetype.flds.map((fld) => fld.name).sort();
+
+      const structureChanged =
+        currentFieldNames.length !== notetypeFieldNames.length ||
+        currentFieldNames.some((name, idx) => name !== notetypeFieldNames[idx]);
+
+      if (structureChanged) {
+        const newFields: Record<string, string> = {};
+        selectedNotetype.flds.forEach((fld) => {
+          newFields[fld.name] = fields[fld.name] || '';
+        });
+        setFields(newFields);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, selectedNotetype?.id]);
 
   // Handle notetype change
   const handleNotetypeChange = (notetypeId: string) => {
@@ -320,7 +340,7 @@ const [tags, setTags] = useState<string[]>([]);
           richTextFields: completeRichTextFields,
         });
         if (success) {
-          toastService.success('Note updated');
+          toastService.success('Card updated');
           navigate('/cards');
         } else {
           toastService.error(noteService.error || 'Failed to update note');
@@ -335,7 +355,7 @@ const [tags, setTags] = useState<string[]>([]);
           richTextFields: completeRichTextFields,
         });
         if (result) {
-          toastService.success('Note created');
+          toastService.success('Card created');
           navigate('/cards');
         } else {
           toastService.error(noteService.error || 'Failed to create note');
@@ -455,16 +475,11 @@ const [tags, setTags] = useState<string[]>([]);
           <RichTextEditor
             content={richTextFields[field.name] || fields[field.name] || ''}
             onChange={(_html, json) => {
-              // Only store rich text JSON, not HTML in fields
-              // Fields will contain empty string for rich text fields
               setRichTextFields((prev) => ({
                 ...prev,
                 [field.name]: json,
               }));
-              // Also update fields with empty string to maintain the field exists
-              if (!fields[field.name]) {
-                handleFieldChange(field.name, '');
-              }
+              // Fields are already initialized - no need to maintain field existence here
             }}
             minHeight="120px"
           />

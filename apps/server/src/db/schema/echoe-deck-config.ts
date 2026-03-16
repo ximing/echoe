@@ -2,6 +2,7 @@ import {
   mysqlTable,
   int,
   varchar,
+  bigint,
   tinyint,
   text,
   index,
@@ -29,12 +30,14 @@ export const echoeDeckConfig = mysqlTable(
     newConfig: text('new_config').notNull().$type<string>(), // JSON for new card settings
     revConfig: text('rev_config').notNull().$type<string>(), // JSON for review settings
     lapseConfig: text('lapse_config').notNull().$type<string>(), // JSON for lapse settings
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidDeckConfigIdIdx: index('uid_deck_config_id_idx').on(table.uid, table.deckConfigId),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

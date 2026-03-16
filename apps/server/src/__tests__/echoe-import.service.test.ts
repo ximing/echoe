@@ -150,7 +150,8 @@ describe('EchoeImportService - tenant boundary for card-note binding', () => {
   });
 
   it('should reject binding card to note owned by another uid', async () => {
-    const noteFindFirstMock = jest.fn().mockResolvedValue({ uid: 'user-b' });
+    // With the uid condition in the query, a note owned by another user will not be found
+    const noteFindFirstMock = jest.fn().mockResolvedValue(undefined);
 
     mockedGetDatabase.mockReturnValue({
       query: {
@@ -166,10 +167,8 @@ describe('EchoeImportService - tenant boundary for card-note binding', () => {
     expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should allow binding card when note is missing or belongs to same uid', async () => {
-    const noteFindFirstMock = jest.fn()
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({ uid: 'user-a' });
+  it('should reject binding card when note is missing', async () => {
+    const noteFindFirstMock = jest.fn().mockResolvedValue(undefined);
 
     mockedGetDatabase.mockReturnValue({
       query: {
@@ -179,12 +178,27 @@ describe('EchoeImportService - tenant boundary for card-note binding', () => {
       },
     } as any);
 
-    const allowedWhenMissing = await (service as any).isCardNoteBindingAllowed('user-a', 'en_missing_1');
-    const allowedWhenOwned = await (service as any).isCardNoteBindingAllowed('user-a', 'en_owned_1');
+    const allowed = await (service as any).isCardNoteBindingAllowed('user-a', 'en_missing_1');
 
-    expect(allowedWhenMissing).toBe(true);
-    expect(allowedWhenOwned).toBe(true);
-    expect(noteFindFirstMock).toHaveBeenCalledTimes(2);
+    expect(allowed).toBe(false);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should allow binding card when note belongs to same uid', async () => {
+    const noteFindFirstMock = jest.fn().mockResolvedValue({ uid: 'user-a' });
+
+    mockedGetDatabase.mockReturnValue({
+      query: {
+        echoeNotes: {
+          findFirst: noteFindFirstMock,
+        },
+      },
+    } as any);
+
+    const allowed = await (service as any).isCardNoteBindingAllowed('user-a', 'en_owned_1');
+
+    expect(allowed).toBe(true);
+    expect(noteFindFirstMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -230,9 +244,17 @@ function createImportDbMock(uid: string): { db: unknown; rows: ImportedRows } {
 
   const db = {
     select: jest.fn().mockImplementation(() => ({
-      from: jest.fn().mockImplementation(() => ({
-        where: jest.fn().mockImplementation(() => ({
-          limit: jest.fn().mockResolvedValue([]),
+      from: jest.fn().mockImplementation((table: unknown) => ({
+        where: jest.fn().mockImplementation((condition: unknown) => ({
+          limit: jest.fn().mockImplementation(() => {
+            // Return inserted rows for validation queries
+            const store = resolveStore(rows, table);
+            if (store && store.length > 0) {
+              // Return the first matching row (simplified - real DB would filter by condition)
+              return Promise.resolve([store[store.length - 1]]);
+            }
+            return Promise.resolve([]);
+          }),
         })),
       })),
     })),

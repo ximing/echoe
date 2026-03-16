@@ -10,6 +10,7 @@ import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeGraves } from '../db/schema/echoe-graves.js';
+import { echoeTemplates } from '../db/schema/echoe-templates.js';
 import { logger } from '../utils/logger.js';
 import { DAY_MS, getRetrievabilitySqlExpr } from '../utils/fsrs-retrievability.js';
 import { generateTypeId } from '../utils/id.js';
@@ -36,6 +37,13 @@ import type {
   FilteredDeckPreviewDto,
   EchoeCardListItemDto,
 } from '@echoe/dto';
+import {
+  isActiveDeck,
+  isActiveDeckConfig,
+  isActiveCard,
+  isActiveNote,
+  isActiveNotetype,
+} from '../utils/active-row-predicates.js';
 
 @Service()
 export class EchoeDeckService {
@@ -46,7 +54,7 @@ export class EchoeDeckService {
     const db = getDatabase();
 
     // Get all decks
-    const decks = await db.select().from(echoeDecks).where(eq(echoeDecks.uid, uid)).orderBy(echoeDecks.name);
+    const decks = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), isActiveDeck)).orderBy(echoeDecks.name);
 
     // Use millisecond timestamp semantics for all card due checks
     const nowMs = Date.now();
@@ -60,7 +68,7 @@ export class EchoeDeckService {
         reviewCount: sql<number>`SUM(CASE WHEN ${echoeCards.queue} = 2 AND ${echoeCards.due} <= ${nowMs} THEN 1 ELSE 0 END)`,
       })
       .from(echoeCards)
-      .where(eq(echoeCards.uid, uid))
+      .where(and(eq(echoeCards.uid, uid), isActiveCard))
       .groupBy(echoeCards.did);
 
     // Get FSRS stats grouped by deck
@@ -81,7 +89,7 @@ export class EchoeDeckService {
         lastStudiedAt: sql<number>`MAX(CASE WHEN ${echoeCards.lastReview} > 0 THEN ${echoeCards.lastReview} ELSE NULL END)`,
       })
       .from(echoeCards)
-      .where(eq(echoeCards.uid, uid))
+      .where(and(eq(echoeCards.uid, uid), isActiveCard))
       .groupBy(echoeCards.did);
 
     // Batch-compute today's new card reviewed count per deck (for daily limit capping)
@@ -154,7 +162,7 @@ export class EchoeDeckService {
         collapsed: deck.collapsed === 1,
         dyn: deck.dyn,
         desc: deck.desc || '',
-        mid: deck.mid,
+        mid: deck.mid ?? '',
         mod: deck.mod,
         newCount: cappedNewCount,
         learnCount: counts.learnCount,
@@ -188,7 +196,7 @@ export class EchoeDeckService {
         count: sql<number>`count(*)`,
       })
       .from(echoeRevlog)
-      .innerJoin(echoeCards, eq(echoeRevlog.cid, echoeCards.cardId))
+      .innerJoin(echoeCards, and(eq(echoeRevlog.cid, echoeCards.cardId), isActiveCard))
       .where(
         and(
           eq(echoeRevlog.uid, uid),
@@ -221,7 +229,7 @@ export class EchoeDeckService {
     const configs = await db
       .select({ deckConfigId: echoeDeckConfig.deckConfigId, newConfig: echoeDeckConfig.newConfig })
       .from(echoeDeckConfig)
-      .where(and(eq(echoeDeckConfig.uid, uid), inArray(echoeDeckConfig.deckConfigId, confIds)));
+      .where(and(eq(echoeDeckConfig.uid, uid), inArray(echoeDeckConfig.deckConfigId, confIds), isActiveDeckConfig));
 
     const result = new Map<string, number>();
     for (const config of configs) {
@@ -346,7 +354,7 @@ export class EchoeDeckService {
   async getDeckById(uid: string, id: string): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       return null;
@@ -404,7 +412,7 @@ export class EchoeDeckService {
       collapsed: deck[0].collapsed === 1,
       dyn: deck[0].dyn,
       desc: deck[0].desc || '',
-      mid: deck[0].mid,
+      mid: deck[0].mid ?? '',
       mod: deck[0].mod,
       newCount: Number(count.newCount) || 0,
       learnCount: Number(count.learnCount) || 0,
@@ -431,10 +439,35 @@ export class EchoeDeckService {
     // If name contains '::', check if parent exists (not for filtered decks)
     if (!dto.dyn && dto.name.includes('::')) {
       const parentName = dto.name.substring(0, dto.name.lastIndexOf('::'));
-      const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName))).limit(1);
+      const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName), isActiveDeck)).limit(1);
       if (parent.length === 0) {
         throw new Error(`Parent deck '${parentName}' does not exist`);
       }
+    }
+
+    // Validate conf (deck config) exists within the same uid
+    // If not provided, use the first available deck config as default
+    let finalConf: string;
+    if (!dto.conf) {
+      const defaultConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(eq(echoeDeckConfig.uid, uid))
+        .limit(1);
+      if (defaultConfig.length === 0) {
+        throw new Error('No deck config found for user. Please create a deck config first.');
+      }
+      finalConf = defaultConfig[0].deckConfigId;
+    } else {
+      const deckConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .limit(1);
+      if (deckConfig.length === 0) {
+        throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
+      }
+      finalConf = dto.conf;
     }
 
     // Determine if this is a filtered deck
@@ -446,7 +479,7 @@ export class EchoeDeckService {
       deckId: deckId,
       uid,
       name: dto.name,
-      conf: dto.conf || '',
+      conf: finalConf,
       extendNew: 20,
       extendRev: 200,
       usn: 0,
@@ -455,7 +488,7 @@ export class EchoeDeckService {
       dyn,
       mod: now,
       desc,
-      mid: '',
+      mid: null,
     };
 
     await db.insert(echoeDecks).values(newDeck);
@@ -497,10 +530,22 @@ export class EchoeDeckService {
   async updateDeck(uid: string, id: string, dto: UpdateEchoeDeckDto): Promise<EchoeDeckWithCountsDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       return null;
+    }
+
+    // Validate conf (deck config) exists within the same uid if provided
+    if (dto.conf !== undefined) {
+      const deckConfig = await db
+        .select()
+        .from(echoeDeckConfig)
+        .where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, dto.conf)))
+        .limit(1);
+      if (deckConfig.length === 0) {
+        throw new Error(`Invalid relation: Deck config '${dto.conf}' not found for field 'conf' (deckConfigId)`);
+      }
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -513,7 +558,7 @@ export class EchoeDeckService {
       // Check if new parent exists if using ::
       if (dto.name.includes('::')) {
         const parentName = dto.name.substring(0, dto.name.lastIndexOf('::'));
-        const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName))).limit(1);
+        const parent = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, parentName), isActiveDeck)).limit(1);
         if (parent.length === 0) {
           throw new Error(`Parent deck '${parentName}' does not exist`);
         }
@@ -523,6 +568,10 @@ export class EchoeDeckService {
 
     if (dto.desc !== undefined) {
       updates.desc = dto.desc;
+    }
+
+    if (dto.conf !== undefined) {
+      updates.conf = dto.conf;
     }
 
     await db.update(echoeDecks).set(updates).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
@@ -536,7 +585,7 @@ export class EchoeDeckService {
   async deleteDeck(uid: string, id: string, deleteCards: boolean = false): Promise<boolean> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       return false;
@@ -545,40 +594,69 @@ export class EchoeDeckService {
     // Pre-fetch data needed inside the transaction to minimize read locks
     let deckIds: string[] = [];
     let noteIds: string[] = [];
+    let cardIds: string[] = [];
 
     if (deleteCards) {
       deckIds = await this.getDeckAndSubdeckIds(uid, id);
-      const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+      const cards = await db.select({ nid: echoeCards.nid, cardId: echoeCards.cardId }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds), isActiveCard));
       noteIds = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
+      cardIds = cards.map((c: Pick<EchoeCards, 'cardId'>) => c.cardId);
     }
 
     // Wrap all mutation operations in a transaction to prevent partial-delete state
     return withTransaction(async (tx) => {
-      const now = Math.floor(Date.now() / 1000);
+      const now = Date.now(); // Millisecond timestamp for soft delete
 
       if (deleteCards) {
+        // Soft delete revlogs for all cards (cascade from cards, FR-3)
+        if (cardIds.length > 0) {
+          await tx.update(echoeRevlog)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeRevlog.uid, uid), eq(echoeRevlog.deletedAt, 0), inArray(echoeRevlog.cid, cardIds)));
+        }
+
         if (noteIds.length > 0) {
           // Add notes to graves
           for (const nid of noteIds) {
             await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: nid, type: 1 });
           }
 
-          // Delete cards
-          await tx.delete(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+          // Soft delete cards
+          await tx.update(echoeCards)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeCards.uid, uid), eq(echoeCards.deletedAt, 0), inArray(echoeCards.did, deckIds)));
 
-          // Delete notes
-          await tx.delete(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
+          // Soft delete notes
+          await tx.update(echoeNotes)
+            .set({ deletedAt: now })
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.deletedAt, 0), inArray(echoeNotes.noteId, noteIds)));
         }
 
-        // Delete sub-decks
-        await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), inArray(echoeDecks.deckId, deckIds.slice(1))));
+        // Set templates.did to null for child decks being deleted
+        if (deckIds.length > 1) {
+          await tx.update(echoeTemplates)
+            .set({ did: null })
+            .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.did, deckIds.slice(1))));
+        }
+
+        // Soft delete sub-decks
+        await tx.update(echoeDecks)
+          .set({ deletedAt: now })
+          .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), inArray(echoeDecks.deckId, deckIds.slice(1))));
       }
 
       // Add deck to graves
       await tx.insert(echoeGraves).values({ graveId: generateTypeId(OBJECT_TYPE.ECHOE_GRAVE), uid, usn: 0, oid: id, type: 0 });
 
-      // Delete deck
-      await tx.delete(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)));
+      // Set templates.did to null for the main deck being deleted
+      await tx.update(echoeTemplates)
+        .set({ did: null })
+        .where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.did, id)));
+
+      // Soft delete deck
+      await tx.update(echoeDecks)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deletedAt, 0), eq(echoeDecks.deckId, id)));
 
       return true;
     });
@@ -593,7 +671,7 @@ export class EchoeDeckService {
     const deck = await db
       .select({ name: echoeDecks.name })
       .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id)))
+      .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, id), isActiveDeck))
       .limit(1);
 
     if (deck.length === 0) {
@@ -604,7 +682,7 @@ export class EchoeDeckService {
     const subDecks = await db
       .select({ deckId: echoeDecks.deckId })
       .from(echoeDecks)
-      .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deck[0].name}::%`)));
+      .where(and(eq(echoeDecks.uid, uid), like(echoeDecks.name, `${deck[0].name}::%`), isActiveDeck));
 
     for (const subDeck of subDecks) {
       result.push(subDeck.deckId);
@@ -619,13 +697,13 @@ export class EchoeDeckService {
   async getDeckConfig(uid: string, deckId: string): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf), isActiveDeckConfig)).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -640,13 +718,13 @@ export class EchoeDeckService {
   async updateDeckConfig(uid: string, deckId: string, dto: UpdateEchoeDeckConfigDto): Promise<EchoeDeckConfigDto | null> {
     const db = getDatabase();
 
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       return null;
     }
 
-    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
+    const config = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf), isActiveDeckConfig)).limit(1);
 
     if (config.length === 0) {
       return null;
@@ -711,7 +789,7 @@ export class EchoeDeckService {
 
     await db.update(echoeDeckConfig).set(updates).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf)));
 
-    const updated = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf))).limit(1);
+    const updated = await db.select().from(echoeDeckConfig).where(and(eq(echoeDeckConfig.uid, uid), eq(echoeDeckConfig.deckConfigId, deck[0].conf), isActiveDeckConfig)).limit(1);
 
     return this.mapConfigToDto(updated[0]);
   }
@@ -876,7 +954,7 @@ export class EchoeDeckService {
       dyn: 1, // 1 = filtered deck
       mod: now,
       desc: `Search: ${dto.searchQuery}`,
-      mid: '',
+      mid: null,
     };
 
     await db.insert(echoeDecks).values(newDeck);
@@ -895,7 +973,7 @@ export class EchoeDeckService {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), isActiveDeck)).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -921,7 +999,7 @@ export class EchoeDeckService {
     const db = getDatabase();
 
     // Get deck info
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, deckId), isActiveDeck)).limit(1);
 
     if (deck.length === 0 || deck[0].dyn !== 1) {
       return false;
@@ -966,15 +1044,19 @@ export class EchoeDeckService {
     const sampleCards: EchoeCardListItemDto[] = await Promise.all(
       cards.map(async (card) => {
         // Get note info
-        const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.noteId, card.nid), eq(echoeNotes.uid, uid))).limit(1);
+        const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.noteId, card.nid), eq(echoeNotes.uid, uid), isActiveNote)).limit(1);
         const noteData = note[0];
 
         // Get deck name
-        const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.deckId, card.did), eq(echoeDecks.uid, uid))).limit(1);
+        const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.deckId, card.did), eq(echoeDecks.uid, uid), isActiveDeck)).limit(1);
 
         // Get note type name
         const noteType = noteData?.mid
-          ? await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.noteTypeId, noteData.mid), eq(echoeNotetypes.uid, uid))).limit(1)
+          ? await db
+              .select()
+              .from(echoeNotetypes)
+              .where(and(eq(echoeNotetypes.noteTypeId, noteData.mid), eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.deletedAt, 0)))
+              .limit(1)
           : [];
 
         // Parse fields from fieldsJson (primary source)
@@ -1066,7 +1148,7 @@ export class EchoeDeckService {
       if (term.startsWith('deck:')) {
         // Filter by deck name
         const deckName = term.substring(5).replace(/"/g, '');
-        const decks = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`));
+        const decks = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), sql`${echoeDecks.name} LIKE ${`%${deckName}%`}`, isActiveDeck));
         const deckIds = decks.map((d: Pick<EchoeDecks, 'deckId'>) => d.deckId);
         if (deckIds.length > 0) {
           conditions.push(inArray(echoeCards.did, deckIds));
@@ -1074,7 +1156,7 @@ export class EchoeDeckService {
       } else if (term.startsWith('tag:')) {
         // Filter by tag
         const tag = term.substring(4).replace(/"/g, '');
-        const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`));
+        const notes = await db.select({ noteId: echoeNotes.noteId }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE ${`%"${tag}"%`}`, isActiveNote));
         const noteIds = notes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.noteId, noteIds));
@@ -1152,15 +1234,15 @@ export class EchoeDeckService {
         }
 
         // Get cards for these notes
-        const cardRecords = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds)));
+        const cardRecords = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.nid, noteIds), isActiveCard));
         cards = cardRecords;
       } else {
         // Direct card conditions
-        cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), ...conditions));
+        cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), isActiveCard, ...conditions));
       }
     } else {
       // No conditions - return all cards (limited)
-      cards = await db.select().from(echoeCards).where(eq(echoeCards.uid, uid)).limit(limit);
+      cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), isActiveCard)).limit(limit);
     }
 
     return cards.slice(0, limit);

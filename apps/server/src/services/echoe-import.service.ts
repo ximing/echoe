@@ -468,7 +468,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name), eq(echoeNotetypes.deletedAt, 0)))
             .limit(1);
 
           let noteTypeId = existing[0]?.noteTypeId;
@@ -571,7 +571,7 @@ export class EchoeImportService {
               dyn: deck.dyn || 0,
               mod: deck.mod || 0,
               desc: deck.desc || '',
-              mid: '',
+              mid: null,
             });
             added++;
           }
@@ -723,7 +723,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, row.name)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, row.name), eq(echoeNotetypes.deletedAt, 0)))
             .limit(1);
 
           let noteTypeId = existing[0]?.noteTypeId;
@@ -799,6 +799,25 @@ export class EchoeImportService {
           if (!deckId) {
             deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
 
+            // Resolve and validate mid (notetype) relation
+            const mappedMid = referenceMap.midToNoteTypeId.get(sourceMid);
+            let validatedMid: string | null = null;
+
+            if (mappedMid) {
+              // Validate that the mapped notetype exists in the database within the same uid
+              const notetypeExists = await db
+                .select({ noteTypeId: echoeNotetypes.noteTypeId })
+                .from(echoeNotetypes)
+                .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid), eq(echoeNotetypes.deletedAt, 0)))
+                .limit(1);
+
+              if (notetypeExists.length > 0) {
+                validatedMid = mappedMid;
+              } else {
+                errors.push(`Invalid relation: Note type '${mappedMid}' not found for field 'mid' (notetypeId) in deck ${row.name} - setting to null`);
+              }
+            }
+
             await db.insert(echoeDecks).values({
               deckId,
               uid,
@@ -812,7 +831,7 @@ export class EchoeImportService {
               dyn: row.dyn || 0,
               mod: row.mod,
               desc: row.desc || '',
-              mid: referenceMap.midToNoteTypeId.get(sourceMid) ?? '',
+              mid: validatedMid,
             });
             added++;
           }
@@ -988,6 +1007,19 @@ export class EchoeImportService {
           continue;
         }
 
+        // Validate that the mapped notetype exists in the database within the same uid
+        const notetypeExists = await db
+          .select({ noteTypeId: echoeNotetypes.noteTypeId })
+          .from(echoeNotetypes)
+          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid), eq(echoeNotetypes.deletedAt, 0)))
+          .limit(1);
+
+        if (notetypeExists.length === 0) {
+          skipped++;
+          errors.push(`Invalid relation: Note type '${mappedMid}' not found for field 'mid' (notetypeId) in note ${row.guid}`);
+          continue;
+        }
+
         // Convert numeric mid to string for source map lookup
         const notetypeFields = notetypeFieldsMap.get(sourceMid) ?? [];
 
@@ -1136,10 +1168,10 @@ export class EchoeImportService {
     const db = getDatabase();
     const noteOwner = await db.query.echoeNotes.findFirst({
       columns: { uid: true },
-      where: eq(echoeNotes.noteId, noteId),
+      where: and(eq(echoeNotes.noteId, noteId), eq(echoeNotes.uid, uid)),
     });
 
-    return !noteOwner || noteOwner.uid === uid;
+    return noteOwner !== undefined;
   }
 
   private async importCardsRows(
@@ -1189,6 +1221,30 @@ export class EchoeImportService {
 
           if (!mappedDid) {
             errors.push(`Skipped card ${row.id}: missing deck mapping for source did ${sourceDid}`);
+            continue;
+          }
+
+          // Validate that the mapped note exists in the database within the same uid
+          const noteExists = await db
+            .select({ noteId: echoeNotes.noteId })
+            .from(echoeNotes)
+            .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, mappedNid)))
+            .limit(1);
+
+          if (noteExists.length === 0) {
+            errors.push(`Invalid relation: Note '${mappedNid}' not found for field 'nid' (noteId) in card ${row.id}`);
+            continue;
+          }
+
+          // Validate that the mapped deck exists in the database within the same uid
+          const deckExists = await db
+            .select({ deckId: echoeDecks.deckId })
+            .from(echoeDecks)
+            .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, mappedDid)))
+            .limit(1);
+
+          if (deckExists.length === 0) {
+            errors.push(`Invalid relation: Deck '${mappedDid}' not found for field 'did' (deckId) in card ${row.id}`);
             continue;
           }
 
@@ -1326,6 +1382,18 @@ export class EchoeImportService {
         const sourceCid = this.getSourceIdKey(row.cid);
         const mappedCid = referenceMap.cidToCardId.get(sourceCid);
         if (!mappedCid) {
+          continue;
+        }
+
+        // Validate that the mapped card exists in the database within the same uid
+        const cardExists = await db
+          .select({ cardId: echoeCards.cardId })
+          .from(echoeCards)
+          .where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, mappedCid)))
+          .limit(1);
+
+        if (cardExists.length === 0) {
+          // Skip silently - revlogs for non-existent cards are expected when cards fail to import
           continue;
         }
 

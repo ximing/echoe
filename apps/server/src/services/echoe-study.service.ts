@@ -28,6 +28,14 @@ import type {
   StudyOptionsDto,
   RatingOptionDto,
 } from '@echoe/dto';
+import {
+  isActiveCard,
+  isActiveNote,
+  isActiveDeck,
+  isActiveDeckConfig,
+  isActiveNotetype,
+  isActiveRevlog,
+} from '../utils/active-row-predicates.js';
 
 /**
  * Internal type for FSRS card input built from database card.
@@ -202,7 +210,7 @@ export class EchoeStudyService {
     });
 
     if (!card) {
-      throw new Error('Card not found');
+      throw new Error(`Invalid relation: Card '${dto.cardId}' not found for field 'cid' (cardId)`);
     }
 
     // Get the note
@@ -344,7 +352,7 @@ export class EchoeStudyService {
           difficulty: schedulingResult.difficulty,
           lastReview: now.getTime(),
         })
-        .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)));
+        .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid), isActiveCard));
 
       // Log the review using pre-review card state
       await tx.insert(echoeRevlog).values({
@@ -384,7 +392,7 @@ export class EchoeStudyService {
               mod: Math.floor(now.getTime() / 1000),
               usn: -1,
             })
-            .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)));
+            .where(and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid), isActiveCard));
         }
 
         // Always add 'leech' tag to the note if not already present
@@ -418,7 +426,7 @@ export class EchoeStudyService {
 
       // Fetch and return the updated card within the transaction
       const cardAfterTx = await db.query.echoeCards.findFirst({
-        where: and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid)),
+        where: and(eq(echoeCards.cardId, dto.cardId), eq(echoeCards.uid, uid), isActiveCard),
       });
       if (!cardAfterTx) {
         throw new Error('Failed to get updated card within transaction');
@@ -961,7 +969,7 @@ export class EchoeStudyService {
     });
 
     if (!card) {
-      throw new Error('Card not found');
+      throw new Error(`Invalid relation: Card '${cardId}' not found for field 'cid' (cardId)`);
     }
 
     // Get the deck

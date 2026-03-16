@@ -20,9 +20,7 @@ export const echoeRevlog = mysqlTable(
     id: int('id').primaryKey().notNull().autoincrement(), // Auto-increment internal primary key
     revlogId: varchar('revlog_id', { length: 191 }).notNull().unique(), // Business ID (nanoid string)
     sourceRevlogId: bigint('source_revlog_id', { mode: 'number' }), // Original source revlog ID (Anki timestamp-based ID)
-    cid: varchar('cid', { length: 191 })
-      .notNull()
-      .references(() => echoeCards.cardId, { onDelete: 'cascade' }), // Card ID - now business ID string
+    cid: varchar('cid', { length: 191 }).notNull(), // Card ID - business ID string
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this review record)
     usn: int('usn').notNull(), // Update sequence number (sync)
     ease: int('ease').notNull(), // Ease factor chosen: 1 Again, 2 Hard, 3 Good, 4 Easy
@@ -47,6 +45,7 @@ export const echoeRevlog = mysqlTable(
     preStability: double('pre_stability').notNull().default(0), // Stability before review
     preDifficulty: double('pre_difficulty').notNull().default(0), // Difficulty before review
     preLastReview: bigint('pre_last_review', { mode: 'number' }).notNull().default(0), // Last review before review
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     cidIdx: index('cid_idx').on(table.cid),
@@ -55,6 +54,7 @@ export const echoeRevlog = mysqlTable(
     uidRevlogIdIdx: index('uid_revlog_id_idx').on(table.uid, table.revlogId),
     uidCidIdx: index('uid_cid_idx').on(table.uid, table.cid),
     uidSourceRevlogIdIdx: index('uid_source_revlog_id_idx').on(table.uid, table.sourceRevlogId),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

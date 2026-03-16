@@ -5,7 +5,7 @@ jest.mock('../db/connection.js', () => ({
 }));
 
 jest.mock('../db/transaction.js', () => ({
-  withTransaction: jest.fn((cb: (tx: any) => Promise<any>) => cb({ insert: jest.fn(), delete: jest.fn() })),
+  withTransaction: jest.fn((cb: (tx: any) => Promise<any>) => cb({ insert: jest.fn(), delete: jest.fn(), update: jest.fn() })),
 }));
 
 import { getDatabase } from '../db/connection.js';
@@ -118,6 +118,7 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
       const tx = {
         insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
         delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }) }),
       };
       return cb(tx);
     });
@@ -172,7 +173,7 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     buildDeleteDeckDbMock([{ id: 'ed_mydeck', name: 'MyDeck' }]);
 
     const txInsertValues: any[] = [];
-    const txDeleteCalls: number[] = [];
+    const txUpdateCalls: number[] = [];
 
     mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
       let callOrder = 0;
@@ -183,10 +184,12 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
             return Promise.resolve();
           }),
         }),
-        delete: jest.fn().mockReturnValue({
-          where: jest.fn().mockImplementation(() => {
-            txDeleteCalls.push(++callOrder);
-            return Promise.resolve();
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockImplementation(() => {
+              txUpdateCalls.push(++callOrder);
+              return Promise.resolve();
+            }),
           }),
         }),
       };
@@ -201,7 +204,398 @@ describe('EchoeDeckService.deleteDeck - transaction protection', () => {
     expect(txInsertValues[0].type).toBe(0);
     expect(txInsertValues[0].oid).toBe('ed_mydeck');
 
-    // 1 delete call (deck itself)
-    expect(txDeleteCalls).toHaveLength(1);
+    // 2 update calls: 1 for templates.did=null + 1 for soft delete deck itself
+    expect(txUpdateCalls).toHaveLength(2);
+  });
+
+  it('should set templates.did to null before deleting deck (deleteCards=false)', async () => {
+    buildDeleteDeckDbMock([{ id: 'ed_mydeck', name: 'MyDeck' }]);
+
+    const txUpdateCalls: { table: string; setData: any; whereConditions: any }[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn().mockImplementation((table: any) => {
+          return {
+            set: jest.fn().mockImplementation((data: any) => {
+              return {
+                where: jest.fn().mockImplementation((conditions: any) => {
+                  txUpdateCalls.push({ table: table.name || 'unknown', setData: data, whereConditions: conditions });
+                  return Promise.resolve();
+                }),
+              };
+            }),
+          };
+        }),
+      };
+      return cb(tx);
+    });
+
+    const svc = new EchoeDeckService();
+    await svc.deleteDeck('uid-d', 'ed_mydeck', false);
+
+    // Should have 2 update calls: 1 for templates.did = null, 1 for soft delete deck
+    expect(txUpdateCalls).toHaveLength(2);
+    expect(txUpdateCalls[0].setData).toEqual({ did: null });
+    expect(txUpdateCalls[1].setData).toHaveProperty('deletedAt');
+  });
+
+  it('should set templates.did to null for both main deck and child decks (deleteCards=true)', async () => {
+    // Mock deck existence check
+    buildDeleteDeckDbMock([{ id: 'ed_parent', name: 'Parent' }]);
+
+    // Mock getDeckAndSubdeckIds to return parent and 2 children
+    const svc = new EchoeDeckService();
+    jest.spyOn(svc as any, 'getDeckAndSubdeckIds').mockResolvedValue(['ed_parent', 'ed_child1', 'ed_child2']);
+
+    const txUpdateCalls: { table: string; setData: any; whereConditions: any }[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn().mockImplementation((table: any) => {
+          return {
+            set: jest.fn().mockImplementation((data: any) => {
+              return {
+                where: jest.fn().mockImplementation((conditions: any) => {
+                  txUpdateCalls.push({ table: table.name || 'unknown', setData: data, whereConditions: conditions });
+                  return Promise.resolve();
+                }),
+              };
+            }),
+          };
+        }),
+      };
+      return cb(tx);
+    });
+
+    // Mock the cards fetch to return empty array
+    const db = mockedGetDatabase();
+    const originalSelect = db.select;
+    mockedGetDatabase.mockReturnValue({
+      ...db,
+      select: jest.fn().mockImplementation((fields?: any) => {
+        // For card fetch (has nid field)
+        if (fields && fields.nid) {
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
+          };
+        }
+        // For other queries, use original mock
+        return originalSelect.call(db, fields);
+      }),
+    } as any);
+
+    await svc.deleteDeck('uid-d', 'ed_parent', true);
+
+    // Should have 4 update calls:
+    // 1. Set templates.did = null for child decks (ed_child1, ed_child2)
+    // 2. Soft delete sub-decks
+    // 3. Set templates.did = null for main deck (ed_parent)
+    // 4. Soft delete main deck
+    expect(txUpdateCalls).toHaveLength(4);
+    const setNullCalls = txUpdateCalls.filter(c => c.setData.did === null);
+    const softDeleteCalls = txUpdateCalls.filter(c => c.setData.deletedAt !== undefined);
+    expect(setNullCalls).toHaveLength(2);
+    expect(softDeleteCalls).toHaveLength(2);
+  });
+
+  it('should delete revlogs before deleting cards when deleteCards=true (FR-3)', async () => {
+    // Mock deck existence check
+    buildDeleteDeckDbMock([{ id: 'ed_deck', name: 'TestDeck' }]);
+
+    // Mock getDeckAndSubdeckIds to return single deck
+    const svc = new EchoeDeckService();
+    jest.spyOn(svc as any, 'getDeckAndSubdeckIds').mockResolvedValue(['ed_deck']);
+
+    // Track all transaction update operations (soft deletes) in order
+    const txUpdateTables: any[] = [];
+
+    mockedWithTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+      const tx = {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn().mockImplementation((table: any) => {
+          // Capture the table object being updated (soft deleted)
+          txUpdateTables.push(table);
+          return {
+            set: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
+          };
+        }),
+      };
+      return cb(tx);
+    });
+
+    // Import table schemas to compare against
+    const { echoeRevlog } = await import('../db/schema/echoe-revlog.js');
+    const { echoeCards } = await import('../db/schema/echoe-cards.js');
+
+    // Mock the cards fetch to return cards with cardIds
+    const db = mockedGetDatabase();
+    const originalSelect = db.select;
+    mockedGetDatabase.mockReturnValue({
+      ...db,
+      select: jest.fn().mockImplementation((fields?: any) => {
+        // For card fetch (has nid and cardId fields)
+        if (fields && fields.nid && fields.cardId) {
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([
+                { nid: 'en_note1', cardId: 'ec_card1' },
+                { nid: 'en_note1', cardId: 'ec_card2' },
+              ]),
+            }),
+          };
+        }
+        // For other queries, use original mock
+        return originalSelect.call(db, fields);
+      }),
+    } as any);
+
+    await svc.deleteDeck('uid-d', 'ed_deck', true);
+
+    // Verify update (soft delete) operations occurred
+    expect(txUpdateTables.length).toBeGreaterThan(0);
+
+    // Find indices of revlog and cards soft deletes
+    const revlogUpdateIndex = txUpdateTables.indexOf(echoeRevlog);
+    const cardsUpdateIndex = txUpdateTables.indexOf(echoeCards);
+
+    // Verify revlogs are soft deleted before cards (FR-3 cascade requirement)
+    expect(revlogUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(cardsUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(revlogUpdateIndex).toBeLessThan(cardsUpdateIndex);
+  });
+});
+
+describe('EchoeDeckService - conf validation (Issue #58)', () => {
+  beforeEach(() => {
+    mockedGetDatabase.mockReset();
+  });
+
+  /**
+   * Helper to build DB mock for createDeck validation tests:
+   * - Call 1: Parent deck check (if name contains '::')
+   * - Call 2: Deck config validation
+   * - Call 3: Insert new deck
+   */
+  const buildCreateDeckDbMock = (deckConfigRows: any[], parentDeckRows: any[] = []) => {
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      // First call: parent deck check
+      if (selectCallCount === 1 && parentDeckRows.length > 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(parentDeckRows),
+            }),
+          }),
+        };
+      }
+      // Subsequent calls: deck config validation
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(deckConfigRows),
+          }),
+        }),
+      };
+    });
+
+    const insertMock = jest.fn().mockReturnValue({
+      values: jest.fn().mockResolvedValue(undefined),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      insert: insertMock,
+    } as any);
+
+    return { selectMock, insertMock };
+  };
+
+  /**
+   * Helper to build DB mock for updateDeck validation tests:
+   * - Call 1: Deck existence check
+   * - Call 2: Deck config validation (if conf provided)
+   * - Call 3: Parent deck check (if name contains '::')
+   * - Call 4: Update deck
+   * - Call 5+: getDeckById (complex hierarchy query)
+   */
+  const buildUpdateDeckDbMock = (deckRows: any[], deckConfigRows: any[] = [], parentDeckRows: any[] = []) => {
+    let selectCallCount = 0;
+    const selectMock = jest.fn().mockImplementation(() => {
+      selectCallCount++;
+      // First call: deck existence check
+      if (selectCallCount === 1) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(deckRows),
+            }),
+          }),
+        };
+      }
+      // Second call: deck config validation
+      if (selectCallCount === 2 && deckConfigRows.length >= 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(deckConfigRows),
+            }),
+          }),
+        };
+      }
+      // Third call: parent deck check
+      if (selectCallCount === 3 && parentDeckRows.length > 0) {
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(parentDeckRows),
+            }),
+          }),
+        };
+      }
+      // Subsequent calls: getDeckById query (return empty to avoid complex mocking)
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      };
+    });
+
+    const updateMock = jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    mockedGetDatabase.mockReturnValue({
+      select: selectMock,
+      update: updateMock,
+    } as any);
+
+    return { selectMock, updateMock };
+  };
+
+  describe('createDeck', () => {
+    it('should throw error when conf is provided but does not exist for the user', async () => {
+      buildCreateDeckDbMock([]); // Empty config rows = not found
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.createDeck('uid-test', {
+          name: 'TestDeck',
+          conf: 'edc_nonexistent',
+        })
+      ).rejects.toThrow("Invalid relation: Deck config 'edc_nonexistent' not found for field 'conf' (deckConfigId)");
+    });
+
+    it('should use first available config when conf is not provided', async () => {
+      const { insertMock } = buildCreateDeckDbMock([
+        { deckConfigId: 'edc_default', uid: 'uid-test', name: 'Default' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      await svc.createDeck('uid-test', {
+        name: 'TestDeck',
+      });
+
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      const insertedDeck = insertMock.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedDeck.conf).toBe('edc_default');
+    });
+
+    it('should throw error when conf is not provided and no configs exist for the user', async () => {
+      buildCreateDeckDbMock([]); // No configs available
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.createDeck('uid-test', {
+          name: 'TestDeck',
+        })
+      ).rejects.toThrow('No deck config found for user. Please create a deck config first.');
+    });
+
+    it('should create deck when valid conf is provided', async () => {
+      const { insertMock } = buildCreateDeckDbMock([
+        { deckConfigId: 'edc_valid', uid: 'uid-test', name: 'Valid Config' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      await svc.createDeck('uid-test', {
+        name: 'TestDeck',
+        conf: 'edc_valid',
+      });
+
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      const insertedDeck = insertMock.mock.results[0].value.values.mock.calls[0][0];
+      expect(insertedDeck.conf).toBe('edc_valid');
+    });
+  });
+
+  describe('updateDeck', () => {
+    it('should throw error when conf is provided but does not exist for the user', async () => {
+      buildUpdateDeckDbMock(
+        [{ deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' }],
+        [] // Empty config rows = not found
+      );
+
+      const svc = new EchoeDeckService();
+      await expect(
+        svc.updateDeck('uid-test', 'ed_test', {
+          conf: 'edc_nonexistent',
+        })
+      ).rejects.toThrow("Invalid relation: Deck config 'edc_nonexistent' not found for field 'conf' (deckConfigId)");
+    });
+
+    it('should update conf when valid conf is provided', async () => {
+      const { updateMock } = buildUpdateDeckDbMock(
+        [{ deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' }],
+        [{ deckConfigId: 'edc_new', uid: 'uid-test', name: 'New Config' }]
+      );
+
+      const svc = new EchoeDeckService();
+      // Mock getDeckById to return null to avoid complex query mocking
+      jest.spyOn(svc, 'getDeckById').mockResolvedValue(null);
+
+      await svc.updateDeck('uid-test', 'ed_test', {
+        conf: 'edc_new',
+      });
+
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      const setCall = updateMock.mock.results[0].value.set.mock.calls[0][0];
+      expect(setCall.conf).toBe('edc_new');
+    });
+
+    it('should not update conf when conf is not provided', async () => {
+      const { updateMock } = buildUpdateDeckDbMock([
+        { deckId: 'ed_test', uid: 'uid-test', name: 'TestDeck', conf: 'edc_old' },
+      ]);
+
+      const svc = new EchoeDeckService();
+      // Mock getDeckById to return null to avoid complex query mocking
+      jest.spyOn(svc, 'getDeckById').mockResolvedValue(null);
+
+      await svc.updateDeck('uid-test', 'ed_test', {
+        name: 'NewName',
+      });
+
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      const setCall = updateMock.mock.results[0].value.set.mock.calls[0][0];
+      expect(setCall.conf).toBeUndefined();
+      expect(setCall.name).toBe('NewName');
+    });
   });
 });

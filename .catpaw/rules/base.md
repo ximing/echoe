@@ -12,7 +12,15 @@ pnpm workspace仓库，安装 npm 包 使用 pnpm
 符合SOILD原则
 同时如无必要勿增实体，不要过度设计
 </constraint>
-
+<constraint>
+数据库禁止使用外键
+</constraint>
+<principle>
+      1. agent-browser 已经通过brew全局安装，可以直接使用
+      2. agent-browser SKILL 见 .catpaw/skills/vercel.agent-browser
+      3. 使用前先通过 open -na "Google Chrome Beta" --args --remote-debugging-port=9225 --user-data-dir=/Users/ximing/chrome_profile 打开浏览器，然后通过 agent-browser connect $(curl -s http://127.0.0.1:9225/json/version | jq -r '.webSocketDebuggerUrl')  链接浏览器
+      4. 然后就可以通过 agent-browser open 等 SKILL 中的命令进行浏览器的操作了
+    </principle>
 
 ## 核心技术栈
 
@@ -99,8 +107,8 @@ export const { trace, debug, info, warn, error, flush, close } = logger;
 
 ### 环境变量配置
 
-| 变量           | 说明         | 默认值   |
-| -------------- | ------------ | -------- |
+| 变量            | 说明         | 默认值   |
+| --------------- | ------------ | -------- |
 | echoe_LOG_DIR   | 日志文件目录 | `./logs` |
 | echoe_LOG_LEVEL | 日志级别     | `info`   |
 

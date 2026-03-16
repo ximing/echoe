@@ -15,8 +15,9 @@ import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeMedia } from '../db/schema/echoe-media.js';
-import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
+
+import { EchoeMediaService } from './echoe-media.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SECOND_MS = 1000;
@@ -659,7 +660,7 @@ export class EchoeExportService {
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds)));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds), eq(echoeNotetypes.deletedAt, 0)));
 
     // Build models JSON for col.json and reference map for downstream note export
     const models: Record<number, any> = {};
@@ -932,7 +933,7 @@ export class EchoeExportService {
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds)));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds), eq(echoeNotetypes.deletedAt, 0)));
 
     // Insert into temp database
     const stmt = tempDb.prepare(`

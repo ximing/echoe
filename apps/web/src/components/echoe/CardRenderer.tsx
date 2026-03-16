@@ -45,6 +45,7 @@ const ALLOWED_TAGS = [
 ];
 
 const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'class', 'id', 'width', 'height', 'style', 'controls', 'type', 'placeholder', 'data-field', 'data-text', 'data-lang'];
+const EMPTY_TYPED_ANSWERS: Record<string, string> = {};
 
 // Tiptap extensions for rendering (same as RichTextRenderer)
 const rendererExtensions = [
@@ -337,6 +338,17 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+function isSameTypedAnswers(a: Record<string, string>, b: Record<string, string>): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  return aKeys.every((key) => a[key] === b[key]);
+}
+
 /**
  * Main render function that processes all template features
  */
@@ -407,19 +419,25 @@ export function CardRenderer({
   richTextFields,
   side,
   clozeOrdinal,
-  typedAnswers = {},
+  typedAnswers,
   onTypeAnswer,
   autoplay = 'never',
   ttsSpeed = 1,
   onAudioReady,
 }: CardRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [localTypedAnswers, setLocalTypedAnswers] = useState<Record<string, string>>({});
+  const normalizedTypedAnswers = typedAnswers ?? EMPTY_TYPED_ANSWERS;
+  const [localTypedAnswers, setLocalTypedAnswers] = useState<Record<string, string>>(normalizedTypedAnswers);
 
   // Initialize local typed answers from prop
   useEffect(() => {
-    setLocalTypedAnswers(typedAnswers);
-  }, [typedAnswers]);
+    setLocalTypedAnswers((prev) => {
+      if (isSameTypedAnswers(prev, normalizedTypedAnswers)) {
+        return prev;
+      }
+      return normalizedTypedAnswers;
+    });
+  }, [normalizedTypedAnswers]);
 
   // Process type-answer after sanitization
   const processedContent = useMemo(() => {
