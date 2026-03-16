@@ -406,3 +406,55 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Fallback query in catch block has no .orderBy(), just .where()
   - Mock must handle all three query patterns correctly for tests to pass
 ---
+## 2026-03-16 21:30 - US-017
+- Implemented inbox-to-card manual conversion endpoint POST /api/v1/inbox/:inboxId/to-card
+- Created InboxToCardController with deck/notetype ownership validation
+- Validates required field mapping before note creation (default: front -> first field, back -> second field)
+- Supports custom field mapping via fieldMapping parameter
+- Creates note and card entities using EchoeNoteService.createNote()
+- Returns noteId, cardId, deckId, notetypeId in response
+- Added 11 comprehensive tests covering all scenarios
+- All tests pass successfully
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/controllers/v1/inbox-to-card.controller.ts (new)
+  - apps/server/src/controllers/index.ts (registered controller)
+  - apps/server/src/__tests__/inbox-to-card.controller.test.ts (new, 11 tests)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Controller uses EchoeNoteService.createNote() to create notes with cards atomically
+  - Field mapping pattern: default to first two fields (Front/Back), allow custom mapping
+  - Notetype field definitions accessed via notetype.flds.map(f => f.name)
+  - Single-field notetypes (cloze) only use front field, skip back field
+  - Ownership validation order: inbox item -> deck -> notetype (fail fast)
+  - EchoeNoteService.createNote() returns EchoeNoteWithCardsDto including cards array
+  - Test mocks must include all DTO fields (EchoeDeckWithCountsDto has 15+ fields)
+  - Error handling: specific errors for not-found vs validation failures
+---
+## 2026-03-16 21:32 - US-018
+- Implemented AI-assisted inbox-to-card recommendation feature
+- Updated InboxToCardController to support optional deckId/notetypeId parameters
+- Added recommendDeckAndNotetype method using simple heuristics (category match, content length)
+- Added getDefaultDeckAndNotetype fallback method for deterministic default mapping
+- Added getAllNotetypes helper method to query active notetypes for user
+- Made deckId and notetypeId optional in ConvertInboxToCardDto
+- Response now includes aiRecommended flag, deckName, and notetypeName
+- Updated tests to include InboxAiService mock and removed validation tests for optional fields
+- Added test for aiRecommended flag in response
+- All 10 inbox-to-card controller tests pass successfully
+- All 94 inbox-related tests pass successfully
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/controllers/v1/inbox-to-card.controller.ts (added AI recommendation logic)
+  - apps/server/src/__tests__/inbox-to-card.controller.test.ts (updated mocks and tests)
+  - packages/dto/src/inbox-to-card.dto.ts (made deckId/notetypeId optional)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - AI recommendation uses simple heuristics: category match to deck name, content length for notetype selection
+  - Fallback pattern: Try AI recommendation first, catch errors and use deterministic default (first deck/notetype)
+  - Response enrichment: Include human-readable names (deckName, notetypeName) alongside IDs for better UX
+  - getAllNotetypes helper uses dynamic imports to avoid circular dependencies with db/connection
+  - Test mocking pattern: Add new service dependencies to beforeEach setup with proper type casting
+  - Optional fields in DTOs: Remove validation tests when fields become optional
+  - aiRecommended flag distinguishes between explicit user choice vs AI/fallback selection
+---

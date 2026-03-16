@@ -52,10 +52,10 @@ export enum CardConversionStatus {
 export interface ConvertInboxToCardDto {
   /** Inbox ID */
   inboxId: string;
-  /** 目标卡组 ID */
-  deckId: string;
-  /** 笔记类型 ID */
-  notetypeId: string;
+  /** 目标卡组 ID (可选，不提供时使用 AI 推荐) */
+  deckId?: string;
+  /** 笔记类型 ID (可选，不提供时使用 AI 推荐) */
+  notetypeId?: string;
   /** 是否使用 AI 优化 */
   useAiOptimize?: boolean;
   /** 自定义字段映射 (可选) */
