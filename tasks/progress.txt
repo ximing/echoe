@@ -569,3 +569,31 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - TypeDI dependency injection: Inject InboxMetricsService via constructor in all services/controllers
   - File extension: Always use .js extension for imports (inbox-metrics.service.js) in TypeScript with moduleResolution: node16
 ---
+## 2026-03-16 22:07 - US-022
+- Implemented web API clients for token, inbox, and report endpoints
+- Created three new API files:
+  - apps/web/src/api/api-token.ts: getApiTokens, createApiToken, deleteApiToken
+  - apps/web/src/api/inbox.ts: CRUD operations, markRead/markAllRead, organizeInboxItem, convertInboxToCard
+  - apps/web/src/api/inbox-report.ts: getInboxReports, getInboxReport, generateInboxReport
+- All API functions use shared DTO contracts from @echoe/dto for type safety
+- Implemented explicit error handling:
+  - 409 conflict for duplicate report generation (returns existing report reference)
+  - 503 AI unavailable responses with user-friendly error messages
+- Typecheck passes successfully
+- Files changed:
+  - apps/web/src/api/api-token.ts (new)
+  - apps/web/src/api/inbox.ts (new)
+  - apps/web/src/api/inbox-report.ts (new)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - API client pattern: Use request helper from ../utils/request for consistent error handling
+  - Response typing: Use ApiResponseDto<T> wrapper for all API responses
+  - Error handling pattern: Wrap API calls in try-catch to handle specific HTTP status codes (409, 503)
+  - Pagination response: Define custom interfaces (InboxListResponse, InboxReportListResponse) for paginated data
+  - Async execution: Support optional ?async=true query param for queue-based execution
+  - 409 conflict handling: Extract existing resource from error response and throw structured error
+  - 503 handling: Throw user-friendly error message for AI service unavailability
+  - DTO imports: Import all required types from @echoe/dto for type safety across frontend/backend
+  - Query params: Pass as { params } in request.get() second argument
+  - API endpoints follow REST conventions: GET/POST/PUT/DELETE with resource IDs in path
+---
