@@ -53,8 +53,8 @@ export interface InboxDto {
   source: InboxSource;
   /** 类别/标签 (backend, frontend, design, product, life, other) */
   category: InboxCategory;
-  /** 已读状态 (0 = 未读, 1 = 已读) */
-  isRead: number;
+  /** 已读状态 (false = 未读, true = 已读) */
+  isRead: boolean;
   /** 软删除时间戳 (null = 活跃) */
   deletedAt: Date | null;
   /** 创建时间 */
@@ -78,7 +78,7 @@ export interface InboxListItemDto {
   /** 类别 */
   category: InboxCategory;
   /** 已读状态 */
-  isRead: number;
+  isRead: boolean;
   /** 创建时间 */
   createdAt: Date;
   /** 最后更新时间 */
@@ -112,7 +112,7 @@ export interface UpdateInboxDto {
   /** 类别 */
   category?: InboxCategory;
   /** 已读状态 */
-  isRead?: number;
+  isRead?: boolean;
 }
 
 /**
@@ -125,8 +125,8 @@ export interface InboxQueryParams {
   source?: InboxSource;
   /** 按类别筛选 */
   category?: InboxCategory;
-  /** 筛选已读状态 (0 = 未读, 1 = 已读) */
-  isRead?: number;
+  /** 筛选已读状态 (false = 未读, true = 已读) */
+  isRead?: boolean;
   /** 搜索关键词 (搜索 front 和 back 内容) */
   keyword?: string;
   /** 页码 (默认 1) */

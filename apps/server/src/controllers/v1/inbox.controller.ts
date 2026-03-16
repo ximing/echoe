@@ -31,7 +31,7 @@ export class InboxController {
   @Get('/')
   async getInboxItems(
     @QueryParam('category') category?: string,
-    @QueryParam('isRead') isRead?: number,
+    @QueryParam('isRead') isRead?: boolean,
     @QueryParam('page') page?: number,
     @QueryParam('limit') limit?: number,
     @CurrentUser() userDto?: UserInfoDto

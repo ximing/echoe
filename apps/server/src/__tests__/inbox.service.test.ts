@@ -44,7 +44,7 @@ describe('InboxService', () => {
         back: 'Back content',
         source: 'manual',
         category: 'backend',
-        isRead: 0,
+        isRead: false,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -89,7 +89,7 @@ describe('InboxService', () => {
       expect(insertedData.back).toBe('Back content');
       expect(insertedData.source).toBe('manual');
       expect(insertedData.category).toBe('backend');
-      expect(insertedData.isRead).toBe(0);
+      expect(insertedData.isRead).toBe(false);
     });
 
     it('should use default values when not provided', async () => {
@@ -105,7 +105,7 @@ describe('InboxService', () => {
               back: 'Back',
               source: 'manual',
               category: 'backend',
-              isRead: 0,
+              isRead: false,
             }]),
           }),
         }),
@@ -129,15 +129,15 @@ describe('InboxService', () => {
 
       expect(insertedData.source).toBe('manual');
       expect(insertedData.category).toBe('backend');
-      expect(insertedData.isRead).toBe(0);
+      expect(insertedData.isRead).toBe(false);
     });
   });
 
   describe('list', () => {
     it('should return paginated inbox items', async () => {
       const mockInboxItems = [
-        { inboxId: 'i123', uid: 'test-uid', front: 'Front 1', back: 'Back 1', source: 'manual', category: 'backend', isRead: 0 },
-        { inboxId: 'i456', uid: 'test-uid', front: 'Front 2', back: 'Back 2', source: 'manual', category: 'backend', isRead: 1 },
+        { inboxId: 'i123', uid: 'test-uid', front: 'Front 1', back: 'Back 1', source: 'manual', category: 'backend', isRead: false },
+        { inboxId: 'i456', uid: 'test-uid', front: 'Front 2', back: 'Back 2', source: 'manual', category: 'backend', isRead: true },
       ];
 
       mockedGetDatabase.mockReturnValue({
@@ -207,7 +207,7 @@ describe('InboxService', () => {
       } as any);
 
       const params: ListInboxParams = {
-        isRead: 0,
+        isRead: false,
       };
 
       await service.list('test-uid', params);
@@ -254,7 +254,7 @@ describe('InboxService', () => {
         back: 'Updated Back',
         source: 'web',
         category: 'frontend',
-        isRead: 1,
+        isRead: true,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -297,7 +297,7 @@ describe('InboxService', () => {
         front: 'Updated Front',
         back: 'Updated Back',
         category: 'frontend',
-        isRead: 1,
+        isRead: true,
       });
 
       expect(result.front).toBe('Updated Front');
@@ -370,7 +370,7 @@ describe('InboxService', () => {
         back: 'Back',
         source: 'manual',
         category: 'backend',
-        isRead: 1,
+        isRead: true,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -407,7 +407,7 @@ describe('InboxService', () => {
 
       const result = await service.markRead('test-uid', 'i123');
 
-      expect(result.isRead).toBe(1);
+      expect(result.isRead).toBe(true);
     });
 
     it('should throw error if inbox item not found', async () => {

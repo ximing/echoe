@@ -547,8 +547,8 @@ export class InboxAiService {
 
       // Calculate daily statistics
       const totalInbox = dailyInboxItems.length;
-      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
-      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
+      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === false).length;
+      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === true).length;
       const deletedInbox = deletedItems.length;
 
       // Category breakdown
@@ -576,7 +576,7 @@ export class InboxAiService {
       // Build AI prompt for report generation
       const dailyFacts = dailyInboxItems
         .map((item: Inbox, idx: number) => {
-          return `[${idx + 1}] ID:${item.inboxId} [${item.category}] (${item.source})\nQ: ${item.front}\nA: ${item.back}\nRead: ${item.isRead === 1 ? 'Yes' : 'No'}`;
+          return `[${idx + 1}] ID:${item.inboxId} [${item.category}] (${item.source})\nQ: ${item.front}\nA: ${item.back}\nRead: ${item.isRead === true ? 'Yes' : 'No'}`;
         })
         .join('\n\n');
 
@@ -747,8 +747,8 @@ Please generate a comprehensive daily report with topics, mistakes, actions, and
         );
 
       const totalInbox = dailyInboxItems.length;
-      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 0).length;
-      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === 1).length;
+      const newInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === false).length;
+      const processedInbox = dailyInboxItems.filter((item: Inbox) => item.isRead === true).length;
       const deletedInbox = deletedItems.length;
 
       const categoryMap = new Map<string, number>();

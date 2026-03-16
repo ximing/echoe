@@ -56,7 +56,7 @@ describe('InboxToCardController', () => {
     back: 'TypeScript is a typed superset of JavaScript',
     source: 'manual',
     category: 'backend',
-    isRead: 0,
+    isRead: false,
     deletedAt: null,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),

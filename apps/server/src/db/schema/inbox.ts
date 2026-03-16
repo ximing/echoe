@@ -2,7 +2,7 @@ import {
   mysqlTable,
   varchar,
   text,
-  tinyint,
+  boolean,
   timestamp,
   index,
   unique,
@@ -21,7 +21,7 @@ export const inbox = mysqlTable(
     back: text('back').notNull().$type<string>(), // Back side/answer content
     source: varchar('source', { length: 255 }).notNull().default('manual'), // Source of the item (e.g., 'manual', 'web', 'api')
     category: varchar('category', { length: 255 }).notNull().default('backend'), // Category/tag for organizing (e.g., 'backend', 'frontend', 'design')
-    isRead: tinyint('is_read').notNull().default(0), // Read state (0 = unread, 1 = read)
+    isRead: boolean('is_read').default(false).notNull(), // Read state (false = unread, true = read)
     deletedAt: timestamp('deleted_at', { mode: 'date', fsp: 3 }), // Soft delete timestamp (null = active)
     createdAt: timestamp('created_at', { mode: 'date', fsp: 3 }).notNull().defaultNow(), // Item creation time
     updatedAt: timestamp('updated_at', { mode: 'date', fsp: 3 })

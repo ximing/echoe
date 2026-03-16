@@ -52,7 +52,7 @@ describe('InboxController', () => {
       back: 'Back content 1',
       source: 'manual',
       category: 'backend',
-      isRead: 0,
+      isRead: false,
       deletedAt: null,
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
@@ -64,7 +64,7 @@ describe('InboxController', () => {
       back: 'Back content 2',
       source: 'web',
       category: 'frontend',
-      isRead: 1,
+      isRead: true,
       deletedAt: null,
       createdAt: new Date('2024-01-02'),
       updatedAt: new Date('2024-01-02'),
@@ -145,7 +145,7 @@ describe('InboxController', () => {
       // Call controller
       const result = await controller.getInboxItems(
         'backend', // category
-        0, // isRead (unread)
+        false, // isRead (unread)
         1,
         20,
         mockUser
@@ -155,7 +155,7 @@ describe('InboxController', () => {
       expect(result.code).toBe(ErrorCode.SUCCESS);
       expect(mockInboxService.list).toHaveBeenCalledWith(mockUser.uid, {
         category: 'backend',
-        isRead: 0,
+        isRead: false,
         page: 1,
         pageSize: 20,
       });
@@ -397,7 +397,7 @@ describe('InboxController', () => {
   describe('POST /api/v1/inbox/:inboxId/read', () => {
     it('should mark inbox item as read', async () => {
       // Setup mock
-      const readItem = { ...mockInboxItems[0], isRead: 1 };
+      const readItem = { ...mockInboxItems[0], isRead: true };
       mockInboxService.markRead.mockResolvedValue(readItem);
 
       // Call controller
@@ -405,7 +405,7 @@ describe('InboxController', () => {
 
       // Verify
       expect(result.code).toBe(ErrorCode.SUCCESS);
-      expect(result.data!.isRead).toBe(1);
+      expect(result.data!.isRead).toBe(true);
       expect(mockInboxService.markRead).toHaveBeenCalledWith(mockUser.uid, 'i1234567890');
     });
 

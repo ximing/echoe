@@ -14,7 +14,7 @@ export interface CreateInboxParams {
   back: string;
   source?: string;
   category?: string;
-  isRead?: number;
+  isRead?: boolean;
 }
 
 export interface UpdateInboxParams {
@@ -22,12 +22,12 @@ export interface UpdateInboxParams {
   back?: string;
   source?: string;
   category?: string;
-  isRead?: number;
+  isRead?: boolean;
 }
 
 export interface ListInboxParams {
   category?: string;
-  isRead?: number;
+  isRead?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -60,7 +60,7 @@ export class InboxService {
         back: data.back,
         source: data.source ?? 'manual',
         category: data.category ?? 'backend',
-        isRead: data.isRead ?? 0,
+        isRead: data.isRead ?? false,
       };
 
       await db.insert(inbox).values(newInboxItem);
@@ -229,10 +229,10 @@ export class InboxService {
         throw new Error('Inbox item not found');
       }
 
-      // Mark as read (set isRead to 1)
+      // Mark as read (set isRead to true)
       await db
         .update(inbox)
-        .set({ isRead: 1 })
+        .set({ isRead: true })
         .where(and(eq(inbox.inboxId, inboxId), eq(inbox.uid, uid), isNull(inbox.deletedAt)));
 
       // Fetch updated inbox item
@@ -262,7 +262,7 @@ export class InboxService {
       const unreadItems = await db
         .select({ inboxId: inbox.inboxId })
         .from(inbox)
-        .where(and(eq(inbox.uid, uid), eq(inbox.isRead, 0), isNull(inbox.deletedAt)));
+        .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), isNull(inbox.deletedAt)));
 
       const updatedCount = unreadItems.length;
 
@@ -270,8 +270,8 @@ export class InboxService {
         // Mark all as read
         await db
           .update(inbox)
-          .set({ isRead: 1 })
-          .where(and(eq(inbox.uid, uid), eq(inbox.isRead, 0), isNull(inbox.deletedAt)));
+          .set({ isRead: true })
+          .where(and(eq(inbox.uid, uid), eq(inbox.isRead, false), isNull(inbox.deletedAt)));
 
         logger.info(`Marked ${updatedCount} inbox items as read for user ${uid}`);
       }
