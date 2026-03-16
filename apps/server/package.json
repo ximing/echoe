@@ -46,6 +46,7 @@
     "@tiptap/extension-strike": "^3.20.1",
     "@tiptap/extension-text": "^3.20.1",
     "@tiptap/extension-underline": "^3.20.1",
+    "ai": "^4.3.19",
     "ali-oss": "^6.23.0",
     "archiver": "^6.0.0",
     "bcrypt": "^5.1.1",

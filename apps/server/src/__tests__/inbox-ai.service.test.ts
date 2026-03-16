@@ -35,6 +35,15 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+// Mock AI SDK
+jest.mock('@ai-sdk/openai', () => ({
+  createOpenAI: jest.fn(() => jest.fn()),
+}));
+
+jest.mock('ai', () => ({
+  generateText: jest.fn(),
+}));
+
 // Import after mocks
 import { getDatabase } from '../db/connection.js';
 import { InboxAiService } from '../services/inbox-ai.service.js';
@@ -415,6 +424,131 @@ describe('InboxAiService', () => {
           task: 'Rewrite',
         })
       ).rejects.toThrow('Inbox item not found');
+    });
+  });
+
+  describe('organizeInbox', () => {
+    // Mock AI SDK
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockedGetDatabase.mockReset();
+    });
+
+    it('should return fallback on AI timeout', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'What is TypeScript?',
+        back: 'TypeScript is a typed superset of JavaScript.',
+        source: 'manual',
+        category: 'backend',
+        isRead: 0,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Create a persistent mock that returns the inbox item for all queries
+      mockedGetDatabase.mockReturnValue(createMockSelect([mockInboxItem]) as any);
+
+      // Mock generateText to throw timeout error
+      const mockGenerateText = require('ai').generateText as jest.Mock;
+      mockGenerateText.mockRejectedValueOnce(new Error('timeout exceeded'));
+
+      const result = await service.organizeInbox({
+        uid: 'test-uid',
+        inboxId: 'i123',
+      });
+
+      expect(result.fallback).toBe(true);
+      expect(result.optimizedFront).toBe('What is TypeScript?');
+      expect(result.optimizedBack).toBe('TypeScript is a typed superset of JavaScript.');
+      expect(result.confidence).toBe(0);
+      expect(result.reason).toContain('AI organize failed');
+    });
+
+    it('should return fallback on JSON parse failure', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'What is TypeScript?',
+        back: 'TypeScript is a typed superset of JavaScript.',
+        source: 'manual',
+        category: 'backend',
+        isRead: 0,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Create a persistent mock
+      mockedGetDatabase.mockReturnValue(createMockSelect([mockInboxItem]) as any);
+
+      // Mock generateText to return invalid JSON
+      const mockGenerateText = require('ai').generateText as jest.Mock;
+      mockGenerateText.mockResolvedValueOnce({
+        text: 'This is not valid JSON',
+      });
+
+      const result = await service.organizeInbox({
+        uid: 'test-uid',
+        inboxId: 'i123',
+      });
+
+      expect(result.fallback).toBe(true);
+      expect(result.optimizedFront).toBe('What is TypeScript?');
+      expect(result.optimizedBack).toBe('TypeScript is a typed superset of JavaScript.');
+      expect(result.confidence).toBe(0);
+      expect(result.reason).toContain('AI organize failed');
+    });
+
+    it('should return fallback on schema validation failure', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'What is TypeScript?',
+        back: 'TypeScript is a typed superset of JavaScript.',
+        source: 'manual',
+        category: 'backend',
+        isRead: 0,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Create a persistent mock
+      mockedGetDatabase.mockReturnValue(createMockSelect([mockInboxItem]) as any);
+
+      // Mock generateText to return JSON with missing required fields
+      const mockGenerateText = require('ai').generateText as jest.Mock;
+      mockGenerateText.mockResolvedValueOnce({
+        text: JSON.stringify({
+          optimizedFront: 'What is TypeScript?',
+          // Missing optimizedBack, reason, confidence
+        }),
+      });
+
+      const result = await service.organizeInbox({
+        uid: 'test-uid',
+        inboxId: 'i123',
+      });
+
+      expect(result.fallback).toBe(true);
+      expect(result.confidence).toBe(0);
+    });
+
+    it('should return fallback when inbox item not found', async () => {
+      mockedGetDatabase.mockReturnValue(createMockSelect([]) as any);
+
+      const result = await service.organizeInbox({
+        uid: 'test-uid',
+        inboxId: 'nonexistent',
+      });
+
+      // Should return fallback with empty strings since item doesn't exist
+      expect(result.fallback).toBe(true);
+      expect(result.confidence).toBe(0);
+      expect(result.reason).toContain('AI organize failed');
     });
   });
 });

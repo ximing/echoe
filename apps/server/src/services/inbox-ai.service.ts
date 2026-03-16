@@ -1,12 +1,16 @@
 import { Service } from 'typedi';
 import { eq, and, isNull, gte, lte, desc, gt, lt } from 'drizzle-orm';
 import dayjs from 'dayjs';
+import { createOpenAI } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+import { z } from 'zod';
 
 import { getDatabase } from '../db/connection.js';
 import { inbox, type Inbox } from '../db/schema/inbox.js';
 import { inboxReport, type InboxReport } from '../db/schema/inbox-report.js';
 import { config } from '../config/config.js';
 import { logger } from '../utils/logger.js';
+import type { AiOrganizeResponseDto } from '@echoe/dto';
 
 /**
  * Token budget configuration
@@ -457,5 +461,147 @@ export class InboxAiService {
   private contextItemToString(item: ContextItem | null): string {
     if (!item) return '';
     return item.content;
+  }
+
+  /**
+   * Execute AI organize with validation and fallback
+   * Implements US-014: AI organize execution validation and fallback
+   */
+  async organizeInbox(params: {
+    uid: string;
+    inboxId: string;
+  }): Promise<AiOrganizeResponseDto> {
+    const { uid, inboxId } = params;
+    let failureReason: string | undefined;
+
+    try {
+      // Get current inbox item for fallback
+      const db = getDatabase();
+      const currentItem = await db
+        .select()
+        .from(inbox)
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .limit(1);
+
+      if (currentItem.length === 0) {
+        throw new Error('Inbox item not found');
+      }
+
+      const originalFront = currentItem[0].front;
+      const originalBack = currentItem[0].back || '';
+
+      // Build AI prompt with context
+      const promptInput = await this.buildPrompt({
+        uid,
+        inboxId,
+        task: 'organize_inbox',
+        outputFormat: 'json',
+      });
+
+      // Define output schema using Zod
+      const aiOrganizeSchema = z.object({
+        optimizedFront: z.string().min(1),
+        optimizedBack: z.string(),
+        reason: z.string().min(1),
+        confidence: z.number().min(0).max(1),
+      });
+
+      // Initialize OpenAI provider with custom baseURL
+      const openaiProvider = createOpenAI({
+        apiKey: config.openai.apiKey,
+        baseURL: config.openai.baseURL,
+      });
+
+      // Call AI model with timeout (15s as per PRD)
+      const result = await generateText({
+        model: openaiProvider(config.openai.model),
+        temperature: 0.2, // Stable and controlled as per PRD
+        maxTokens: 2000,
+        abortSignal: AbortSignal.timeout(15000), // 15s timeout
+        system: `You are an AI assistant that helps organize inbox content for flashcard learning.
+
+Your task is to optimize the front (question) and back (answer) of inbox items to make them suitable for flashcard-based learning.
+
+Guidelines:
+1. Keep the optimized content concise and focused on a single knowledge point
+2. If the back is missing or incomplete, try to complete it based on the front and context
+3. Do not introduce facts that don't exist in the original content or context
+4. If information is insufficient, explicitly state "Cannot determine" rather than making up content
+5. Output must be in JSON format with fields: optimizedFront, optimizedBack, reason, confidence
+
+Context provided:
+- Current input: The inbox item to optimize
+- Recent context (L1): Related inbox items from the last 7 days
+- Report memory (L2): Summaries from the last 30 days
+
+Your response must be valid JSON matching this schema:
+{
+  "optimizedFront": "string (the optimized question/front)",
+  "optimizedBack": "string (the optimized answer/back)",
+  "reason": "string (explanation for the optimization)",
+  "confidence": number (0-1, your confidence in this optimization)
+}`,
+        prompt: JSON.stringify(promptInput, null, 2),
+      });
+
+      // Parse and validate AI response
+      const parsed = JSON.parse(result.text);
+      const validated = aiOrganizeSchema.parse(parsed);
+
+      logger.info('AI organize succeeded', {
+        inboxId,
+        uid,
+        confidence: validated.confidence,
+      });
+
+      return {
+        optimizedFront: validated.optimizedFront,
+        optimizedBack: validated.optimizedBack,
+        reason: validated.reason,
+        confidence: validated.confidence,
+        fallback: false,
+      };
+    } catch (error) {
+      // Record failure reason for observability
+      if (error instanceof Error) {
+        if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
+          failureReason = 'AI request timeout (15s exceeded)';
+        } else if (error instanceof SyntaxError || error.message.includes('JSON')) {
+          failureReason = 'AI response parse failure (invalid JSON)';
+        } else if (error.message.includes('validation')) {
+          failureReason = 'AI response validation failure (schema mismatch)';
+        } else {
+          failureReason = `AI service error: ${error.message}`;
+        }
+      } else {
+        failureReason = 'Unknown AI service error';
+      }
+
+      logger.error('AI organize failed, returning fallback', {
+        inboxId,
+        uid,
+        failureReason,
+        error,
+      });
+
+      // Fallback: Return original content with fallback flag
+      const db = getDatabase();
+      const currentItem = await db
+        .select()
+        .from(inbox)
+        .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)))
+        .limit(1);
+
+      const originalFront = currentItem[0]?.front || '';
+      const originalBack = currentItem[0]?.back || '';
+
+      return {
+        optimizedFront: originalFront,
+        optimizedBack: originalBack,
+        reason: `AI organize failed: ${failureReason}. Returning original content.`,
+        confidence: 0,
+        fallback: true,
+      };
+    }
   }
 }
