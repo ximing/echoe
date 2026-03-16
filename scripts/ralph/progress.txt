@@ -71,3 +71,27 @@ Started: Mon Mar 16 18:25:16 CST 2026
 - Both content (markdown) and summary (JSON) fields support AI retrieval with different use cases
 - Date index enables efficient time-range queries across users
 ---
+
+## Sun Mar 16 18:45:00 CST 2026 - US-005
+- Verified migration generation workflow
+- Built server successfully with `pnpm --filter @echoe/server build`
+- Migration file 0001_known_dagger.sql already exists with all required tables
+- Migration includes all three tables: api_token, inbox, inbox_report
+- Critical uid+date unique constraint present for inbox_report (line 38)
+- All required indexes present for each table
+- Drizzle meta files are consistent (journal and snapshots updated)
+- Typecheck passes successfully
+
+**Files changed:**
+- apps/server/drizzle/0001_known_dagger.sql (already existed, verified)
+- apps/server/drizzle/meta/_journal.json (already updated, verified)
+- apps/server/drizzle/meta/0001_snapshot.json (already exists, verified)
+
+**Learnings for future iterations:**
+- Must always build server BEFORE generating migrations (drizzle-kit reads from dist/)
+- Migration generation is idempotent - if schemas match, it says "No schema changes"
+- The migration file naming uses random names (e.g., "known_dagger") with sequential numbering
+- Drizzle meta files include journal (migration history) and snapshots (schema state)
+- Migrations run automatically on server startup, so generated migrations will be applied on next run
+- The uid+date unique constraint prevents duplicate daily reports at the database level
+---
