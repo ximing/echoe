@@ -3,6 +3,7 @@ import {
   int,
   varchar,
   text,
+  bigint,
   tinyint,
   index,
   unique,
@@ -31,12 +32,14 @@ export const echoeDecks = mysqlTable(
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     desc: text('desc').notNull().$type<string>(), // Deck description
     mid: varchar('mid', { length: 191 }), // Last note type used - business ID string (nullable)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidDeckIdIdx: index('uid_deck_id_idx').on(table.uid, table.deckId),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

@@ -3,6 +3,7 @@ import {
   int,
   varchar,
   text,
+  bigint,
   index,
   unique,
 } from 'drizzle-orm/mysql-core';
@@ -31,6 +32,7 @@ export const echoeTemplates = mysqlTable(
     did: varchar('did', { length: 191 }), // Override deck ID - business ID string (nullable)
     mod: int('mod').notNull(), // Last modified time (Unix timestamp in seconds)
     usn: int('usn').notNull(), // Update sequence number (sync)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     ntidIdx: index('ntid_idx').on(table.ntid),
@@ -38,6 +40,7 @@ export const echoeTemplates = mysqlTable(
     usnIdx: index('usn_idx').on(table.usn),
     uidTemplateIdIdx: index('uid_template_id_idx').on(table.uid, table.templateId),
     uidNtidOrdUnique: unique('uid_ntid_ord_unique').on(table.uid, table.ntid, table.ord),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

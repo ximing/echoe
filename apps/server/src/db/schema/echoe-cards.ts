@@ -42,6 +42,7 @@ export const echoeCards = mysqlTable(
     stability: double('stability').notNull().default(0), // Stability (days) - represents how well the card is remembered
     difficulty: double('difficulty').notNull().default(0), // FSRS difficulty (ts-fsrs raw scale, not a probability)
     lastReview: bigint('last_review', { mode: 'number' }).notNull().default(0), // Last review timestamp (Unix ms)
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     nidIdx: index('nid_idx').on(table.nid),
@@ -58,6 +59,7 @@ export const echoeCards = mysqlTable(
     uidNidIdx: index('uid_nid_idx').on(table.uid, table.nid),
     uidDidQueueDueIdx: index('uid_did_queue_due_idx').on(table.uid, table.did, table.queue, table.due),
     uidLastReviewIdx: index('uid_last_review_idx').on(table.uid, table.lastReview),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 

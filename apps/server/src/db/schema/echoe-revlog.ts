@@ -45,6 +45,7 @@ export const echoeRevlog = mysqlTable(
     preStability: double('pre_stability').notNull().default(0), // Stability before review
     preDifficulty: double('pre_difficulty').notNull().default(0), // Difficulty before review
     preLastReview: bigint('pre_last_review', { mode: 'number' }).notNull().default(0), // Last review before review
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     cidIdx: index('cid_idx').on(table.cid),
@@ -53,6 +54,7 @@ export const echoeRevlog = mysqlTable(
     uidRevlogIdIdx: index('uid_revlog_id_idx').on(table.uid, table.revlogId),
     uidCidIdx: index('uid_cid_idx').on(table.uid, table.cid),
     uidSourceRevlogIdIdx: index('uid_source_revlog_id_idx').on(table.uid, table.sourceRevlogId),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
   })
 );
 
