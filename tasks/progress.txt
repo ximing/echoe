@@ -526,3 +526,46 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Logging pattern: Log start/completion with metrics (processedUsers, deletedCount, duration)
   - Drizzle delete: result.rowsAffected ?? 0 handles missing rowsAffected field
 ---
+## 2026-03-16 22:05 - US-021
+- Implemented InboxMetricsService with centralized metrics emission and structured event logging
+- Added comprehensive metrics tracking for all PRD 10.6 indicators:
+  - Business metrics: inbox_create_total, inbox_organize_success_rate, inbox_organize_latency_p95, report_generate_success_rate, report_generate_latency_p95, to_card_success_rate, token_create_total, token_auth_success_rate
+  - Technical metrics: ai_service_error_rate, ai_service_latency_p99, db_query_latency_p95, queue_job_backlog
+- Integrated metrics tracking across all relevant services and controllers:
+  - ApiTokenService: trackTokenCreate on token creation
+  - ApiTokenAuthMiddleware: trackTokenAuthSuccess/trackTokenAuthFailure on authentication
+  - InboxService: trackInboxCreate on inbox item creation
+  - InboxAiService: trackInboxOrganizeStart/trackInboxOrganizeSuccess with timing and fallback flag
+  - InboxReportController: trackReportGenerateStart/trackReportGenerateSuccess/trackReportGenerateConflict/trackReportGenerateError with timing
+  - InboxToCardController: trackToCardStart/trackToCardSuccess/trackToCardError with AI recommendation flag
+- Used @echoe/logger for all structured logs (no console logging)
+- Tracked AI fallback count via fallback flag in trackInboxOrganizeSuccess
+- Tracked report generation conflicts via trackReportGenerateConflict (409 responses)
+- Updated all test files to mock InboxMetricsService dependency injection
+- All 10 api-token service tests pass
+- All 16 inbox service tests pass
+- All 17 inbox-report controller tests pass
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/inbox-metrics.service.ts (new)
+  - apps/server/src/services/api-token.service.ts (added metrics tracking)
+  - apps/server/src/middlewares/api-token-auth.middleware.ts (added metrics tracking)
+  - apps/server/src/services/inbox.service.ts (added metrics tracking)
+  - apps/server/src/services/inbox-ai.service.ts (added metrics tracking with timing)
+  - apps/server/src/controllers/v1/inbox-report.controller.ts (added metrics tracking with timing)
+  - apps/server/src/controllers/v1/inbox-to-card.controller.ts (added metrics tracking)
+  - apps/server/src/__tests__/*.test.ts (updated to mock InboxMetricsService)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Metrics service pattern: Create centralized service with enum-based metric types and event types
+  - Structured logging pattern: Use logger.info with metadata objects, include timestamp in all events
+  - Timing pattern: Record startTime = Date.now() at method start, calculate latency = Date.now() - startTime before tracking
+  - Fallback tracking: Use boolean flag (fallback: true/false) to distinguish AI failures from successes
+  - Conflict tracking: Track 409 responses as separate event type (trackReportGenerateConflict)
+  - Test mocking pattern: Mock metrics service in beforeEach with all tracking methods as jest.fn()
+  - Metrics emit pattern: logger.info with [METRIC] prefix and structured data (metric, value, metadata)
+  - Event logging pattern: logger.info with [EVENT] prefix and structured data (event, metadata)
+  - Error logging pattern: logger.error with [ERROR] prefix, error message, stack, and metadata
+  - TypeDI dependency injection: Inject InboxMetricsService via constructor in all services/controllers
+  - File extension: Always use .js extension for imports (inbox-metrics.service.js) in TypeScript with moduleResolution: node16
+---
