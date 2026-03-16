@@ -36,6 +36,13 @@
       "when": 1773676998337,
       "tag": "0004_open_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1773677291160,
+      "tag": "0005_chief_susan_delgado",
+      "breakpoints": true
     }
   ]
 }
