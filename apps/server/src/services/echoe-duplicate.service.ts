@@ -170,7 +170,10 @@ export class EchoeDuplicateService {
     }
 
     // Get field definitions from notetypes to find field index
-    const notetypes = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, notetypeId)));
+    const notetypes = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, notetypeId), eq(echoeNotetypes.deletedAt, 0)));
 
     if (notetypes.length === 0) {
       return [];

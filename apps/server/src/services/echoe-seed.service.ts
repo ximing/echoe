@@ -335,7 +335,10 @@ export class EchoeSeedService {
 
     // Seed note types
     for (const noteType of NOTE_TYPES) {
-      const existing = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.noteTypeId, noteType.noteTypeId));
+      const existing = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(and(eq(echoeNotetypes.noteTypeId, noteType.noteTypeId), eq(echoeNotetypes.deletedAt, 0)));
       if (existing.length === 0) {
         await db.insert(echoeNotetypes).values(noteType);
         logger.info(`Seeded note type: ${noteType.name}`);

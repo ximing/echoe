@@ -1006,7 +1006,11 @@ export class EchoeDeckService {
 
         // Get note type name
         const noteType = noteData?.mid
-          ? await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.noteTypeId, noteData.mid), eq(echoeNotetypes.uid, uid))).limit(1)
+          ? await db
+              .select()
+              .from(echoeNotetypes)
+              .where(and(eq(echoeNotetypes.noteTypeId, noteData.mid), eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.deletedAt, 0)))
+              .limit(1)
           : [];
 
         // Parse fields from fieldsJson (primary source)

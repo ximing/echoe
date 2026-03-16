@@ -659,7 +659,7 @@ export class EchoeExportService {
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds)));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds), eq(echoeNotetypes.deletedAt, 0)));
 
     // Build models JSON for col.json and reference map for downstream note export
     const models: Record<number, any> = {};
@@ -932,7 +932,7 @@ export class EchoeExportService {
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds)));
+      .where(and(eq(echoeNotetypes.uid, uid), inArray(echoeNotetypes.noteTypeId, noteTypeIds), eq(echoeNotetypes.deletedAt, 0)));
 
     // Insert into temp database
     const stmt = tempDb.prepare(`

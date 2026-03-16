@@ -15,6 +15,13 @@
       "when": 1773586800000,
       "tag": "0001_drop_echoe_foreign_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773622518469,
+      "tag": "0002_absent_triathlon",
+      "breakpoints": true
     }
   ]
 }

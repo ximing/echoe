@@ -468,7 +468,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, model.name), eq(echoeNotetypes.deletedAt, 0)))
             .limit(1);
 
           let noteTypeId = existing[0]?.noteTypeId;
@@ -723,7 +723,7 @@ export class EchoeImportService {
           const existing = await db
             .select({ noteTypeId: echoeNotetypes.noteTypeId })
             .from(echoeNotetypes)
-            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, row.name)))
+            .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.name, row.name), eq(echoeNotetypes.deletedAt, 0)))
             .limit(1);
 
           let noteTypeId = existing[0]?.noteTypeId;
@@ -808,7 +808,7 @@ export class EchoeImportService {
               const notetypeExists = await db
                 .select({ noteTypeId: echoeNotetypes.noteTypeId })
                 .from(echoeNotetypes)
-                .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid)))
+                .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid), eq(echoeNotetypes.deletedAt, 0)))
                 .limit(1);
 
               if (notetypeExists.length > 0) {
@@ -1011,7 +1011,7 @@ export class EchoeImportService {
         const notetypeExists = await db
           .select({ noteTypeId: echoeNotetypes.noteTypeId })
           .from(echoeNotetypes)
-          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid)))
+          .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, mappedMid), eq(echoeNotetypes.deletedAt, 0)))
           .limit(1);
 
         if (notetypeExists.length === 0) {

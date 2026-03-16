@@ -176,7 +176,11 @@ export class EchoeNoteService {
   async createNote(uid: string, dto: CreateEchoeNoteDto): Promise<EchoeNoteWithCardsDto> {
     // Get note type to determine templates (outside transaction - read only)
     const db = getDatabase();
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId))).limit(1);
+    const notetype = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId), eq(echoeNotetypes.deletedAt, 0)))
+      .limit(1);
 
     if (notetype.length === 0) {
       throw new Error(`Invalid relation: Note type '${dto.notetypeId}' not found for field 'mid' (notetypeId)`);
@@ -315,7 +319,7 @@ export class EchoeNoteService {
       const notetype = await db
         .select()
         .from(echoeNotetypes)
-        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid)))
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid), eq(echoeNotetypes.deletedAt, 0)))
         .limit(1);
 
       if (notetype.length === 0) {
@@ -776,7 +780,11 @@ export class EchoeNoteService {
   async getAllNoteTypes(uid: string): Promise<EchoeNoteTypeDto[]> {
     const db = getDatabase();
 
-    const notetypes = await db.select().from(echoeNotetypes).where(eq(echoeNotetypes.uid, uid)).orderBy(echoeNotetypes.name);
+    const notetypes = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.deletedAt, 0)))
+      .orderBy(echoeNotetypes.name);
 
     if (notetypes.length === 0) {
       return [];
@@ -867,7 +875,11 @@ export class EchoeNoteService {
 
     // If cloning from an existing note type
     if (dto.cloneFrom) {
-      const sourceNotetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.cloneFrom))).limit(1);
+      const sourceNotetype = await db
+        .select()
+        .from(echoeNotetypes)
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.cloneFrom), eq(echoeNotetypes.deletedAt, 0)))
+        .limit(1);
       if (sourceNotetype.length === 0) {
         throw new Error(`Invalid relation: Note type '${dto.cloneFrom}' not found for field 'cloneFrom' (source notetype)`);
       }
@@ -989,7 +1001,11 @@ export class EchoeNoteService {
   async updateNoteType(uid: string, id: string, dto: UpdateEchoeNoteTypeDto): Promise<EchoeNoteTypeDto | null> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
+    const notetype = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id), eq(echoeNotetypes.deletedAt, 0)))
+      .limit(1);
 
     if (notetype.length === 0) {
       return null;
@@ -1127,32 +1143,42 @@ export class EchoeNoteService {
   }
 
   /**
-   * Delete a note type (rejects if notes exist)
+   * Delete a note type (soft delete - archives instead of deleting)
+   * Sets decks.mid = null for associated decks as per FR-3
+   * Preserves all notes, cards, revlogs, and templates (no cascade delete)
    */
   async deleteNoteType(uid: string, id: string): Promise<{ success: boolean; message?: string }> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
+    // Check if notetype exists and is not already deleted
+    const notetype = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id), eq(echoeNotetypes.deletedAt, 0)))
+      .limit(1);
 
     if (notetype.length === 0) {
-      return { success: false, message: 'Note type not found' };
+      return { success: false, message: 'Note type not found or already deleted' };
     }
 
-    // Check if any notes use this type
-    const notes = await db.select({ count: sql<number>`COUNT(*)` }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id)));
-    const noteCount = Number(notes[0]?.count || 0);
+    // Use transaction for atomicity
+    return withTransaction(async (tx) => {
+      const now = Date.now();
 
-    if (noteCount > 0) {
-      return { success: false, message: `Cannot delete note type: ${noteCount} notes exist using this type` };
-    }
+      // 1. Mark notetype as deleted (soft delete)
+      await tx
+        .update(echoeNotetypes)
+        .set({ deletedAt: now })
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
 
-    // Delete templates first
-    await db.delete(echoeTemplates).where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.ntid, id)));
+      // 2. Set decks.mid = null for associated decks (as per FR-3)
+      await tx
+        .update(echoeDecks)
+        .set({ mid: null })
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.mid, id)));
 
-    // Delete note type
-    await db.delete(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id)));
-
-    return { success: true };
+      return { success: true };
+    });
   }
 
   /**
@@ -1161,7 +1187,11 @@ export class EchoeNoteService {
   async getNoteTypeById(uid: string, id: string): Promise<EchoeNoteTypeDto | null> {
     const db = getDatabase();
 
-    const notetype = await db.select().from(echoeNotetypes).where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id))).limit(1);
+    const notetype = await db
+      .select()
+      .from(echoeNotetypes)
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, id), eq(echoeNotetypes.deletedAt, 0)))
+      .limit(1);
 
     if (notetype.length === 0) {
       return null;

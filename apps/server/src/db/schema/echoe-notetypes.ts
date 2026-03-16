@@ -3,6 +3,7 @@ import {
   int,
   varchar,
   text,
+  bigint,
   index,
   unique,
 } from 'drizzle-orm/mysql-core';
@@ -29,11 +30,13 @@ export const echoeNotetypes = mysqlTable(
     latexPre: text('latex_pre').notNull().$type<string>(), // LaTeX preamble
     latexPost: text('latex_post').notNull().$type<string>(), // LaTeX postamble
     req: text('req').notNull().$type<string>(), // JSON array of which fields are required
+    deletedAt: bigint('deleted_at', { mode: 'number' }).notNull().default(0), // Soft delete timestamp (0 = active)
   },
   (table) => ({
     nameIdx: index('name_idx').on(table.name),
     usnIdx: index('usn_idx').on(table.usn),
     uidNoteTypeIdIdx: index('uid_note_type_id_idx').on(table.uid, table.noteTypeId),
+    deletedAtIdx: index('deleted_at_idx').on(table.deletedAt),
     uidNameUnique: unique('uid_name_unique').on(table.uid, table.name),
   })
 );
