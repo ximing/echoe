@@ -95,3 +95,28 @@ Started: Mon Mar 16 18:25:16 CST 2026
 - Migrations run automatically on server startup, so generated migrations will be applied on next run
 - The uid+date unique constraint prevents duplicate daily reports at the database level
 ---
+
+## Sun Mar 16 18:50:00 CST 2026 - US-006
+- Verified DTO contracts implementation for token, inbox, report, and card conversion
+- All four DTO files exist: api-token.dto.ts, inbox.dto.ts, inbox-report.dto.ts, inbox-to-card.dto.ts
+- Enums properly defined: InboxSource, InboxCategory, CardConversionSource, CardConversionStatus
+- AiOrganizeResponseDto includes all required fields: optimizedFront, optimizedBack, reason, confidence, fallback
+- All DTOs properly exported from packages/dto/src/index.ts
+- Typecheck passes successfully
+
+**Files changed:**
+- packages/dto/src/api-token.dto.ts (already existed, verified)
+- packages/dto/src/inbox.dto.ts (already existed, verified)
+- packages/dto/src/inbox-report.dto.ts (already existed, verified)
+- packages/dto/src/inbox-to-card.dto.ts (already existed, verified)
+- packages/dto/src/index.ts (already updated, verified)
+
+**Learnings for future iterations:**
+- DTOs follow consistent naming pattern: {entity}.dto.ts for entity-specific DTOs
+- Each DTO file includes multiple related interfaces: base DTO, list item DTO, request DTOs, response DTOs
+- Enums are defined for constrained string values (source, category, status)
+- Query params DTOs include pagination, filtering, and sorting fields
+- Bulk operation DTOs include action enums and payload structures
+- AiOrganizeResponseDto is central to AI features - includes fallback flag for degraded scenarios
+- DTO exports use .js extension in index.ts (compiled output paths)
+---
