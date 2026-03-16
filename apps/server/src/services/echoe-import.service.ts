@@ -1168,10 +1168,10 @@ export class EchoeImportService {
     const db = getDatabase();
     const noteOwner = await db.query.echoeNotes.findFirst({
       columns: { uid: true },
-      where: eq(echoeNotes.noteId, noteId),
+      where: and(eq(echoeNotes.noteId, noteId), eq(echoeNotes.uid, uid)),
     });
 
-    return !noteOwner || noteOwner.uid === uid;
+    return noteOwner !== undefined;
   }
 
   private async importCardsRows(
