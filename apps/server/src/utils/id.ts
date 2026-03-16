@@ -11,6 +11,18 @@ export const generateTagId = () => {
   return generateTypeId(OBJECT_TYPE.TAG);
 };
 
+export const generateApiTokenId = () => {
+  return generateTypeId(OBJECT_TYPE.API_TOKEN);
+};
+
+export const generateInboxId = () => {
+  return generateTypeId(OBJECT_TYPE.INBOX);
+};
+
+export const generateInboxReportId = () => {
+  return generateTypeId(OBJECT_TYPE.INBOX_REPORT);
+};
+
 export const generateTypeId = (type: (typeof OBJECT_TYPE)[keyof typeof OBJECT_TYPE]) => {
   switch (type) {
     case OBJECT_TYPE.MEMO: {
@@ -105,6 +117,12 @@ export const generateTypeId = (type: (typeof OBJECT_TYPE)[keyof typeof OBJECT_TY
     }
     case OBJECT_TYPE.ECHOE_MEDIA: {
       return `em${typeid()}`;
+    }
+    case OBJECT_TYPE.API_TOKEN: {
+      return `at${typeid()}`;
+    }
+    case OBJECT_TYPE.INBOX_REPORT: {
+      return `ir${typeid()}`;
     }
   }
   throw new Error(`Invalid type: ${type}`);
