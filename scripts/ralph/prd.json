@@ -1,134 +1,131 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/remove-foreign-keys-business-id-big-bang",
-  "description": "移除 Echoe MySQL 外键约束，改为业务 ID + Service 事务维护关系完整性，一次性切换完成，不做数据迁移与兼容分支。",
+  "branchName": "ralph/inbox-api-token-ai-workflow",
+  "description": "收件箱与开放 API Token 功能：支持手动/API 推入、AI 整理、日报生成与卡片化。",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Remove Drizzle references in Echoe schema",
-      "description": "As a backend developer, I want all Echoe schema relations represented by fields and indexes instead of .references() so schema no longer defines database foreign keys.",
+      "title": "Add Inbox object types and ID generators",
+      "description": "As a backend developer, I want dedicated object types and centralized ID helpers so API token/inbox/report entities use consistent business IDs.",
       "acceptanceCriteria": [
-        "Remove all .references() usage from apps/server/src/db/schema/echoe-notes.ts, echoe-cards.ts, echoe-revlog.ts, echoe-decks.ts, and echoe-templates.ts",
-        "Keep relation columns as varchar(191) business ID fields and preserve required indexes for relation lookups",
-        "grep '\\.references\\(' apps/server/src/db/schema returns no Echoe relation references",
+        "Add OBJECT_TYPE entries: API_TOKEN, INBOX, INBOX_REPORT in apps/server/src/models/constant/type.ts",
+        "Add generateApiTokenId(), generateInboxId(), generateInboxReportId() in apps/server/src/utils/id.ts based on generateTypeId",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Add idempotent foreign-key drop migration",
-      "description": "As a release engineer, I want one migration that removes all existing Echoe foreign keys safely so runtime DB structure matches schema definitions.",
+      "title": "Create api_token schema and indexes",
+      "description": "As a backend developer, I want an api_token table so users can create and revoke API credentials safely.",
       "acceptanceCriteria": [
-        "Create migration logic that discovers target FK constraints via information_schema and drops only existing constraints",
-        "Cover all 8 FK relations listed in PRD section 4.1",
-        "Repeated migration execution is idempotent and does not fail when constraints are already absent",
+        "Add apps/server/src/db/schema/api-token.ts with fields token_id, uid, name, token_hash, deleted_at, created_at, updated_at",
+        "Ensure token_id is unique and add indexes for uid and token_hash",
+        "Export api_token schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Implement Note service relation validation",
-      "description": "As a backend developer, I want note write paths to validate related business IDs so note create/update rejects invalid mid references.",
+      "title": "Create inbox schema and indexes",
+      "description": "As a backend developer, I want an inbox table so users can store captured content with read state and source metadata.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-note.service.ts, create/update note paths validate mid existence within the same uid",
-        "Invalid relation returns explicit 4xx business error with relation field context",
-        "No numeric ID casting is introduced for relation validation",
-        "Tests pass",
+        "Add apps/server/src/db/schema/inbox.ts with business field inbox_id and content fields front/back/source/category/is_read",
+        "Ensure source default manual, category default backend, and soft-delete field deleted_at",
+        "Add indexes for inbox_id(unique), uid, category, is_read",
+        "Export inbox schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Implement Deck service relation validation",
-      "description": "As a backend developer, I want deck write paths to validate conf and mid references so deck create/update enforces same-uid relation integrity.",
+      "title": "Create inbox_report schema with summary memory",
+      "description": "As a backend developer, I want inbox reports to store both markdown content and structured summary for later AI retrieval.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-deck.service.ts, create/update deck validates conf and optional mid within the same uid",
-        "Update behavior follows PRD FR-2 matrix and returns 4xx for invalid relations",
-        "Deck relation checks execute without compatibility branch or dual-write logic",
-        "Tests pass",
+        "Add apps/server/src/db/schema/inbox-report.ts with fields inbox_report_id, date, content, summary, deleted_at",
+        "Add unique constraint on uid+date to prevent duplicate daily reports",
+        "Add indexes for inbox_report_id(unique), uid, date",
+        "Export inbox_report schema from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Implement Config service relation validation",
-      "description": "As a backend developer, I want config-domain writes to validate template/notetype/deck-config relations so config service enforces FR-2 integrity rules.",
+      "title": "Generate migration for inbox and token tables",
+      "description": "As a release engineer, I want deterministic migration artifacts so new tables and indexes can be applied safely.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-config.service.ts, template create/update validates ntid and optional did with uid scope",
-        "Deck-config and notetype related write paths validate required upstream objects with uid scope",
-        "Relation validation failures return explicit 4xx errors",
-        "Tests pass",
+        "Run pnpm --filter @echoe/server build before migration generation",
+        "Run pnpm --filter @echoe/server migrate:generate and produce migration SQL for api_token/inbox/inbox_report",
+        "Migration includes uid+date unique constraint for inbox_report and required indexes",
+        "Drizzle meta files are updated consistently",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Implement Study service relation validation",
-      "description": "As a backend developer, I want study-domain writes to validate card/revlog relations so cid and dependent IDs are always checked within uid scope.",
+      "title": "Add DTO contracts for token inbox report and card conversion",
+      "description": "As a shared package maintainer, I want typed DTO contracts so backend and frontend use the same API payload shape.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-study.service.ts, revlog creation validates cid existence in same uid",
-        "Any study write path that accepts relation IDs validates against business ID columns without cross-tenant leakage",
-        "Invalid relations return explicit 4xx business errors",
-        "Tests pass",
+        "Add DTO files for API token, inbox, inbox report, and inbox-to-card in packages/dto/src",
+        "Define enums and response DTOs including AiOrganizeResponse fields optimizedFront optimizedBack reason confidence fallback",
+        "Export all new DTOs from packages/dto/src/index.ts",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Align import services with relation validation",
-      "description": "As a backend developer, I want import pipelines to follow the same relation-validation rules so imported data does not bypass FR-2 checks.",
+      "title": "Build DTO package and align consumers",
+      "description": "As a maintainer, I want dto build output refreshed so server and web can compile against new inbox/token contracts.",
       "acceptanceCriteria": [
-        "Update apps/server/src/services/echoe-import.service.ts and echoe-csv-import.service.ts write paths to enforce same-uid relation checks",
-        "Imported card/note/template/deck records fail fast with explicit errors when upstream objects are missing",
-        "No compatibility branch or data backfill logic is introduced in import flow",
-        "Tests pass",
+        "Run pnpm --filter @echoe/dto build successfully",
+        "Server and web imports resolve new DTO exports without missing-symbol errors",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Implement Note owner delete transaction",
-      "description": "As a backend developer, I want note deletion to be a single transaction so note -> card -> revlog cascade is explicit and rollback-safe.",
+      "title": "Implement API token service core logic",
+      "description": "As a backend developer, I want token create/list/delete logic so users can manage API tokens with secure storage.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-note.service.ts, delete note runs as one transaction with uid-scoped conditions",
-        "Deleting a note removes dependent cards and revlogs according to PRD FR-3",
-        "Any step failure triggers full rollback",
+        "Implement token creation that returns plaintext token once and stores only SHA256 hash",
+        "Implement list and delete operations scoped by uid with soft-delete semantics",
+        "Use generateApiTokenId for token business ID generation",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Implement Deck owner delete transaction",
-      "description": "As a backend developer, I want deck deletion to run with explicit cascade semantics so cards are deleted and template did is set null in one transaction.",
+      "title": "Implement ApiTokenAuth middleware and precedence",
+      "description": "As a backend developer, I want bearer token authentication integrated so API clients can access protected APIs without JWT cookies.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-deck.service.ts, delete deck runs in one transaction with uid-scoped conditions",
-        "Deleting a deck deletes related cards and sets templates.did to null",
-        "Any step failure triggers full rollback",
+        "Add ApiTokenAuthMiddleware to parse Authorization Bearer token and validate token hash",
+        "Set authenticated user identity on request context after token validation",
+        "Authentication chain enforces precedence Token > JWT when both credentials are present",
+        "Invalid token returns explicit 401 response",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -138,12 +135,13 @@
     },
     {
       "id": "US-010",
-      "title": "Implement Card owner delete transaction",
-      "description": "As a backend developer, I want card deletion in study domain to explicitly delete revlogs so card -> revlog cascade no longer depends on DB foreign keys.",
+      "title": "Expose API token management endpoints",
+      "description": "As an authenticated user, I want to create view and delete my API tokens from dedicated endpoints.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-study.service.ts, deleting card triggers uid-scoped revlog cleanup within one transaction",
-        "Card delete flow follows FR-3 mapping for revlog cascade",
-        "Any step failure triggers full rollback",
+        "Implement GET /api/v1/api-tokens, POST /api/v1/api-tokens, DELETE /api/v1/api-tokens/:tokenId",
+        "DELETE endpoint uses tokenId business ID (not numeric auto-increment id)",
+        "Token management endpoints require JWT auth and reject token-auth self-management",
+        "Create response returns plaintext token only at creation time",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -153,12 +151,13 @@
     },
     {
       "id": "US-011",
-      "title": "Implement Config owner delete transactions",
-      "description": "As a backend developer, I want notetype and deck-config deletions owned by config service so cascades and set-null rules are explicit and transaction-safe.",
+      "title": "Implement inbox CRUD and read-state service",
+      "description": "As a backend developer, I want inbox business logic so users can create edit read and soft-delete inbox items.",
       "acceptanceCriteria": [
-        "In apps/server/src/services/echoe-config.service.ts, delete notetype performs: delete notes, delete templates, set decks.mid null (uid scoped)",
-        "In apps/server/src/services/echoe-config.service.ts, delete deck_config deletes related decks and triggers downstream cascades",
-        "Both delete flows run in one transaction and rollback on failure",
+        "Implement create/list/update/delete with uid scoping and deleted_at filtering",
+        "List supports pagination and filters for category and isRead",
+        "Implement mark-read and read-all with updatedCount response for read-all",
+        "Use generateInboxId for inbox business IDs",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -168,12 +167,13 @@
     },
     {
       "id": "US-012",
-      "title": "Add structured logging for relation operations",
-      "description": "As an operator, I want structured logs for relation validation and cascade execution so failures and affected rows are observable in production.",
+      "title": "Expose inbox CRUD and read-state endpoints",
+      "description": "As an authenticated user, I want REST endpoints for inbox operations so the web app and API clients can manage captured content.",
       "acceptanceCriteria": [
-        "Use @echoe/logger in relation validation and delete-cascade flows (no console logging)",
-        "Logs include at least event, uid, rootObject, targetField, targetId, affectedRows, result, and durationMs",
-        "Logging is added to note/deck/study/config service relation-critical paths",
+        "Implement routes: GET/POST /api/v1/inbox, PUT/DELETE /api/v1/inbox/:inboxId, POST /api/v1/inbox/:inboxId/read, POST /api/v1/inbox/read-all",
+        "Request and query payloads are validated with DTOs",
+        "Not-found and validation failures return consistent 4xx codes",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 12,
@@ -182,12 +182,12 @@
     },
     {
       "id": "US-013",
-      "title": "Add regression tests for FR-2 and FR-3",
-      "description": "As a backend maintainer, I want automated tests for relation validation and cascade semantics so foreign-key removal is protected by regression coverage.",
+      "title": "Build AI organize context retrieval pipeline",
+      "description": "As a backend developer, I want organized context assembly so AI can rewrite inbox content using relevant short and mid-term memory.",
       "acceptanceCriteria": [
-        "Add/extend tests covering FR-2 create/update validation matrix and immutable-field behavior",
-        "Add/extend tests covering FR-3 cascade semantics, set-null behavior, and transaction rollback",
-        "Include cross-tenant negative cases to prove uid isolation",
+        "Context assembly includes L0 current inbox item, L1 related inbox items from last 7 days (top 10), and L2 30-day report summaries",
+        "When context exceeds token budget, trim by similarity then recency then diversity",
+        "Prompt input payload follows PRD task/currentInput/retrievedContext/constraints structure",
         "Tests pass",
         "Typecheck passes"
       ],
@@ -197,15 +197,211 @@
     },
     {
       "id": "US-014",
-      "title": "Run quality gates and verify FK-free schema",
-      "description": "As a release engineer, I want final quality and schema verification completed so the Big Bang rollout can ship without compatibility or data-migration tasks.",
+      "title": "Implement AI organize execution validation and fallback",
+      "description": "As an end user, I want reliable AI organize results so failures do not block inbox editing and output format remains machine-readable.",
       "acceptanceCriteria": [
-        "Run and pass backend quality gates required by PRD (tests, lint, typecheck)",
-        "Verify target Echoe tables report zero FOREIGN KEY constraints after migration",
-        "Confirm rollout does not add data migration/backfill scripts or compatibility branches",
+        "Call model with organize-specific parameters and timeout policy from PRD",
+        "Validate AI output schema includes optimizedFront optimizedBack reason confidence",
+        "On timeout or parse failure return original front/back with fallback=true",
+        "Record failure reason for observability",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Implement inbox report CRUD and idempotent generate",
+      "description": "As a backend developer, I want daily report APIs so users can list view and generate one report per day.",
+      "acceptanceCriteria": [
+        "Implement GET /api/v1/inbox/reports and GET /api/v1/inbox/reports/:reportId",
+        "Implement POST /api/v1/inbox/reports/generate using user timezone day window",
+        "Duplicate generate request for same uid+date returns 409 with existing report reference",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement report AI pipeline with 30-day memory and evidence",
+      "description": "As a user, I want report insights grounded in recent history so suggestions are relevant and traceable.",
+      "acceptanceCriteria": [
+        "Report generation uses daily facts plus 30-day summary memory including weekly aggregates",
+        "Persist both markdown report content and summary JSON fields topics mistakes actions",
+        "Key insights in generated report include evidenceIds references",
+        "Repeat suggestions against last 7 days are replaced by alternative suggestions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement inbox-to-card manual conversion",
+      "description": "As a user, I want to convert an inbox item into a card using selected deck and note type.",
+      "acceptanceCriteria": [
+        "Implement POST /api/v1/inbox/:inboxId/to-card with deckId and notetypeId path",
+        "Validate selected deck/notetype ownership and required field mapping before creation",
+        "Create note and card entities and return noteId cardId deckId notetypeId",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Implement AI-assisted inbox-to-card recommendation",
+      "description": "As a user, I want optional AI deck/notetype recommendation so I can convert inbox content quickly without manual configuration.",
+      "acceptanceCriteria": [
+        "When deckId/notetypeId is absent, choose target deck/notetype based on AI analysis and user preference memory",
+        "If AI recommendation fails, fallback to deterministic default mapping path",
+        "Response includes aiRecommended flag and chosen deck/notetype info",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Add async queue jobs for AI-heavy inbox tasks",
+      "description": "As a backend developer, I want queued execution for expensive AI jobs so retries and timeout policies are centrally managed.",
+      "acceptanceCriteria": [
+        "Add queue definitions for generate_report organize_inbox and to_card_ai jobs",
+        "Configure retry and timeout values matching PRD task schedule table",
+        "Expose service hooks to run sync fast path or enqueue async path",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Add scheduled jobs for weekly summary and cleanup",
+      "description": "As an operator, I want scheduled maintenance so AI memory stays fresh and deleted data does not accumulate indefinitely.",
+      "acceptanceCriteria": [
+        "Add weekly-summary-aggregation cron at 0 2 * * 0",
+        "Add cleanup-deleted-records cron at 0 3 * * * for records soft-deleted over 30 days",
+        "Scheduled jobs are idempotent and uid-safe",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Add metrics and structured logs for inbox AI flows",
+      "description": "As a maintainer, I want observable metrics and logs so token auth AI calls and report generation health can be monitored.",
+      "acceptanceCriteria": [
+        "Emit metrics for success rate and latency aligned with PRD 10.6 indicator names",
+        "Use @echoe/logger for all new logs and avoid console logging",
+        "Track AI fallback count and report generation conflicts as measurable events",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Add web API clients for token inbox and report endpoints",
+      "description": "As a frontend developer, I want typed API modules so pages can consume inbox/token/report features consistently.",
+      "acceptanceCriteria": [
+        "Add typed API functions in apps/web/src/api for token, inbox, report, organize, and to-card endpoints",
+        "Use shared DTO contracts from @echoe/dto for request and response typing",
+        "Handle 409 daily-report conflict and 503 AI unavailable responses explicitly in API layer",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Implement settings API token management UI",
+      "description": "As a user, I want a settings page for token management so I can create view and revoke API tokens safely.",
+      "acceptanceCriteria": [
+        "Implement /settings/api-tokens page with token list, create, and delete actions",
+        "Show plaintext token only once immediately after creation with clear copy affordance",
+        "Register page-level service once and consume in child components via Domain pattern",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Implement inbox page UI with AI actions",
+      "description": "As a user, I want an inbox page where I can manage captures and trigger AI organize or card conversion actions.",
+      "acceptanceCriteria": [
+        "Implement /inbox page with list add edit delete mark-read read-all",
+        "Support filters for category/isRead and paginated list loading",
+        "Expose organize and to-card actions with success and error feedback",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Implement inbox reports UI",
+      "description": "As a user, I want report pages to generate browse and inspect daily inbox reports.",
+      "acceptanceCriteria": [
+        "Implement /inbox/reports list and detail page rendering markdown report content",
+        "Implement generate button flow with explicit handling of 409 already-generated response",
+        "Display report summary fields topics mistakes actions in detail view",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Add backend tests for token inbox and AI reliability",
+      "description": "As a backend developer, I want test coverage on critical flows so auth behavior and AI fallback logic remain stable.",
+      "acceptanceCriteria": [
+        "Add or update tests covering token precedence over JWT, inbox CRUD filters, organize fallback, and report generate idempotency",
+        "Keep tests scoped by uid to prevent cross-tenant behavior regressions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Add frontend tests and run full quality gates",
+      "description": "As a release engineer, I want frontend validation and global quality checks so inbox and token features are safe to ship.",
+      "acceptanceCriteria": [
+        "Add or update frontend tests for token page workflows, inbox actions, and report generation interactions",
+        "Run project quality checks for changed packages with no new failures",
+        "Tests pass",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 27,
       "passes": false,
       "notes": ""
     }

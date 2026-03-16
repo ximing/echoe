@@ -17,6 +17,12 @@ export default {
       "version": "1.0.0",
       "path": ".catpaw/skills/vercel.agent-browser",
       "category": "skills"
+    },
+    {
+      "name": "@superpowers/brainstorming",
+      "version": "1.0.0",
+      "path": ".catpaw/skills/superpowers.brainstorming.md",
+      "category": "skills"
     }
   ]
 }
