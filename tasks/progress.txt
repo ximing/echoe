@@ -78,3 +78,27 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - "No schema changes, nothing to migrate" means database schema matches code schema
   - Meta files (_journal.json, snapshot.json) track migration history and must be committed
 ---
+## 2026-03-16 18:43 - US-006
+- Verified DTO contracts implementation (already completed in previous iteration)
+- Created DTO files:
+  - api-token.dto.ts: ApiTokenDto, ApiTokenListItemDto, CreateApiTokenDto, CreateApiTokenResponseDto, DeleteApiTokenDto
+  - inbox.dto.ts: InboxDto, InboxListItemDto, CreateInboxDto, UpdateInboxDto, InboxQueryParams, BulkUpdateInboxDto, BulkOperationResponseDto
+  - inbox-report.dto.ts: InboxReportDto, InboxReportListItemDto, InboxReportQueryParams, InboxReportSummaryDto, UpsertInboxReportDto
+  - inbox-to-card.dto.ts: AiOrganizeResponseDto (with optimizedFront, optimizedBack, reason, confidence, fallback), ConvertInboxToCardDto, AiOptimizeInboxDto, BulkConvertInboxToCardDto, ConversionResultDto, BulkConversionResponseDto, ConversionPreviewDto
+- Defined enums: InboxSource, InboxCategory, CardConversionSource, CardConversionStatus
+- All DTOs exported from packages/dto/src/index.ts
+- Typecheck passes successfully
+- Files changed:
+  - packages/dto/src/api-token.dto.ts (already implemented)
+  - packages/dto/src/inbox.dto.ts (already implemented)
+  - packages/dto/src/inbox-report.dto.ts (already implemented)
+  - packages/dto/src/inbox-to-card.dto.ts (already implemented)
+  - packages/dto/src/index.ts (already exported)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - DTO files use .dto.ts suffix for clear identification
+  - Enums use UPPER_CASE values (e.g., MANUAL = 'manual') for consistency
+  - AiOrganizeResponseDto includes fallback flag for degraded AI responses
+  - Query params DTOs include pagination (page, limit), filtering, and sorting options
+  - Bulk operation DTOs return success/failed counts with detailed error info
+---
