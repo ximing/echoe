@@ -117,30 +117,41 @@ describe('InboxAiService', () => {
 
       // Use very recent dates (within last 7 days) to ensure they pass the date filter
       const recentDate = new Date();
-      const mockRelatedItems = [
-        {
-          inboxId: 'i124',
-          uid: 'test-uid',
-          front: 'What is React?',
-          back: 'React is a JavaScript library for building UIs.',
-          source: 'manual',
-          category: 'backend',
-          isRead: 0,
-          deletedAt: null,
-          createdAt: recentDate,
-          updatedAt: recentDate,
-        },
-      ];
+      const mockRelatedItem = {
+        inboxId: 'i124',
+        uid: 'test-uid',
+        front: 'What is React?',
+        back: 'React is a JavaScript library for building UIs.',
+        source: 'manual',
+        category: 'backend',
+        isRead: 0,
+        deletedAt: null,
+        createdAt: recentDate,
+        updatedAt: recentDate,
+      };
 
-      let callCount = 0;
-      mockedGetDatabase.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return createMockSelect([mockCurrentItem]) as any;
+      // Create a stateful mock that returns different data for each query
+      // Since getDatabase() is called once and reused, we need to make the mock chain stateful
+      let queryCount = 0;
+      const limitFn = jest.fn().mockImplementation(() => {
+        queryCount++;
+        if (queryCount === 1) {
+          // First query: get current item for similarity comparison
+          return Promise.resolve([mockCurrentItem]);
         } else {
-          return createMockSelect(mockRelatedItems) as any;
+          // Second query: get items from last 7 days (should include both current and related items)
+          return Promise.resolve([mockCurrentItem, mockRelatedItem]);
         }
       });
+
+      const orderByFn = jest.fn().mockReturnValue({ limit: limitFn });
+      const whereFn = jest.fn().mockReturnValue({ orderBy: orderByFn, limit: limitFn });
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectFn,
+      } as any);
 
       const result = await service.getL1Context('test-uid', 'i123');
 
