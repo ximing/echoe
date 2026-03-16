@@ -26,6 +26,7 @@ import { AudioSettings } from './pages/settings/components/audio-settings';
 import { DataSettings } from './pages/settings/components/data-settings';
 import { PresetSettings } from './pages/settings/components/preset-settings';
 import DashboardPage from './pages/dashboard';
+import { InboxPage } from './pages/inbox/inbox-page';
 import NotFoundPage from './pages/not-found';
 import { ProtectedRoute } from './components/protected-route';
 import { Layout } from './components/layout';
@@ -69,6 +70,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <DashboardPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inbox"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <InboxPage />
               </Layout>
             </ProtectedRoute>
           }
