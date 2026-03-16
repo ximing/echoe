@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1773585023276,
-      "tag": "0000_massive_mariko_yashida",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1773586800000,
-      "tag": "0001_drop_echoe_foreign_keys",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1773622518469,
-      "tag": "0002_absent_triathlon",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1773624918809,
-      "tag": "0003_thankful_crystal",
+      "when": 1773638419992,
+      "tag": "0000_parallel_nick_fury",
       "breakpoints": true
     }
   ]

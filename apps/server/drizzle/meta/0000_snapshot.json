@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "e5b4a6aa-fd13-4b29-990c-5cd480bb7fe6",
+  "id": "8155eb7f-6fe6-4eee-a4f3-0aafd0c4533f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -446,6 +446,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "('{}')"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -508,23 +516,16 @@
             "mod"
           ],
           "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
-      "foreignKeys": {
-        "echoe_notes_mid_echoe_notetypes_note_type_id_fk": {
-          "name": "echoe_notes_mid_echoe_notetypes_note_type_id_fk",
-          "tableFrom": "echoe_notes",
-          "tableTo": "echoe_notetypes",
-          "columnsFrom": [
-            "mid"
-          ],
-          "columnsTo": [
-            "note_type_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
         "echoe_notes_id": {
           "name": "echoe_notes_id",
@@ -727,6 +728,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -823,36 +832,16 @@
             "last_review"
           ],
           "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "echoe_cards_nid_echoe_notes_note_id_fk": {
-          "name": "echoe_cards_nid_echoe_notes_note_id_fk",
-          "tableFrom": "echoe_cards",
-          "tableTo": "echoe_notes",
-          "columnsFrom": [
-            "nid"
-          ],
-          "columnsTo": [
-            "note_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         },
-        "echoe_cards_did_echoe_decks_deck_id_fk": {
-          "name": "echoe_cards_did_echoe_decks_deck_id_fk",
-          "tableFrom": "echoe_cards",
-          "tableTo": "echoe_decks",
-          "columnsFrom": [
-            "did"
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
           ],
-          "columnsTo": [
-            "deck_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "isUnique": false
         }
       },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
         "echoe_cards_id": {
           "name": "echoe_cards_id",
@@ -1069,6 +1058,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1116,23 +1113,16 @@
             "source_revlog_id"
           ],
           "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
+          ],
+          "isUnique": false
         }
       },
-      "foreignKeys": {
-        "echoe_revlog_cid_echoe_cards_card_id_fk": {
-          "name": "echoe_revlog_cid_echoe_cards_card_id_fk",
-          "tableFrom": "echoe_revlog",
-          "tableTo": "echoe_cards",
-          "columnsFrom": [
-            "cid"
-          ],
-          "columnsTo": [
-            "card_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
         "echoe_revlog_id": {
           "name": "echoe_revlog_id",
@@ -1256,6 +1246,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1280,36 +1278,16 @@
             "deck_id"
           ],
           "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "echoe_decks_conf_echoe_deck_config_deck_config_id_fk": {
-          "name": "echoe_decks_conf_echoe_deck_config_deck_config_id_fk",
-          "tableFrom": "echoe_decks",
-          "tableTo": "echoe_deck_config",
-          "columnsFrom": [
-            "conf"
-          ],
-          "columnsTo": [
-            "deck_config_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         },
-        "echoe_decks_mid_echoe_notetypes_note_type_id_fk": {
-          "name": "echoe_decks_mid_echoe_notetypes_note_type_id_fk",
-          "tableFrom": "echoe_decks",
-          "tableTo": "echoe_notetypes",
-          "columnsFrom": [
-            "mid"
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
           ],
-          "columnsTo": [
-            "note_type_id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "isUnique": false
         }
       },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
         "echoe_decks_id": {
           "name": "echoe_decks_id",
@@ -1440,6 +1418,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1462,6 +1448,13 @@
           "columns": [
             "uid",
             "deck_config_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
           ],
           "isUnique": false
         }
@@ -1602,6 +1595,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1624,6 +1625,13 @@
           "columns": [
             "uid",
             "note_type_id"
+          ],
+          "isUnique": false
+        },
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
           ],
           "isUnique": false
         }
@@ -1747,6 +1755,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1778,36 +1794,16 @@
             "template_id"
           ],
           "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "echoe_templates_ntid_echoe_notetypes_note_type_id_fk": {
-          "name": "echoe_templates_ntid_echoe_notetypes_note_type_id_fk",
-          "tableFrom": "echoe_templates",
-          "tableTo": "echoe_notetypes",
-          "columnsFrom": [
-            "ntid"
-          ],
-          "columnsTo": [
-            "note_type_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         },
-        "echoe_templates_did_echoe_decks_deck_id_fk": {
-          "name": "echoe_templates_did_echoe_decks_deck_id_fk",
-          "tableFrom": "echoe_templates",
-          "tableTo": "echoe_decks",
-          "columnsFrom": [
-            "did"
+        "deleted_at_idx": {
+          "name": "deleted_at_idx",
+          "columns": [
+            "deleted_at"
           ],
-          "columnsTo": [
-            "deck_id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "isUnique": false
         }
       },
+      "foreignKeys": {},
       "compositePrimaryKeys": {
         "echoe_templates_id": {
           "name": "echoe_templates_id",

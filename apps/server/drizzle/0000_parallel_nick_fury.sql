@@ -60,6 +60,7 @@ CREATE TABLE `echoe_notes` (
 	`rich_text_fields` json,
 	`fld_names` json,
 	`fields_json` json NOT NULL DEFAULT ('{}'),
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_notes_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_notes_note_id_unique` UNIQUE(`note_id`),
 	CONSTRAINT `uid_guid_unique` UNIQUE(`uid`,`guid`)
@@ -89,6 +90,7 @@ CREATE TABLE `echoe_cards` (
 	`stability` double NOT NULL DEFAULT 0,
 	`difficulty` double NOT NULL DEFAULT 0,
 	`last_review` bigint NOT NULL DEFAULT 0,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_cards_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_cards_card_id_unique` UNIQUE(`card_id`)
 );
@@ -120,6 +122,7 @@ CREATE TABLE `echoe_revlog` (
 	`pre_stability` double NOT NULL DEFAULT 0,
 	`pre_difficulty` double NOT NULL DEFAULT 0,
 	`pre_last_review` bigint NOT NULL DEFAULT 0,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_revlog_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_revlog_revlog_id_unique` UNIQUE(`revlog_id`)
 );
@@ -139,6 +142,7 @@ CREATE TABLE `echoe_decks` (
 	`mod` int NOT NULL,
 	`desc` text NOT NULL,
 	`mid` varchar(191),
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_decks_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_decks_deck_id_unique` UNIQUE(`deck_id`),
 	CONSTRAINT `uid_name_unique` UNIQUE(`uid`,`name`)
@@ -159,6 +163,7 @@ CREATE TABLE `echoe_deck_config` (
 	`new_config` text NOT NULL,
 	`rev_config` text NOT NULL,
 	`lapse_config` text NOT NULL,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_deck_config_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_deck_config_deck_config_id_unique` UNIQUE(`deck_config_id`),
 	CONSTRAINT `uid_name_unique` UNIQUE(`uid`,`name`)
@@ -180,6 +185,7 @@ CREATE TABLE `echoe_notetypes` (
 	`latex_pre` text NOT NULL,
 	`latex_post` text NOT NULL,
 	`req` text NOT NULL,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_notetypes_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_notetypes_note_type_id_unique` UNIQUE(`note_type_id`),
 	CONSTRAINT `uid_name_unique` UNIQUE(`uid`,`name`)
@@ -199,6 +205,7 @@ CREATE TABLE `echoe_templates` (
 	`did` varchar(191),
 	`mod` int NOT NULL,
 	`usn` int NOT NULL,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
 	CONSTRAINT `echoe_templates_id` PRIMARY KEY(`id`),
 	CONSTRAINT `echoe_templates_template_id_unique` UNIQUE(`template_id`),
 	CONSTRAINT `uid_ntid_ord_unique` UNIQUE(`uid`,`ntid`,`ord`)
@@ -238,14 +245,6 @@ CREATE TABLE `echoe_config` (
 	CONSTRAINT `echoe_config_uid_key_pk` PRIMARY KEY(`uid`,`key`)
 );
 --> statement-breakpoint
-ALTER TABLE `echoe_notes` ADD CONSTRAINT `echoe_notes_mid_echoe_notetypes_note_type_id_fk` FOREIGN KEY (`mid`) REFERENCES `echoe_notetypes`(`note_type_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_cards` ADD CONSTRAINT `echoe_cards_nid_echoe_notes_note_id_fk` FOREIGN KEY (`nid`) REFERENCES `echoe_notes`(`note_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_cards` ADD CONSTRAINT `echoe_cards_did_echoe_decks_deck_id_fk` FOREIGN KEY (`did`) REFERENCES `echoe_decks`(`deck_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_revlog` ADD CONSTRAINT `echoe_revlog_cid_echoe_cards_card_id_fk` FOREIGN KEY (`cid`) REFERENCES `echoe_cards`(`card_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_decks` ADD CONSTRAINT `echoe_decks_conf_echoe_deck_config_deck_config_id_fk` FOREIGN KEY (`conf`) REFERENCES `echoe_deck_config`(`deck_config_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_decks` ADD CONSTRAINT `echoe_decks_mid_echoe_notetypes_note_type_id_fk` FOREIGN KEY (`mid`) REFERENCES `echoe_notetypes`(`note_type_id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_templates` ADD CONSTRAINT `echoe_templates_ntid_echoe_notetypes_note_type_id_fk` FOREIGN KEY (`ntid`) REFERENCES `echoe_notetypes`(`note_type_id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `echoe_templates` ADD CONSTRAINT `echoe_templates_did_echoe_decks_deck_id_fk` FOREIGN KEY (`did`) REFERENCES `echoe_decks`(`deck_id`) ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX `email_idx` ON `users` (`email`);--> statement-breakpoint
 CREATE INDEX `phone_idx` ON `users` (`phone`);--> statement-breakpoint
 CREATE INDEX `deleted_at_idx` ON `users` (`deleted_at`);--> statement-breakpoint
@@ -259,6 +258,7 @@ CREATE INDEX `uid_note_id_idx` ON `echoe_notes` (`uid`,`note_id`);--> statement-
 CREATE INDEX `uid_mid_idx` ON `echoe_notes` (`uid`,`mid`);--> statement-breakpoint
 CREATE INDEX `uid_sfld_idx` ON `echoe_notes` (`uid`,`sfld`);--> statement-breakpoint
 CREATE INDEX `uid_mod_idx` ON `echoe_notes` (`uid`,`mod`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_notes` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `nid_idx` ON `echoe_cards` (`nid`);--> statement-breakpoint
 CREATE INDEX `did_idx` ON `echoe_cards` (`did`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_cards` (`usn`);--> statement-breakpoint
@@ -271,25 +271,31 @@ CREATE INDEX `uid_card_id_idx` ON `echoe_cards` (`uid`,`card_id`);--> statement-
 CREATE INDEX `uid_nid_idx` ON `echoe_cards` (`uid`,`nid`);--> statement-breakpoint
 CREATE INDEX `uid_did_queue_due_idx` ON `echoe_cards` (`uid`,`did`,`queue`,`due`);--> statement-breakpoint
 CREATE INDEX `uid_last_review_idx` ON `echoe_cards` (`uid`,`last_review`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_cards` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `cid_idx` ON `echoe_revlog` (`cid`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_revlog` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_idx` ON `echoe_revlog` (`uid`);--> statement-breakpoint
 CREATE INDEX `uid_revlog_id_idx` ON `echoe_revlog` (`uid`,`revlog_id`);--> statement-breakpoint
 CREATE INDEX `uid_cid_idx` ON `echoe_revlog` (`uid`,`cid`);--> statement-breakpoint
 CREATE INDEX `uid_source_revlog_id_idx` ON `echoe_revlog` (`uid`,`source_revlog_id`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_revlog` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `name_idx` ON `echoe_decks` (`name`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_decks` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_deck_id_idx` ON `echoe_decks` (`uid`,`deck_id`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_decks` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `name_idx` ON `echoe_deck_config` (`name`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_deck_config` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_deck_config_id_idx` ON `echoe_deck_config` (`uid`,`deck_config_id`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_deck_config` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `name_idx` ON `echoe_notetypes` (`name`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_notetypes` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_note_type_id_idx` ON `echoe_notetypes` (`uid`,`note_type_id`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_notetypes` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `ntid_idx` ON `echoe_templates` (`ntid`);--> statement-breakpoint
 CREATE INDEX `ord_idx` ON `echoe_templates` (`ord`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_templates` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_template_id_idx` ON `echoe_templates` (`uid`,`template_id`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `echoe_templates` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `filename_idx` ON `echoe_media` (`filename`);--> statement-breakpoint
 CREATE INDEX `hash_idx` ON `echoe_media` (`hash`);--> statement-breakpoint
 CREATE INDEX `uid_media_id_idx` ON `echoe_media` (`uid`,`media_id`);--> statement-breakpoint
