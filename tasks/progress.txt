@@ -102,3 +102,18 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Query params DTOs include pagination (page, limit), filtering, and sorting options
   - Bulk operation DTOs return success/failed counts with detailed error info
 ---
+## 2026-03-16 18:45 - US-007
+- Built DTO package successfully using `pnpm --filter @echoe/dto build`
+- Verified server typecheck passes with new DTO exports
+- Verified web typecheck passes with new DTO exports
+- Build output includes index.js, index.mjs, index.d.ts with all new DTOs (api-token, inbox, inbox-report, inbox-to-card)
+- Files changed:
+  - packages/dto/dist/* (build output, gitignored)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - DTO package uses Rollup to generate both CJS (index.js) and ESM (index.mjs) outputs
+  - Build must complete successfully before consumers (server/web) can import new types
+  - Typecheck validation ensures no missing-symbol errors in consuming packages
+  - dist/ folder is gitignored - only source files are committed, build happens in CI/CD
+  - The @echoe/dto package is symlinked in node_modules via pnpm workspace protocol
+---
