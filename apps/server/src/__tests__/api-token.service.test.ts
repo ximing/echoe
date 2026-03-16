@@ -20,9 +20,13 @@ const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>
 
 describe('ApiTokenService', () => {
   let service: ApiTokenService;
+  let mockMetricsService: any;
 
   beforeEach(() => {
-    service = new ApiTokenService();
+    mockMetricsService = {
+      trackTokenCreate: jest.fn(),
+    };
+    service = new ApiTokenService(mockMetricsService);
     mockedGetDatabase.mockClear();
   });
 

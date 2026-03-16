@@ -5,6 +5,7 @@ import { getDatabase } from '../db/connection.js';
 import { inbox } from '../db/schema/inbox.js';
 import { generateInboxId } from '../utils/id.js';
 import { logger } from '../utils/logger.js';
+import { InboxMetricsService } from './inbox-metrics.service.js';
 
 import type { Inbox, NewInbox } from '../db/schema/inbox.js';
 
@@ -41,6 +42,8 @@ export interface ListInboxResult {
 
 @Service()
 export class InboxService {
+  constructor(private metricsService: InboxMetricsService) {}
+
   /**
    * Create a new inbox item
    */
@@ -69,6 +72,7 @@ export class InboxService {
         .where(and(eq(inbox.inboxId, inboxId), isNull(inbox.deletedAt)));
 
       logger.info(`Inbox item created for user ${uid}: ${inboxId}`);
+      this.metricsService.trackInboxCreate(uid, inboxId, newInboxItem.source || 'manual');
 
       return createdInbox;
     } catch (error) {

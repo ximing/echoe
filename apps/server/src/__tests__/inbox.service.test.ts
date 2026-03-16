@@ -25,9 +25,13 @@ const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>
 
 describe('InboxService', () => {
   let service: InboxService;
+  let mockMetricsService: any;
 
   beforeEach(() => {
-    service = new InboxService();
+    mockMetricsService = {
+      trackInboxCreate: jest.fn(),
+    };
+    service = new InboxService(mockMetricsService);
     mockedGetDatabase.mockClear();
   });
 

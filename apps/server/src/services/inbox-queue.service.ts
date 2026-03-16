@@ -98,20 +98,25 @@ class SimpleQueue {
     });
   }
 
-  private async processQueue() {
-    if (this.running >= this.concurrency || this.queue.length === 0) {
-      return;
-    }
+  private processQueue() {
+    // 启动尽可能多的任务，直到达到并发限制
+    // 注意：这里是同步循环，确保 running 计数器在检查和增加之间没有异步间隙
+    while (this.running < this.concurrency && this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (!task) break;
 
-    const task = this.queue.shift();
-    if (!task) return;
+      this.running++;
 
-    this.running++;
-    try {
-      await task();
-    } finally {
-      this.running--;
-      this.processQueue();
+      // 异步执行任务，不等待完成
+      task()
+        .catch(() => {
+          // 错误已在 task 内部处理，这里仅捕获防止未处理异常
+        })
+        .finally(() => {
+          this.running--;
+          // 任务完成后，尝试处理更多任务
+          this.processQueue();
+        });
     }
   }
 }

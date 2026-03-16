@@ -92,8 +92,20 @@ describe('InboxReportController', () => {
       getPendingCount: jest.fn(),
     } as unknown as jest.Mocked<InboxQueueService>;
 
+    const mockMetricsService = {
+      trackReportGenerateStart: jest.fn(),
+      trackReportGenerateSuccess: jest.fn(),
+      trackReportGenerateConflict: jest.fn(),
+      trackReportGenerateError: jest.fn(),
+    } as any;
+
     // Create controller with mock services
-    controller = new InboxReportController(mockInboxReportService, mockInboxAiService, mockInboxQueueService);
+    controller = new InboxReportController(
+      mockInboxReportService,
+      mockInboxAiService,
+      mockInboxQueueService,
+      mockMetricsService
+    );
   });
 
   afterEach(() => {

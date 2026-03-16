@@ -6,11 +6,13 @@ import { getDatabase } from '../db/connection.js';
 import { apiToken } from '../db/schema/api-token.js';
 import { generateApiTokenId } from '../utils/id.js';
 import { logger } from '../utils/logger.js';
+import { InboxMetricsService } from './inbox-metrics.service.js';
 
 import type { ApiToken, NewApiToken } from '../db/schema/api-token.js';
 
 @Service()
 export class ApiTokenService {
+  constructor(private metricsService: InboxMetricsService) {}
   /**
    * Create a new API token for a user
    * Returns plaintext token once, stores only SHA256 hash
@@ -37,6 +39,7 @@ export class ApiTokenService {
       await db.insert(apiToken).values(newToken);
 
       logger.info(`API token created for user ${uid}: ${tokenId}`);
+      this.metricsService.trackTokenCreate(uid, tokenId);
 
       return { tokenId, plaintextToken };
     } catch (error) {

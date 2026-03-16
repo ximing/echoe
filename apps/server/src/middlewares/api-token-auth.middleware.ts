@@ -3,6 +3,7 @@ import { Container } from 'typedi';
 
 import { ApiTokenService } from '../services/api-token.service.js';
 import { UserService } from '../services/user.service.js';
+import { InboxMetricsService } from '../services/inbox-metrics.service.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -47,10 +48,12 @@ export const apiTokenAuthMiddleware = async (
 
     // Validate the token
     const apiTokenService = Container.get(ApiTokenService);
+    const metricsService = Container.get(InboxMetricsService);
     const apiToken = await apiTokenService.validateToken(plaintextToken);
 
     // Token is invalid or deleted - skip this middleware
     if (!apiToken) {
+      metricsService.trackTokenAuthFailure('invalid_token');
       return next();
     }
 
@@ -60,6 +63,7 @@ export const apiTokenAuthMiddleware = async (
 
     // User not found or soft-deleted - return 401
     if (!user || user.deletedAt > 0) {
+      metricsService.trackTokenAuthFailure('user_not_found_or_deleted', apiToken.tokenId);
       return response.status(401).json({
         success: false,
         message: 'Invalid token: user not found or deleted',
@@ -77,6 +81,7 @@ export const apiTokenAuthMiddleware = async (
     request.apiTokenId = apiToken.tokenId;
 
     logger.debug(`API token authenticated: ${apiToken.tokenId} for user ${user.uid}`);
+    metricsService.trackTokenAuthSuccess(user.uid, apiToken.tokenId);
 
     // Continue to the next middleware or route handler
     // This bypasses JWT authentication since we already set request.user
@@ -85,6 +90,9 @@ export const apiTokenAuthMiddleware = async (
     logger.error('API token authentication error:', {
       error: error instanceof Error ? error.message : String(error),
     });
+
+    const metricsService = Container.get(InboxMetricsService);
+    metricsService.trackTokenAuthFailure('authentication_error');
 
     // Return 401 for any authentication errors
     return response.status(401).json({

@@ -13,6 +13,7 @@ import { Service } from 'typedi';
 import { InboxReportService } from '../../services/inbox-report.service.js';
 import { InboxAiService } from '../../services/inbox-ai.service.js';
 import { InboxQueueService, InboxJobType } from '../../services/inbox-queue.service.js';
+import { InboxMetricsService } from '../../services/inbox-metrics.service.js';
 import { ResponseUtil } from '../../utils/response.js';
 import { ErrorCode } from '../../constants/error-codes.js';
 import { logger } from '../../utils/logger.js';
@@ -36,7 +37,8 @@ export class InboxReportController {
   constructor(
     private inboxReportService: InboxReportService,
     private inboxAiService: InboxAiService,
-    private inboxQueueService: InboxQueueService
+    private inboxQueueService: InboxQueueService,
+    private metricsService: InboxMetricsService
   ) {}
 
   /**
@@ -163,10 +165,21 @@ export class InboxReportController {
       );
     }
 
+    const startTime = Date.now();
+
     try {
+      // Track report generation start
+      this.metricsService.trackReportGenerateStart(user.uid, date);
+
       // Check if report already exists (idempotency)
       const existingReport = await this.inboxReportService.findByUidAndDate(user.uid, date);
       if (existingReport) {
+        this.metricsService.trackReportGenerateConflict(
+          user.uid,
+          existingReport.inboxReportId,
+          date
+        );
+
         return {
           code: ErrorCode.CONFLICT,
           msg: 'Report already exists for this date',
@@ -208,6 +221,11 @@ export class InboxReportController {
         });
       }
 
+      const latency = Date.now() - startTime;
+
+      // Track report generation success
+      this.metricsService.trackReportGenerateSuccess(user.uid, report.inboxReportId, date, latency);
+
       const reportDto: InboxReportDto = {
         inboxReportId: report.inboxReportId,
         uid: report.uid,
@@ -221,9 +239,19 @@ export class InboxReportController {
 
       return ResponseUtil.success(reportDto);
     } catch (error) {
+      const latency = Date.now() - startTime;
+
       if (error instanceof Error && error.message === 'REPORT_ALREADY_EXISTS') {
         // Return 409 Conflict with existing report reference
         const existingReport = await this.inboxReportService.findByUidAndDate(user.uid, date);
+
+        if (existingReport) {
+          this.metricsService.trackReportGenerateConflict(
+            user.uid,
+            existingReport.inboxReportId,
+            date
+          );
+        }
 
         return {
           code: ErrorCode.CONFLICT,
@@ -236,6 +264,9 @@ export class InboxReportController {
             : null,
         };
       }
+
+      // Track report generation error
+      this.metricsService.trackReportGenerateError(user.uid, date, error as Error, latency);
 
       logger.error('Error generating inbox report:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR, 'Failed to generate inbox report');

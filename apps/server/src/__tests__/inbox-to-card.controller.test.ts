@@ -171,12 +171,19 @@ describe('InboxToCardController', () => {
 
     mockInboxAiService = {} as unknown as jest.Mocked<InboxAiService>;
 
+    const mockMetricsService = {
+      trackToCardStart: jest.fn(),
+      trackToCardSuccess: jest.fn(),
+      trackToCardError: jest.fn(),
+    } as any;
+
     // Create controller with mock services
     controller = new InboxToCardController(
       mockInboxService,
       mockEchoeNoteService,
       mockEchoeDeckService,
-      mockInboxAiService
+      mockInboxAiService,
+      mockMetricsService
     );
   });
 

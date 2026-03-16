@@ -6,6 +6,7 @@ import { InboxService } from '../../services/inbox.service.js';
 import { EchoeNoteService } from '../../services/echoe-note.service.js';
 import { EchoeDeckService } from '../../services/echoe-deck.service.js';
 import { InboxAiService } from '../../services/inbox-ai.service.js';
+import { InboxMetricsService } from '../../services/inbox-metrics.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
 
@@ -18,7 +19,8 @@ export class InboxToCardController {
     private inboxService: InboxService,
     private echoeNoteService: EchoeNoteService,
     private echoeDeckService: EchoeDeckService,
-    private inboxAiService: InboxAiService
+    private inboxAiService: InboxAiService,
+    private metricsService: InboxMetricsService
   ) {}
 
   /**
@@ -36,6 +38,9 @@ export class InboxToCardController {
       if (!userDto?.uid) {
         return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
       }
+
+      // Track to-card conversion start
+      this.metricsService.trackToCardStart(userDto.uid, inboxId);
 
       // 1. Get inbox item
       const inboxItem = await this.inboxService.findByIdAndUid(userDto.uid, inboxId);
@@ -109,7 +114,7 @@ export class InboxToCardController {
       // Default field mapping: front -> first field, back -> second field
       const fieldMapping = dto.fieldMapping || {};
       const frontFieldName = fieldMapping.front || notetypeFields[0];
-      const backFieldName = fieldMapping.back || notetypeFields[1];
+      const backFieldName = fieldMapping.back || (notetypeFields.length > 1 ? notetypeFields[1] : undefined);
 
       if (!notetypeFields.includes(frontFieldName)) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, `Field '${frontFieldName}' not found in note type`);
@@ -134,7 +139,14 @@ export class InboxToCardController {
         tags: [],
       });
 
-      // 8. Return response with note and card IDs, including AI recommendation flag
+      // 8. Track success and return response with note and card IDs, including AI recommendation flag
+      this.metricsService.trackToCardSuccess(
+        userDto.uid,
+        inboxId,
+        noteWithCards.noteId,
+        aiRecommended
+      );
+
       return ResponseUtil.success({
         noteId: noteWithCards.noteId,
         cardId: noteWithCards.cards[0]?.cardId,
@@ -146,6 +158,11 @@ export class InboxToCardController {
       });
     } catch (error: any) {
       logger.error('Convert inbox to card error:', error);
+
+      // Track to-card conversion error
+      if (userDto?.uid) {
+        this.metricsService.trackToCardError(userDto.uid, inboxId, error);
+      }
 
       // Handle specific errors
       if (error.message?.includes('Invalid relation')) {

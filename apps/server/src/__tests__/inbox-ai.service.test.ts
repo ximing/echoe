@@ -69,9 +69,14 @@ function createMockSelect(returnValue: any[]) {
 
 describe('InboxAiService', () => {
   let service: InboxAiService;
+  let mockMetricsService: any;
 
   beforeEach(() => {
-    service = new InboxAiService();
+    mockMetricsService = {
+      trackInboxOrganizeStart: jest.fn(),
+      trackInboxOrganizeSuccess: jest.fn(),
+    };
+    service = new InboxAiService(mockMetricsService);
     mockedGetDatabase.mockReset();
   });
 

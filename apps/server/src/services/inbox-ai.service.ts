@@ -10,6 +10,7 @@ import { inbox, type Inbox } from '../db/schema/inbox.js';
 import { inboxReport, type InboxReport } from '../db/schema/inbox-report.js';
 import { config } from '../config/config.js';
 import { logger } from '../utils/logger.js';
+import { InboxMetricsService } from './inbox-metrics.service.js';
 import type { AiOrganizeResponseDto } from '@echoe/dto';
 
 /**
@@ -106,6 +107,7 @@ export interface BuildPromptParams {
 
 @Service()
 export class InboxAiService {
+  constructor(private metricsService: InboxMetricsService) {}
   /**
    * Retrieve L0: Current inbox item
    */
@@ -785,7 +787,11 @@ ${sourceBreakdown.map((s) => `- ${s.source}: ${s.count}`).join('\n')}
     inboxId: string;
   }): Promise<AiOrganizeResponseDto> {
     const { uid, inboxId } = params;
+    const startTime = Date.now();
     let failureReason: string | undefined;
+
+    // Track organize start
+    this.metricsService.trackInboxOrganizeStart(uid, inboxId);
 
     try {
       // Get current inbox item for fallback
@@ -861,11 +867,17 @@ Your response must be valid JSON matching this schema:
       const parsed = JSON.parse(result.text);
       const validated = aiOrganizeSchema.parse(parsed);
 
+      const latency = Date.now() - startTime;
+
       logger.info('AI organize succeeded', {
         inboxId,
         uid,
         confidence: validated.confidence,
+        latency,
       });
+
+      // Track organize success
+      this.metricsService.trackInboxOrganizeSuccess(uid, inboxId, latency, false);
 
       return {
         optimizedFront: validated.optimizedFront,
@@ -890,12 +902,18 @@ Your response must be valid JSON matching this schema:
         failureReason = 'Unknown AI service error';
       }
 
+      const latency = Date.now() - startTime;
+
       logger.error('AI organize failed, returning fallback', {
         inboxId,
         uid,
         failureReason,
+        latency,
         error,
       });
+
+      // Track organize fallback
+      this.metricsService.trackInboxOrganizeSuccess(uid, inboxId, latency, true);
 
       // Fallback: Return original content with fallback flag
       const db = getDatabase();
