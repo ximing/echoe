@@ -4,6 +4,7 @@
  */
 
 export * from './users.js';
+export * from './api-token.js';
 export * from './table-migrations.js';
 export * from './echoe-col.js';
 export * from './echoe-notes.js';
