@@ -29,3 +29,25 @@ Started: Mon Mar 16 18:25:16 CST 2026
 - Drizzle ORM patterns: use `primaryKey()` for uniqueness, `index()` for query optimization, and `.$onUpdate()` for automatic timestamp updates
 - Schema verification requires checking both the schema file AND the export in index.ts
 ---
+
+## Sun Mar 16 18:35:00 CST 2026 - US-003
+- Verified inbox schema implementation
+- Schema includes all required fields: inbox_id, uid, front, back, source, category, is_read, deleted_at, created_at, updated_at
+- Default values correctly set: source='manual', category='backend'
+- inbox_id has unique constraint (using unique() in addition to primaryKey())
+- All required indexes present: inbox_id(unique), uid, category, is_read
+- Additional composite indexes added for query optimization: uid_is_read, uid_category
+- Schema properly exported from apps/server/src/db/schema/index.ts
+- Typecheck passes successfully
+
+**Files changed:**
+- apps/server/src/db/schema/inbox.ts (already existed, verified)
+- apps/server/src/db/schema/index.ts (already exported, verified)
+
+**Learnings for future iterations:**
+- Inbox schema uses TEXT type for front/back content fields to support longer content
+- Boolean-like fields use tinyint(0/1) instead of boolean for MySQL compatibility
+- Composite indexes (uid_is_read, uid_category) improve common query patterns
+- The unique() constraint on inbox_id is redundant with primaryKey() but makes intent explicit
+- Content fields use `.$type<string>()` for explicit type annotation
+---
