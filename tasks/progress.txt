@@ -344,3 +344,34 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - AI organize uses buildPrompt() which includes L0/L1/L2 context for better results
   - Temperature 0.2 balances stability and creativity for organize tasks
 ---
+## 2026-03-16 19:25 - US-015
+- Implemented inbox report CRUD and idempotent generate endpoints
+- Created InboxReportService with create, list, findByIdAndUid, and findByUidAndDate methods
+- Created InboxReportController with three endpoints:
+  - GET /api/v1/inbox/reports: List reports with pagination and date filters
+  - GET /api/v1/inbox/reports/:reportId: Get single report by ID
+  - POST /api/v1/inbox/reports/generate: Generate daily report with 409 conflict handling
+- Added CONFLICT error code (7) to error-codes.ts for duplicate report handling
+- Implemented 409 conflict response when report already exists for uid+date
+- Added comprehensive tests: 10 service tests, 17 controller tests (all passing)
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/src/services/inbox-report.service.ts (new)
+  - apps/server/src/controllers/v1/inbox-report.controller.ts (new)
+  - apps/server/src/controllers/index.ts (registered controller)
+  - apps/server/src/constants/error-codes.ts (added CONFLICT code)
+  - apps/server/src/__tests__/inbox-report.service.test.ts (new, 10 tests)
+  - apps/server/src/__tests__/inbox-report.controller.test.ts (new, 17 tests)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Report service uses findByUidAndDate to check for existing reports before creation
+  - REPORT_ALREADY_EXISTS error message is thrown and caught in controller for 409 handling
+  - 409 conflict response includes existing report reference (inboxReportId, date) for client convenience
+  - Date validation uses regex /^\d{4}-\d{2}-\d{2}$/ for YYYY-MM-DD format
+  - ResponseUtil.error only accepts 2 params (code, message), so conflict response must be built manually
+  - List endpoint returns InboxReportListItemDto (excludes full content) for performance
+  - Get endpoint returns full InboxReportDto including content field
+  - Service list method supports date filters: exact date, startDate, endDate
+  - Sort options: sortBy ('date' | 'createdAt'), order ('asc' | 'desc')
+  - Placeholder report generation (TODO: implement AI report generation in US-016)
+---
