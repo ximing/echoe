@@ -40,6 +40,7 @@ describe('InboxReportService', () => {
   describe('create', () => {
     it('should create an inbox report and return it', async () => {
       const mockReport = {
+        id: 1,
         inboxReportId: 'ir123',
         uid: 'test-uid',
         date: '2026-03-16',
@@ -97,6 +98,7 @@ describe('InboxReportService', () => {
 
     it('should throw REPORT_ALREADY_EXISTS error when report exists for uid+date', async () => {
       const existingReport = {
+        id: 2,
         inboxReportId: 'ir123',
         uid: 'test-uid',
         date: '2026-03-16',
@@ -130,6 +132,7 @@ describe('InboxReportService', () => {
           from: jest.fn().mockReturnValue({
             where: jest.fn().mockResolvedValue([
               {
+                id: 3,
                 inboxReportId: 'ir123',
                 uid: 'test-uid',
                 date: '2026-03-16',
@@ -171,6 +174,7 @@ describe('InboxReportService', () => {
     it('should list inbox reports with pagination', async () => {
       const mockReports = [
         {
+          id: 1,
           inboxReportId: 'ir1',
           uid: 'test-uid',
           date: '2026-03-16',
@@ -181,6 +185,7 @@ describe('InboxReportService', () => {
           updatedAt: new Date(),
         },
         {
+          id: 2,
           inboxReportId: 'ir2',
           uid: 'test-uid',
           date: '2026-03-15',
@@ -235,6 +240,7 @@ describe('InboxReportService', () => {
     it('should filter reports by date', async () => {
       const mockReports = [
         {
+          id: 1,
           inboxReportId: 'ir1',
           uid: 'test-uid',
           date: '2026-03-16',
@@ -285,6 +291,7 @@ describe('InboxReportService', () => {
     it('should filter reports by date range', async () => {
       const mockReports = [
         {
+          id: 1,
           inboxReportId: 'ir1',
           uid: 'test-uid',
           date: '2026-03-15',
@@ -295,6 +302,7 @@ describe('InboxReportService', () => {
           updatedAt: new Date(),
         },
         {
+          id: 2,
           inboxReportId: 'ir2',
           uid: 'test-uid',
           date: '2026-03-16',
@@ -346,6 +354,7 @@ describe('InboxReportService', () => {
   describe('findByIdAndUid', () => {
     it('should find a report by ID and UID', async () => {
       const mockReport = {
+        id: 1,
         inboxReportId: 'ir123',
         uid: 'test-uid',
         date: '2026-03-16',
@@ -399,6 +408,7 @@ describe('InboxReportService', () => {
   describe('findByUidAndDate', () => {
     it('should find a report by UID and date', async () => {
       const mockReport = {
+        id: 1,
         inboxReportId: 'ir123',
         uid: 'test-uid',
         date: '2026-03-16',

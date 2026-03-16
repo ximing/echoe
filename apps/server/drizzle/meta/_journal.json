@@ -15,6 +15,13 @@
       "when": 1773649594071,
       "tag": "0001_known_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773676083446,
+      "tag": "0002_cold_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

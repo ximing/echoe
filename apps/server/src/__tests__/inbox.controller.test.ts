@@ -46,6 +46,7 @@ describe('InboxController', () => {
   // Mock inbox item data
   const mockInboxItems = [
     {
+      id: 1,
       inboxId: 'i1234567890',
       uid: 'test-user-uid',
       front: 'Front content 1',
@@ -58,6 +59,7 @@ describe('InboxController', () => {
       updatedAt: new Date('2024-01-01'),
     },
     {
+      id: 2,
       inboxId: 'i0987654321',
       uid: 'test-user-uid',
       front: 'Front content 2',

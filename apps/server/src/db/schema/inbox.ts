@@ -7,6 +7,7 @@ import {
   timestamp,
   index,
   unique,
+  int,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -16,7 +17,8 @@ import {
 export const inbox = mysqlTable(
   'inbox',
   {
-    inboxId: varchar('inbox_id', { length: 191 }).primaryKey().notNull(), // Business ID (nanoid with 'i' prefix)
+    id: int('id').primaryKey().autoincrement(), // Auto-increment primary key
+    inboxId: varchar('inbox_id', { length: 191 }).notNull(), // Business ID (nanoid with 'i' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this inbox item)
     front: text('front').notNull().$type<string>(), // Front side/question content
     back: text('back').notNull().$type<string>(), // Back side/answer content

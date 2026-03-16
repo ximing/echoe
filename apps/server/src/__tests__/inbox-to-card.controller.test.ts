@@ -50,6 +50,7 @@ describe('InboxToCardController', () => {
 
   // Mock inbox item
   const mockInboxItem = {
+    id: 1,
     inboxId: 'i1234567890',
     uid: 'test-user-uid',
     front: 'What is TypeScript?',

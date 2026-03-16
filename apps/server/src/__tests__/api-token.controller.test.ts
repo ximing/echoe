@@ -29,6 +29,7 @@ describe('ApiTokenController', () => {
   // Mock API token data
   const mockTokens = [
     {
+      id: 1,
       tokenId: 'at1234567890',
       uid: 'test-user-uid',
       name: 'Token 1',
@@ -38,6 +39,7 @@ describe('ApiTokenController', () => {
       updatedAt: new Date('2024-01-01'),
     },
     {
+      id: 2,
       tokenId: 'at0987654321',
       uid: 'test-user-uid',
       name: 'Token 2',
@@ -131,6 +133,7 @@ describe('ApiTokenController', () => {
     it('should create token and return plaintext once with JWT', async () => {
       // Setup mock
       const createResult = {
+        id: 3,
         tokenId: 'atnewtoken123',
         plaintextToken: 'a'.repeat(40),
       };

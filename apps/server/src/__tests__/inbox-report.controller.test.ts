@@ -51,6 +51,7 @@ describe('InboxReportController', () => {
   // Mock inbox report data
   const mockReports = [
     {
+      id: 1,
       inboxReportId: 'ir1234567890',
       uid: 'test-user-uid',
       date: '2026-03-16',
@@ -61,6 +62,7 @@ describe('InboxReportController', () => {
       updatedAt: new Date('2026-03-16'),
     },
     {
+      id: 2,
       inboxReportId: 'ir0987654321',
       uid: 'test-user-uid',
       date: '2026-03-15',
@@ -307,6 +309,7 @@ describe('InboxReportController', () => {
       };
 
       const newReport = {
+        id: 3,
         inboxReportId: 'ir_new',
         uid: 'test-user-uid',
         date: '2026-03-17',
@@ -405,6 +408,7 @@ describe('InboxReportController', () => {
       };
 
       const newReport = {
+        id: 4,
         inboxReportId: 'ir_new',
         uid: 'test-user-uid',
         date: '2026-03-17',

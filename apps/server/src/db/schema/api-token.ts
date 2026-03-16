@@ -4,6 +4,7 @@ import {
   bigint,
   timestamp,
   index,
+  int,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -13,7 +14,8 @@ import {
 export const apiToken = mysqlTable(
   'api_token',
   {
-    tokenId: varchar('token_id', { length: 191 }).primaryKey().notNull(), // Unique token identifier (nanoid with 'at' prefix)
+    id: int('id').primaryKey().autoincrement(), // Auto-increment primary key
+    tokenId: varchar('token_id', { length: 191 }).notNull(), // Unique token identifier (nanoid with 'at' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this token)
     name: varchar('name', { length: 255 }).notNull(), // Human-readable token name
     tokenHash: varchar('token_hash', { length: 255 }).notNull(), // Hashed token value for security
@@ -25,6 +27,7 @@ export const apiToken = mysqlTable(
       .$onUpdate(() => new Date()), // Last update time
   },
   (table) => ({
+    tokenIdUnique: index('token_id_unique').on(table.tokenId), // Unique constraint on business ID
     uidIdx: index('uid_idx').on(table.uid), // Query tokens by user
     tokenHashIdx: index('token_hash_idx').on(table.tokenHash), // Validate token on auth
     deletedAtIdx: index('deleted_at_idx').on(table.deletedAt), // Filter for soft deletes
