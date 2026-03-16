@@ -56,3 +56,25 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - Unique constraint on uid+date prevents duplicate daily reports at database level
   - This pattern supports idempotent report generation (409 conflict response)
 ---
+## 2026-03-16 18:40 - US-005
+- Verified migration generation (already completed in previous iteration)
+- Server built successfully with pnpm --filter @echoe/server build
+- Migration file 0001_known_dagger.sql includes all three tables:
+  - api_token with uid, token_hash, deleted_at indexes
+  - inbox with uid, category, is_read, uid+is_read, uid+category, deleted_at indexes
+  - inbox_report with uid+date unique constraint and uid, date indexes
+- Drizzle meta files updated: _journal.json includes migration entry 0001_known_dagger
+- Snapshot files 0000_snapshot.json and 0001_snapshot.json present and consistent
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/drizzle/0001_known_dagger.sql (already generated)
+  - apps/server/drizzle/meta/_journal.json (already updated)
+  - apps/server/drizzle/meta/0001_snapshot.json (already updated)
+  - tasks/prd.json (updated passes status)
+- **Learnings for future iterations:**
+  - Must run pnpm build before migrate:generate - drizzle-kit reads from dist/ not src/
+  - Migration file naming uses format NNNN_random_name.sql (e.g., 0001_known_dagger.sql)
+  - Drizzle automatically detects schema changes and only generates migration if needed
+  - "No schema changes, nothing to migrate" means database schema matches code schema
+  - Meta files (_journal.json, snapshot.json) track migration history and must be committed
+---
