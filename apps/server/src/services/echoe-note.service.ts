@@ -38,6 +38,13 @@ import type {
   EchoeNoteQueryParams,
   EchoeCardQueryParams,
 } from '@echoe/dto';
+import {
+  isActiveNote,
+  isActiveCard,
+  isActiveNotetype,
+  isActiveTemplate,
+  isActiveDeck,
+} from '../utils/active-row-predicates.js';
 
 @Service()
 export class EchoeNoteService {
@@ -53,7 +60,7 @@ export class EchoeNoteService {
     const db = getDatabase();
     const { deckId, tags, q, status, page = 1, limit = 20 } = params;
 
-    const conditions: any[] = [eq(echoeNotes.uid, uid)];
+    const conditions: any[] = [eq(echoeNotes.uid, uid), isActiveNote];
 
     // Filter by deck - find cards in deck, then get notes
     if (deckId !== undefined) {
@@ -64,7 +71,7 @@ export class EchoeNoteService {
       const cards = await db
         .select({ nid: echoeCards.nid })
         .from(echoeCards)
-        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds)));
+        .where(and(eq(echoeCards.uid, uid), inArray(echoeCards.did, deckIds), isActiveCard));
 
       const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
       if (noteIds.length > 0) {
@@ -112,7 +119,7 @@ export class EchoeNoteService {
       }
 
       if (cardConditions) {
-        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), cardConditions));
+        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), cardConditions, isActiveCard));
         const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
         if (noteIds.length > 0) {
           conditions.push(inArray(echoeNotes.noteId, noteIds));
@@ -155,14 +162,14 @@ export class EchoeNoteService {
   async getNoteById(uid: string, id: string): Promise<EchoeNoteWithCardsDto | null> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id), isActiveNote)).limit(1);
 
     if (note.length === 0) {
       return null;
     }
 
     // Get cards for this note
-    const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
+    const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id), isActiveCard));
 
     return {
       ...this.mapNoteToDto(note[0]),
@@ -179,7 +186,7 @@ export class EchoeNoteService {
     const notetype = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId), eq(echoeNotetypes.deletedAt, 0)))
+      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, dto.notetypeId), isActiveNotetype))
       .limit(1);
 
     if (notetype.length === 0) {
@@ -187,7 +194,7 @@ export class EchoeNoteService {
     }
 
     // Validate deck ownership (outside transaction - read only)
-    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, dto.deckId))).limit(1);
+    const deck = await db.select().from(echoeDecks).where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, dto.deckId), isActiveDeck)).limit(1);
 
     if (deck.length === 0) {
       throw new Error(`Invalid relation: Deck '${dto.deckId}' not found for field 'did' (deckId)`);
@@ -286,7 +293,7 @@ export class EchoeNoteService {
         });
       }
 
-      const insertedNote = await tx.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, noteId))).limit(1);
+      const insertedNote = await tx.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, noteId), isActiveNote)).limit(1);
 
       if (insertedNote.length === 0) {
         throw new Error(`Failed to load inserted note ${noteId}`);
@@ -305,7 +312,7 @@ export class EchoeNoteService {
   async updateNote(uid: string, id: string, dto: UpdateEchoeNoteDto): Promise<EchoeNoteDto | null> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id), isActiveNote)).limit(1);
 
     if (note.length === 0) {
       return null;
@@ -319,7 +326,7 @@ export class EchoeNoteService {
       const notetype = await db
         .select()
         .from(echoeNotetypes)
-        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid), eq(echoeNotetypes.deletedAt, 0)))
+        .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.noteTypeId, note[0].mid), isActiveNotetype))
         .limit(1);
 
       if (notetype.length === 0) {
@@ -353,7 +360,7 @@ export class EchoeNoteService {
 
     await db.update(echoeNotes).set(updates).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id)));
 
-    const updated = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
+    const updated = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id), isActiveNote)).limit(1);
     return this.mapNoteToDto(updated[0]);
   }
 
@@ -363,14 +370,14 @@ export class EchoeNoteService {
   async deleteNote(uid: string, id: string): Promise<boolean> {
     const db = getDatabase();
 
-    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id))).limit(1);
+    const note = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.noteId, id), isActiveNote)).limit(1);
 
     if (note.length === 0) {
       return false;
     }
 
     // Get cards for this note (read before transaction to avoid holding read locks longer than necessary)
-    const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id)));
+    const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.nid, id), isActiveCard));
 
     const now = Date.now(); // Millisecond timestamp for soft delete
 
@@ -413,7 +420,7 @@ export class EchoeNoteService {
   async getCardById(uid: string, id: string): Promise<EchoeCardWithNoteDto | null> {
     const db = getDatabase();
 
-    const card = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, id))).limit(1);
+    const card = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), eq(echoeCards.cardId, id), isActiveCard)).limit(1);
 
     if (card.length === 0) {
       return null;
@@ -439,7 +446,7 @@ export class EchoeNoteService {
     const { deckId, q, status, tag, sort = 'added', order = 'desc', page = 1, limit = 50 } = params;
 
     // Build card conditions
-    let cardConditions: any[] = [eq(echoeCards.uid, uid)];
+    let cardConditions: any[] = [eq(echoeCards.uid, uid), isActiveCard];
 
     // Filter by deck
     if (deckId !== undefined) {
@@ -470,7 +477,7 @@ export class EchoeNoteService {
           const leechNotes = await db
             .select({ noteId: echoeNotes.noteId })
             .from(echoeNotes)
-            .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE '%"leech"%'`));
+            .where(and(eq(echoeNotes.uid, uid), sql`${echoeNotes.tags} LIKE '%"leech"%'`, isActiveNote));
 
           const leechNoteIds = leechNotes.map((n: Pick<EchoeNotes, 'noteId'>) => n.noteId);
           if (leechNoteIds.length > 0) {
@@ -483,7 +490,7 @@ export class EchoeNoteService {
     }
 
     // Build note conditions
-    let noteConditions: any[] = [eq(echoeNotes.uid, uid)];
+    let noteConditions: any[] = [eq(echoeNotes.uid, uid), isActiveNote];
 
     // Filter by search query
     if (q) {
@@ -535,9 +542,9 @@ export class EchoeNoteService {
         notetype: echoeNotetypes,
       })
       .from(echoeCards)
-      .leftJoin(echoeNotes, eq(echoeCards.nid, echoeNotes.noteId))
-      .leftJoin(echoeDecks, and(eq(echoeCards.did, echoeDecks.deckId), eq(echoeDecks.uid, uid)))
-      .leftJoin(echoeNotetypes, and(eq(echoeNotes.mid, echoeNotetypes.noteTypeId), eq(echoeNotetypes.uid, uid)))
+      .leftJoin(echoeNotes, and(eq(echoeCards.nid, echoeNotes.noteId), isActiveNote))
+      .leftJoin(echoeDecks, and(eq(echoeCards.did, echoeDecks.deckId), eq(echoeDecks.uid, uid), isActiveDeck))
+      .leftJoin(echoeNotetypes, and(eq(echoeNotes.mid, echoeNotetypes.noteTypeId), eq(echoeNotetypes.uid, uid), isActiveNotetype))
       .where(whereClause)
       .orderBy(orderBy)
       .limit(limit)
@@ -663,7 +670,7 @@ export class EchoeNoteService {
 
       case 'unsuspend': {
         // Get all cards at once and restore queue based on card type.
-        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds), isActiveCard));
         await this.restoreQueueByCardType(uid, cards, now, 'unsuspend');
         affected = cards.length;
         break;
@@ -680,7 +687,7 @@ export class EchoeNoteService {
 
       case 'unbury': {
         // Get all cards at once and restore queue based on card type.
-        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const cards = await db.select().from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds), isActiveCard));
         await this.restoreQueueByCardType(uid, cards, now, 'unbury');
         affected = cards.length;
         break;
@@ -722,7 +729,7 @@ export class EchoeNoteService {
           throw new Error('tag is required for addTag action');
         }
         // Get unique note IDs from cards (batch query)
-        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds), isActiveCard));
         const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
@@ -730,7 +737,7 @@ export class EchoeNoteService {
         }
 
         // Batch query all notes at once
-        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
+        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds), isActiveNote));
 
         // Process notes and collect updates
         for (const note of notes) {
@@ -752,7 +759,7 @@ export class EchoeNoteService {
           throw new Error('tag is required for removeTag action');
         }
         // Get unique note IDs from cards (batch query)
-        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds)));
+        const cards = await db.select({ nid: echoeCards.nid }).from(echoeCards).where(and(eq(echoeCards.uid, uid), inArray(echoeCards.cardId, cardIds), isActiveCard));
         const noteIds: string[] = Array.from(new Set(cards.map((c: Pick<EchoeCards, 'nid'>) => c.nid)));
 
         if (noteIds.length === 0) {
@@ -760,7 +767,7 @@ export class EchoeNoteService {
         }
 
         // Batch query all notes at once
-        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds)));
+        const notes = await db.select().from(echoeNotes).where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.noteId, noteIds), isActiveNote));
 
         // Process notes and collect updates
         for (const note of notes) {
@@ -789,7 +796,7 @@ export class EchoeNoteService {
     const notetypes = await db
       .select()
       .from(echoeNotetypes)
-      .where(and(eq(echoeNotetypes.uid, uid), eq(echoeNotetypes.deletedAt, 0)))
+      .where(and(eq(echoeNotetypes.uid, uid), isActiveNotetype))
       .orderBy(echoeNotetypes.name);
 
     if (notetypes.length === 0) {
@@ -801,13 +808,13 @@ export class EchoeNoteService {
     const allTemplates = await db
       .select()
       .from(echoeTemplates)
-      .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.ntid, noteTypeIds)));
+      .where(and(eq(echoeTemplates.uid, uid), inArray(echoeTemplates.ntid, noteTypeIds), isActiveTemplate));
 
     // Batch query all note counts in one call
     const noteCounts = await db
       .select({ mid: echoeNotes.mid, count: sql<number>`COUNT(*)` })
       .from(echoeNotes)
-      .where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.mid, noteTypeIds)))
+      .where(and(eq(echoeNotes.uid, uid), inArray(echoeNotes.mid, noteTypeIds), isActiveNote))
       .groupBy(echoeNotes.mid);
 
     // Create a map for quick lookup
@@ -1203,13 +1210,13 @@ export class EchoeNoteService {
       return null;
     }
 
-    const templates = await db.select().from(echoeTemplates).where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.ntid, id)));
+    const templates = await db.select().from(echoeTemplates).where(and(eq(echoeTemplates.uid, uid), eq(echoeTemplates.ntid, id), isActiveTemplate));
 
     // Get note count for this note type
     const noteCountResult = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(echoeNotes)
-      .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id)));
+      .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.mid, id), isActiveNote));
     const noteCount = Number(noteCountResult[0]?.count || 0);
 
     return {

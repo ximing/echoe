@@ -15,8 +15,9 @@ import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeDecks } from '../db/schema/echoe-decks.js';
 import { echoeNotetypes } from '../db/schema/echoe-notetypes.js';
 import { echoeMedia } from '../db/schema/echoe-media.js';
-import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
+
+import { EchoeMediaService } from './echoe-media.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SECOND_MS = 1000;

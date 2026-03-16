@@ -9,6 +9,7 @@ import { sql, eq, and } from 'drizzle-orm';
 import { getDatabase } from '../db/connection.js';
 import { echoeNotes } from '../db/schema/echoe-notes.js';
 import { logger } from '../utils/logger.js';
+import { isActiveNote } from '../utils/active-row-predicates.js';
 
 import type { EchoeTagDto, RenameTagDto, MergeTagsDto } from '@echoe/dto';
 
@@ -21,7 +22,7 @@ export class EchoeTagService {
     const db = getDatabase();
 
     // Get all notes with tags
-    const notes = await db.select({ tags: echoeNotes.tags }).from(echoeNotes).where(eq(echoeNotes.uid, uid));
+    const notes = await db.select({ tags: echoeNotes.tags }).from(echoeNotes).where(and(eq(echoeNotes.uid, uid), isActiveNote));
 
     // Count tag usage
     const tagCounts = new Map<string, number>();

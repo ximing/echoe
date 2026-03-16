@@ -2,9 +2,10 @@ import { Service } from 'typedi';
 import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
-import { echoeRevlog } from '../db/schema/echoe-revlog.js';
 import { echoeCards } from '../db/schema/echoe-cards.js';
-import { echoeNotes } from '../db/schema/echoe-notes.js';
+import { echoeRevlog } from '../db/schema/echoe-revlog.js';
+import { isActiveCard, isActiveRevlog } from '../utils/active-row-predicates.js';
+
 import { EchoeDeckService } from './echoe-deck.service.js';
 
 import type {
@@ -194,7 +195,7 @@ export class EchoeStatsService {
           lastReview: echoeCards.lastReview,
         })
         .from(echoeCards)
-        .where(eq(echoeCards.uid, uid));
+        .where(and(eq(echoeCards.uid, uid), isActiveCard));
     }
 
     const cards = await query;
@@ -381,7 +382,7 @@ export class EchoeStatsService {
         lastReview: echoeCards.lastReview,
       })
       .from(echoeCards)
-      .where(eq(echoeCards.uid, uid));
+      .where(and(eq(echoeCards.uid, uid), isActiveCard));
 
     const deckMap = new Map<
       string,
