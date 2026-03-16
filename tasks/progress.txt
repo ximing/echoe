@@ -314,3 +314,33 @@ Started: 2026年 3月16日 星期一 15时33分24秒 CST
   - AI prompt structure: { task, currentInput, retrievedContext, constraints }
   - Test debugging tip: Add console.log to track mock call count and returned data
 ---
+## 2026-03-16 19:10 - US-014
+- Implemented AI organize execution with validation and fallback in InboxAiService.organizeInbox()
+- Added AI model call using @ai-sdk/openai with temperature=0.2 for stable results
+- Implemented 15-second timeout using AbortSignal.timeout() as per PRD requirements
+- Added Zod schema validation for AI output (optimizedFront, optimizedBack, reason, confidence)
+- Implemented comprehensive fallback logic:
+  - Returns original front/back with fallback=true on timeout
+  - Returns original front/back with fallback=true on JSON parse failure
+  - Returns original front/back with fallback=true on schema validation failure
+  - Returns original front/back with fallback=true when inbox item not found
+- Added failure reason logging for observability using logger.error()
+- Installed ai@^4.3.19 package (compatible with existing @ai-sdk/openai@0.0.52)
+- Added 4 comprehensive tests covering all failure scenarios
+- All 14 tests pass successfully
+- Typecheck passes successfully
+- Files changed:
+  - apps/server/package.json (added ai dependency)
+  - apps/server/src/services/inbox-ai.service.ts (added organizeInbox method)
+  - apps/server/src/__tests__/inbox-ai.service.test.ts (added 4 new tests)
+  - pnpm-lock.yaml (updated with ai package)
+- **Learnings for future iterations:**
+  - AI SDK version compatibility: @ai-sdk/openai@0.0.52 requires ai@^4.x, not ai@^6.x
+  - Use createOpenAI() with baseURL config for custom OpenAI endpoints
+  - AbortSignal.timeout() provides clean timeout handling for AI calls
+  - Zod schema validation ensures type-safe AI output parsing
+  - Fallback pattern: catch all errors, log detailed failure reason, return safe default
+  - Test pattern: Use mockReturnValue() instead of mockReturnValueOnce() when getDatabase() is reused
+  - AI organize uses buildPrompt() which includes L0/L1/L2 context for better results
+  - Temperature 0.2 balances stability and creativity for organize tasks
+---
