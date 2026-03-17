@@ -97,6 +97,12 @@ export interface InboxReportSummaryDto {
   }[];
   /** AI 生成的洞察 */
   insights: InsightItemDto[];
+  /** 主要主题/话题 */
+  topics?: string[];
+  /** 需要注意的问题 */
+  mistakes?: string[];
+  /** 行动建议 */
+  actions?: string[];
 }
 
 /**
