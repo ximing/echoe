@@ -20,3 +20,38 @@ Started: 2026年 3月17日 星期二 CST
 - Controller delete: Use @Delete('/:id') with @Param('id'), parse and validate ID, return success message
 - Controller responses: Use ResponseUtil.success() and ResponseUtil.error() for consistency
 - Controller tests: Mock services, test happy path + error cases, use ! operator for result.data after null check
+
+## 2026-03-17 15:30 - US-001
+- Added storageKey column to echoe_media table
+- Files changed:
+  - apps/server/src/db/schema/echoe-media.ts (added storageKey varchar(500) column)
+  - apps/server/drizzle/0001_tired_forge.sql (generated migration)
+- **Learnings for future iterations:**
+  - Schema changes require building server first before generating migrations
+  - Migration generation creates both SQL file and snapshot JSON
+  - Lint passes with 2111 warnings but 0 errors (acceptable)
+  - storageKey column is nullable to support backward compatibility with existing records
+---
+## 2026-03-17 16:00 - US-002
+- Modified uploadMedia method to save storageKey to database
+- Files changed:
+  - apps/server/src/services/echoe-media.service.ts (added storageKey to database insert)
+- **Learnings for future iterations:**
+  - storageKey variable was already calculated but not saved - just needed to add it to the insert values
+  - Pre-existing build errors in llm.service.ts and user-model.service.ts (missing @aimo/dto, user-models.js) are unrelated to media changes
+  - Lint warnings are acceptable as long as there are 0 errors
+  - Always stage only the files related to current user story (avoid committing unrelated files)
+---
+## 2026-03-17 16:30 - US-003
+- Modified listMedia to return dynamic temporary access URLs
+- Files changed:
+  - packages/dto/src/echoe.ts (added optional url field to EchoeMediaDto)
+  - apps/server/src/services/echoe-media.service.ts (modified listMedia to generate URLs via generateAccessUrl)
+- **Learnings for future iterations:**
+  - DTOs can have optional fields for backwards compatibility (url?: string)
+  - Use Promise.all for parallel async operations when generating URLs for multiple records
+  - Always handle errors gracefully - log warnings but don't fail the entire operation if one URL generation fails
+  - The storageAdapter.generateAccessUrl() method takes storageKey and metadata, returns temporary URL
+  - Temporary URLs expire in 6 hours (default behavior of generateAccessUrl)
+  - Must include storageKey in database select to generate URLs (it's nullable for backwards compatibility)
+---

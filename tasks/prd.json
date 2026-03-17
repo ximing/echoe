@@ -13,8 +13,8 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Added storageKey varchar(500) column, generated migration 0001_tired_forge.sql, build and lint pass"
     },
     {
       "id": "US-002",
@@ -27,8 +27,8 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Added storageKey to database insert in uploadMedia method, format echoe-media/{uid}/{filename}, URL generation preserved"
     },
     {
       "id": "US-003",
@@ -41,8 +41,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Added url field to EchoeMediaDto, modified listMedia to generate dynamic URLs using generateAccessUrl, handles missing storageKey gracefully"
     },
     {
       "id": "US-004",
