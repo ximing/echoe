@@ -93,8 +93,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Implemented DELETE endpoints for source and category with proper inbox record cleanup"
     },
     {
       "id": "US-007",

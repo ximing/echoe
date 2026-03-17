@@ -13,9 +13,11 @@ Started: 2026年 3月17日 星期二 CST
 - Services: Use @Service() decorator from typedi, ensure uid scoping in all queries
 - Auto-seeding: Check count on first list() call, seed defaults if count = 0
 - Idempotent create: Check if entity exists before inserting, return existing if found
+- Delete pattern: Fetch entity first, update related records to null, then delete entity
 - Controllers: Use @JsonController('/api/v1/resource'), inject services via constructor, must export from controllers/index.ts
 - Controller auth: Use @CurrentUser() decorator, always check if userDto?.uid exists before processing
 - Controller validation: Trim whitespace from user input, validate required fields, return proper error codes
+- Controller delete: Use @Delete('/:id') with @Param('id'), parse and validate ID, return success message
 - Controller responses: Use ResponseUtil.success() and ResponseUtil.error() for consistency
 - Controller tests: Mock services, test happy path + error cases, use ! operator for result.data after null check
 
@@ -97,5 +99,28 @@ Started: 2026年 3月17日 星期二 CST
   - Test pattern: Mock services, test happy path + error cases (unauthorized, validation, db errors)
   - Use non-null assertion operator (!) in tests when accessing result.data after checking it's not null
   - List endpoints return wrapper objects with items array and total count
+---
+
+## 2026-03-17 10:10 - US-006
+- Implemented DELETE endpoints for inbox sources and categories with proper cleanup
+- Files changed:
+  - apps/server/src/controllers/v1/inbox-source.controller.ts (added DELETE endpoint)
+  - apps/server/src/controllers/v1/inbox-category.controller.ts (added DELETE endpoint)
+  - apps/server/src/services/inbox-source.service.ts (updated delete method to clear inbox records)
+  - apps/server/src/services/inbox-category.service.ts (updated delete method to clear inbox records)
+  - apps/server/src/__tests__/inbox-source.controller.test.ts (added delete tests)
+  - apps/server/src/__tests__/inbox-category.controller.test.ts (added delete tests)
+  - apps/server/src/__tests__/inbox-source.service.test.ts (updated delete tests)
+  - apps/server/src/__tests__/inbox-category.service.test.ts (updated delete tests)
+- **Learnings for future iterations:**
+  - Delete pattern: First fetch the entity to get its name, then update related records, then delete
+  - When deleting a source/category, set inbox.source or inbox.category to null (don't delete inbox records)
+  - Import inbox schema in service files to enable updating inbox records
+  - Use @Delete() decorator with @Param('id') for DELETE endpoints
+  - Parse string ID to number with parseInt() and validate with isNaN()
+  - Return success message in response: { message: 'Source deleted successfully' }
+  - Test delete endpoint with: success case, unauthorized, invalid ID, and database error
+  - Test service delete with: success case and not found case (should return early without error)
+  - Mock user uid in tests must match the uid used in test assertions
 ---
 
