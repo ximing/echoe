@@ -4,8 +4,11 @@ import type {
   CreateInboxDto,
   UpdateInboxDto,
   InboxQueryParams,
+  SourceDto,
+  CategoryDto,
 } from '@echoe/dto';
 import * as inboxApi from '../api/inbox.js';
+import * as inboxSourceCategoryApi from '../api/inbox-source-category.js';
 import { toast } from './toast.service.js';
 
 interface InboxListState {
@@ -27,7 +30,11 @@ export class InboxService extends Service {
 
   isLoading = false;
   error: string | null = null;
-  filters: { category?: string; isRead?: boolean } = {};
+  filters: { source?: string; category?: string; isRead?: boolean } = {};
+
+  sources: SourceDto[] = [];
+  categories: CategoryDto[] = [];
+  isLoadingOptions = false;
 
   async loadInboxItems(params?: InboxQueryParams) {
     this.isLoading = true;
@@ -36,6 +43,7 @@ export class InboxService extends Service {
       const response = await inboxApi.getInboxItems({
         page: params?.page ?? this.list.page,
         limit: params?.limit ?? this.list.limit,
+        source: params?.source ?? this.filters.source,
         category: params?.category ?? this.filters.category,
         isRead: params?.isRead ?? this.filters.isRead,
         sortBy: params?.sortBy ?? 'createdAt',
@@ -47,6 +55,23 @@ export class InboxService extends Service {
       toast.error(this.error);
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  async loadSourcesAndCategories() {
+    this.isLoadingOptions = true;
+    try {
+      const [sourcesResponse, categoriesResponse] = await Promise.all([
+        inboxSourceCategoryApi.getInboxSources(),
+        inboxSourceCategoryApi.getInboxCategories(),
+      ]);
+      this.sources = sourcesResponse.data.items;
+      this.categories = categoriesResponse.data.items;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load sources and categories';
+      toast.error(message);
+    } finally {
+      this.isLoadingOptions = false;
     }
   }
 
@@ -145,7 +170,7 @@ export class InboxService extends Service {
     }
   }
 
-  setFilters(filters: { category?: string; isRead?: boolean }) {
+  setFilters(filters: { source?: string; category?: string; isRead?: boolean }) {
     this.filters = filters;
     this.list.page = 1; // Reset to first page when filters change
     this.loadInboxItems();

@@ -1,5 +1,6 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { InboxService } from '../../services/inbox.service.js';
 import type { InboxListItemDto } from '@echoe/dto';
 import {
@@ -16,6 +17,7 @@ import {
 
 export const InboxPage = view(() => {
   const inboxService = useService(InboxService);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -23,9 +25,51 @@ export const InboxPage = view(() => {
   const [selectedItem, setSelectedItem] = useState<InboxListItemDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  // Initialize filters from URL params
   useEffect(() => {
+    const source = searchParams.get('source') || undefined;
+    const category = searchParams.get('category') || undefined;
+    const isReadParam = searchParams.get('isRead');
+    const isRead =
+      isReadParam === 'true' ? true : isReadParam === 'false' ? false : undefined;
+
+    inboxService.filters = { source, category, isRead };
     inboxService.loadInboxItems();
+    inboxService.loadSourcesAndCategories();
   }, []);
+
+  const updateFilters = (newFilters: {
+    source?: string;
+    category?: string;
+    isRead?: boolean;
+  }) => {
+    // Update URL params
+    const params = new URLSearchParams(searchParams);
+    if (newFilters.source) {
+      params.set('source', newFilters.source);
+    } else {
+      params.delete('source');
+    }
+    if (newFilters.category) {
+      params.set('category', newFilters.category);
+    } else {
+      params.delete('category');
+    }
+    if (newFilters.isRead !== undefined) {
+      params.set('isRead', String(newFilters.isRead));
+    } else {
+      params.delete('isRead');
+    }
+    setSearchParams(params);
+
+    // Update service filters
+    inboxService.setFilters(newFilters);
+  };
+
+  const clearAllFilters = () => {
+    setSearchParams(new URLSearchParams());
+    inboxService.clearFilters();
+  };
 
   const handleCreate = () => {
     setShowCreateDialog(true);
@@ -98,7 +142,30 @@ export const InboxPage = view(() => {
         {/* Filters */}
         {showFilters && (
           <div className="mt-4 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  来源:
+                </label>
+                <select
+                  value={inboxService.filters.source ?? ''}
+                  onChange={(e) =>
+                    updateFilters({
+                      ...inboxService.filters,
+                      source: e.target.value || undefined,
+                    })
+                  }
+                  className="px-3 py-1.5 bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-600 rounded-lg text-sm"
+                  disabled={inboxService.isLoadingOptions}
+                >
+                  <option value="">全部</option>
+                  {inboxService.sources.map((source) => (
+                    <option key={source.id} value={source.name}>
+                      {source.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   分类:
@@ -106,19 +173,20 @@ export const InboxPage = view(() => {
                 <select
                   value={inboxService.filters.category ?? ''}
                   onChange={(e) =>
-                    inboxService.setFilters({
+                    updateFilters({
                       ...inboxService.filters,
                       category: e.target.value || undefined,
                     })
                   }
                   className="px-3 py-1.5 bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-600 rounded-lg text-sm"
+                  disabled={inboxService.isLoadingOptions}
                 >
                   <option value="">全部</option>
-                  <option value="backend">后端</option>
-                  <option value="frontend">前端</option>
-                  <option value="design">设计</option>
-                  <option value="product">产品</option>
-                  <option value="other">其他</option>
+                  {inboxService.categories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center gap-2">
@@ -134,7 +202,7 @@ export const InboxPage = view(() => {
                         : 'unread'
                   }
                   onChange={(e) =>
-                    inboxService.setFilters({
+                    updateFilters({
                       ...inboxService.filters,
                       isRead:
                         e.target.value === ''
@@ -152,7 +220,7 @@ export const InboxPage = view(() => {
                 </select>
               </div>
               <button
-                onClick={() => inboxService.clearFilters()}
+                onClick={clearAllFilters}
                 className="ml-auto px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
               >
                 清除筛选
