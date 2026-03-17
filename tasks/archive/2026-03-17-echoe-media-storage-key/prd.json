@@ -1,0 +1,74 @@
+{
+  "project": "Echoe",
+  "branchName": "ralph/echoe-media-storage-key",
+  "description": "Echoe Media 存储优化与动态临时链接 - 存储 storageKey 到数据库，所有返回 media URL 的地方调用 generateAccessUrl 生成临时链接",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add storageKey field to database",
+      "description": "As a developer, I need to store media file storageKey in the database for dynamic URL generation.",
+      "acceptanceCriteria": [
+        "Add storageKey column to echoe_media table (VARCHAR 500)",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Completed: Added storageKey varchar(500) column, generated migration 0001_tired_forge.sql, build and lint pass"
+    },
+    {
+      "id": "US-002",
+      "title": "Modify uploadMedia to save storageKey",
+      "description": "As a developer, I need to save storageKey to database when uploading media files.",
+      "acceptanceCriteria": [
+        "uploadMedia method saves storageKey to database",
+        "storageKey format: echoe-media/{uid}/{filename}",
+        "Keep existing URL generation logic (return URL on upload)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Completed: Added storageKey to database insert in uploadMedia method, format echoe-media/{uid}/{filename}, URL generation preserved"
+    },
+    {
+      "id": "US-003",
+      "title": "Modify listMedia to return dynamic temp links",
+      "description": "As a user, I want to get dynamically generated temp access URLs in the media list.",
+      "acceptanceCriteria": [
+        "listMedia calls generateAccessUrl for each record",
+        "Temp URLs expire in 6 hours",
+        "Response includes dynamically generated url field",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Completed: Added url field to EchoeMediaDto, modified listMedia to generate dynamic URLs using generateAccessUrl, handles missing storageKey gracefully"
+    },
+    {
+      "id": "US-004",
+      "title": "Modify getMedia to return dynamic temp links",
+      "description": "As a developer, I need getMedia to also use dynamic URL generation.",
+      "acceptanceCriteria": [
+        "getMedia method generates temp access URL on return",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Completed: Added getMediaMetadata method and GET /api/v1/media/:filename/metadata endpoint that returns metadata with dynamic URL. Preserved existing getMedia file-serving functionality."
+    },
+    {
+      "id": "US-005",
+      "title": "Check and update all APIs returning media URLs",
+      "description": "As a developer, I need to ensure all places returning media URLs use dynamic generation.",
+      "acceptanceCriteria": [
+        "Search codebase for all media URL return points",
+        "Identify which need dynamic URL generation",
+        "Update identified endpoints",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Completed: Comprehensive audit of all media-related endpoints. All endpoints returning media metadata (GET /, GET /:filename/metadata, POST /upload) now use dynamic URL generation via generateAccessUrl. File-serving endpoint (GET /:filename) serves buffers directly as intended. No additional changes needed."
+    }
+  ]
+}

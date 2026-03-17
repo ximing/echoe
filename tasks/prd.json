@@ -1,74 +1,119 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/echoe-media-storage-key",
-  "description": "Echoe Media 存储优化与动态临时链接 - 存储 storageKey 到数据库，所有返回 media URL 的地方调用 generateAccessUrl 生成临时链接",
+  "branchName": "ralph/anki-apkg-import",
+  "description": "Anki .apkg 文件导入功能 - 支持直接导入 Anki 的 .apkg 文件，解析 ZIP 和 SQLite 数据库，保持模板样式和媒体文件",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add storageKey field to database",
-      "description": "As a developer, I need to store media file storageKey in the database for dynamic URL generation.",
+      "title": "Add JSZip and sql.js dependencies",
+      "description": "As a developer, I need to add JSZip and sql.js libraries to the web app for parsing .apkg files in the browser.",
       "acceptanceCriteria": [
-        "Add storageKey column to echoe_media table (VARCHAR 500)",
-        "Generate and run migration successfully",
+        "Add jszip package to apps/web",
+        "Add sql.js package to apps/web",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "Completed: Added storageKey varchar(500) column, generated migration 0001_tired_forge.sql, build and lint pass"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Modify uploadMedia to save storageKey",
-      "description": "As a developer, I need to save storageKey to database when uploading media files.",
+      "title": "Create APKG parser service",
+      "description": "As a developer, I need to create a parser service that can extract and parse .apkg files in the browser.",
       "acceptanceCriteria": [
-        "uploadMedia method saves storageKey to database",
-        "storageKey format: echoe-media/{uid}/{filename}",
-        "Keep existing URL generation logic (return URL on upload)",
+        "Create apkg-parser.service.ts in apps/web/src/services/",
+        "Use JSZip to unzip .apkg file",
+        "Detect and extract collection.anki21 or collection.anki2 SQLite database",
+        "Use sql.js to open and query SQLite database",
+        "Parse media JSON mapping file",
+        "Support both anki21 and anki2 formats",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Completed: Added storageKey to database insert in uploadMedia method, format echoe-media/{uid}/{filename}, URL generation preserved"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Modify listMedia to return dynamic temp links",
-      "description": "As a user, I want to get dynamically generated temp access URLs in the media list.",
+      "title": "Add import notes API endpoint",
+      "description": "As a user, I want to import Anki notes and cards into Echoe via API.",
       "acceptanceCriteria": [
-        "listMedia calls generateAccessUrl for each record",
-        "Temp URLs expire in 6 hours",
-        "Response includes dynamically generated url field",
+        "Create POST /api/v1/import/anki endpoint",
+        "Accept parsed Anki data (notes, cards, models, decks) in request body",
+        "Convert Anki notes to Echoe notes format",
+        "Parse Anki templates (qfmt, afmt) and store HTML content",
+        "Parse CSS from models and apply to notes",
+        "Create notes in database as new records",
+        "Create corresponding deck/folder structure from Anki decks",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Completed: Added url field to EchoeMediaDto, modified listMedia to generate dynamic URLs using generateAccessUrl, handles missing storageKey gracefully"
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Modify getMedia to return dynamic temp links",
-      "description": "As a developer, I need getMedia to also use dynamic URL generation.",
+      "title": "Add import review history API endpoint",
+      "description": "As a user, I want to import my Anki review history so I can continue learning with existing progress.",
       "acceptanceCriteria": [
-        "getMedia method generates temp access URL on return",
+        "Add revlog parsing to import endpoint",
+        "Convert revlog entries to Echoe FSRS review records",
+        "Import review history with original timestamps",
+        "Preserve interval and ease factor data",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Completed: Added getMediaMetadata method and GET /api/v1/media/:filename/metadata endpoint that returns metadata with dynamic URL. Preserved existing getMedia file-serving functionality."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Check and update all APIs returning media URLs",
-      "description": "As a developer, I need to ensure all places returning media URLs use dynamic generation.",
+      "title": "Add media file import support",
+      "description": "As a user, I want to import images and audio files from Anki cards.",
       "acceptanceCriteria": [
-        "Search codebase for all media URL return points",
-        "Identify which need dynamic URL generation",
-        "Update identified endpoints",
+        "Extract media files from unzipped apkg",
+        "Parse media JSON mapping (数字文件名 -> 原始文件名)",
+        "Upload media files to Echoe storage via existing API",
+        "Update note content to use new media URLs",
+        "Support common media types: images (jpg, png, gif, svg), audio (mp3, wav, ogg), video (mp4, webm)",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Completed: Comprehensive audit of all media-related endpoints. All endpoints returning media metadata (GET /, GET /:filename/metadata, POST /upload) now use dynamic URL generation via generateAccessUrl. File-serving endpoint (GET /:filename) serves buffers directly as intended. No additional changes needed."
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Create Anki import UI",
+      "description": "As a user, I want a user interface to upload and import Anki .apkg files.",
+      "acceptanceCriteria": [
+        "Create ImportPage in apps/web/src/pages/",
+        "Add file upload component with drag-and-drop support",
+        "Add .apkg file type validation",
+        "Show import progress (parsing, uploading, completed)",
+        "Display import statistics (notes count, cards count, media count)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Add import error handling",
+      "description": "As a user, I want to see clear error messages when import fails.",
+      "acceptanceCriteria": [
+        "Validate .apkg file format before processing",
+        "Handle corrupted SQLite database gracefully",
+        "Handle missing media files gracefully",
+        "Show specific error messages with suggested fixes",
+        "Rollback partial imports on failure",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
     }
   ]
 }
