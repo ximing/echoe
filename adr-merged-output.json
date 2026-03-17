@@ -1,0 +1,642 @@
+[
+  {
+    "id": "ENG-0001",
+    "title": "Soft-Delete Strategy via deleted_at Field",
+    "type": "Constraint",
+    "context": "All queryable tables use soft-delete pattern with deleted_at field (0 = active, >0 = deleted) instead of hard deletion.",
+    "decision": "MUST apply active row predicates to every query. All select queries must include isActiveXXX predicate from active-row-predicates.ts. Filter by deletedAt = 0.",
+    "evidence": [
+      "apps/server/src/utils/active-row-predicates.ts",
+      "apps/server/src/middlewares/api-token-auth.middleware.ts",
+      "apps/server/src/services/echoe-study.service.ts",
+      "apps/server/src/db/schema/echoe-cards.ts"
+    ],
+    "impact": {
+      "tech": "Query safety - missing predicates causes data leaks. Data integrity issues if filter missing.",
+      "biz": "Users expect deleted items to be invisible"
+    }
+  },
+  {
+    "id": "ENG-0002",
+    "title": "Multi-tenant Data Isolation via uid Column",
+    "type": "Constraint",
+    "context": "Echoe is a multi-tenant SaaS system.",
+    "decision": "Every data query MUST include eq(table.uid, uid) in WHERE clause.",
+    "evidence": [
+      "apps/server/src/services/echoe-study.service.ts",
+      "apps/server/src/db/schema/echoe-cards.ts"
+    ],
+    "impact": {
+      "tech": "Data leak risk if uid filter missing",
+      "biz": "Critical security requirement"
+    }
+  },
+  {
+    "id": "ENG-0003",
+    "title": "SSRF Protection via URL Validation",
+    "type": "Constraint",
+    "context": "All external URL requests must validate against SSRF attacks.",
+    "decision": "Use validateURLForSSRF() for async validation with DNS resolution.",
+    "evidence": [
+      "apps/server/src/utils/url-validator.ts"
+    ],
+    "impact": {
+      "tech": "Security blocker",
+      "biz": "Compliance requirement"
+    }
+  },
+  {
+    "id": "ENG-0004",
+    "title": "Arrow Format Conversion for LanceDB Results",
+    "type": "Constraint",
+    "context": "LanceDB returns results as Apache Arrow objects, not plain JSON.",
+    "decision": "MUST use arrow.ts helpers: toStringList(), toStructList(), toTimestamp(). List fields must first use .toArray() method to convert to JavaScript array.",
+    "evidence": [
+      "apps/server/src/utils/arrow.ts",
+      ".catpaw/rules/dancedb.md"
+    ],
+    "impact": {
+      "tech": "Runtime safety. Correctly handle Arrow data types.",
+      "biz": "Vector search relies on LanceDB"
+    }
+  },
+  {
+    "id": "ENG-0005",
+    "title": "ID Generation Centralized Management",
+    "type": "Constraint",
+    "context": "All entities use type-prefixed nanoid format. System needs unified ID generation.",
+    "decision": "All ID generation must be implemented in apps/server/src/utils/id.ts. Use generateTypeId(type) to generate type-prefixed ID.",
+    "evidence": [
+      "apps/server/src/utils/id.ts",
+      ".catpaw/rules/base.md"
+    ],
+    "impact": {
+      "tech": "Consistent ID format across system",
+      "biz": "IDs are public identifiers"
+    }
+  },
+  {
+    "id": "ENG-0006",
+    "title": "Legacy Data Compatibility: JSON Parsing with Fallback",
+    "type": "SourceOfTruth",
+    "context": "echoe migrated from Anki format. Old data uses space-delimited tags.",
+    "decision": "parseTags() tries JSON array first, falls back to space-delimited.",
+    "evidence": [
+      "apps/server/src/utils/echoe-note.utils.ts"
+    ],
+    "impact": {
+      "tech": "Backward compatibility",
+      "biz": "User data migration from Anki"
+    }
+  },
+  {
+    "id": "ENG-0007",
+    "title": "FSRS Retrievability Calculation with Clock-Drift Handling",
+    "type": "SourceOfTruth",
+    "context": "Spaced repetition uses FSRS algorithm.",
+    "decision": "calculateRetrievability() handles new cards (null), treats clock drift as just-reviewed.",
+    "evidence": [
+      "apps/server/src/utils/fsrs-retrievability.ts"
+    ],
+    "impact": {
+      "tech": "FSRS is mathematical model",
+      "biz": "Learning curve depends on correct retrievability"
+    }
+  },
+  {
+    "id": "ENG-0008",
+    "title": "FSRS Step Format Unification: number[] <-> string[]",
+    "type": "Constraint",
+    "context": "DTO layer uses number[] (minutes) for FSRS config steps.",
+    "decision": "parseStepToMinutes() converts any format to positive number.",
+    "evidence": [
+      "apps/server/src/utils/fsrs-steps.ts"
+    ],
+    "impact": {
+      "tech": "Type safety boundary",
+      "biz": "FSRS config is user-facing"
+    }
+  },
+  {
+    "id": "ENG-0009",
+    "title": "BA (Basic Auth) Configuration Flag is Hard-Fail",
+    "type": "Constraint",
+    "context": "BA authentication requires explicit opt-in via BA_AUTH_ENABLED=true.",
+    "decision": "baAuthInterceptor checks config.ba.enabled. If false, return 401 immediately.",
+    "evidence": [
+      "apps/server/src/middlewares/ba-auth.interceptor.ts"
+    ],
+    "impact": {
+      "tech": "Security-first default",
+      "biz": "Public APIs require explicit enablement"
+    }
+  },
+  {
+    "id": "ENG-0010",
+    "title": "Auth Excluded Paths Whitelist",
+    "type": "Constraint",
+    "context": "AUTH_EXCLUDED_PATHS defines routes that skip authentication check.",
+    "decision": "authHandler checks requiresAuth() which tests AUTH_EXCLUDED_PATHS first.",
+    "evidence": [
+      "apps/server/src/middlewares/auth-handler.ts"
+    ],
+    "impact": {
+      "tech": "Security whitelist",
+      "biz": "Public endpoints must be explicitly allowed"
+    }
+  },
+  {
+    "id": "ENG-0011",
+    "title": "Authentication Priority: API Token > JWT",
+    "type": "Constraint",
+    "context": "Two authentication methods coexist: API Token (Bearer header) and JWT (cookie/header).",
+    "decision": "apiTokenAuthMiddleware runs first and sets request.user if valid token found.",
+    "evidence": [
+      "apps/server/src/middlewares/api-token-auth.middleware.ts",
+      "apps/server/src/middlewares/auth-handler.ts"
+    ],
+    "impact": {
+      "tech": "Middleware ordering critical",
+      "biz": "API token users have first-class auth support"
+    }
+  },
+  {
+    "id": "ENG-0012",
+    "title": "JWT Authentication via CurrentUser Decorator",
+    "type": "Constraint",
+    "context": "Backend API needs secure authentication mechanism.",
+    "decision": "Backend controllers use @CurrentUser() decorator to get authenticated user info.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Centralized authentication handling",
+      "biz": "Improve security"
+    }
+  },
+  {
+    "id": "ENG-0013",
+    "title": "Workspace Auto-Initialization Safety Net",
+    "type": "Constraint",
+    "context": "ensureUserWorkspace middleware auto-initializes Echoe workspace.",
+    "decision": "Middleware logs errors but doesn't fail request.",
+    "evidence": [
+      "apps/server/src/middlewares/ensure-user-workspace.ts"
+    ],
+    "impact": {
+      "tech": "Resilience pattern",
+      "biz": "Echoe cards require initialized workspace"
+    }
+  },
+  {
+    "id": "ENG-0014",
+    "title": "Error Handler Response Format Divergence",
+    "type": "SourceOfTruth",
+    "context": "errorHandler middleware format differs from other API responses.",
+    "decision": "HttpError returns httpCode status + { status: 'error', message }.",
+    "evidence": [
+      "apps/server/src/middlewares/error-handler.ts"
+    ],
+    "impact": {
+      "tech": "API contract inconsistency",
+      "biz": "Error handling is exception case"
+    }
+  },
+  {
+    "id": "ENG-0015",
+    "title": "IOC Container Auto-Load Services via Glob",
+    "type": "Constraint",
+    "context": "Backend dependency injection needs automated management.",
+    "decision": "Backend IOC container auto-loads via glob patterns in src/ioc.ts.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Simplify dependency management",
+      "biz": "Reduce development complexity"
+    }
+  },
+  {
+    "id": "ENG-0016",
+    "title": "Git Commit Requires Pre-commit Hooks",
+    "type": "Constraint",
+    "context": "Code quality and commit standards need enforcement.",
+    "decision": "All Git commits must pass pre-commit hooks. Never use --no-verify.",
+    "evidence": [
+      ".catpaw/rules/lint.md"
+    ],
+    "impact": {
+      "tech": "Enforce code style checking",
+      "biz": "Ensure code base quality consistency"
+    }
+  },
+  {
+    "id": "ENG-0017",
+    "title": "LanceDB List Field NULL Handling",
+    "type": "Constraint",
+    "context": "LanceDB uses Arrow data types.",
+    "decision": "When addColumns valueSql is List type, use arrow_cast(NULL, 'List(Utf8)').",
+    "evidence": [
+      ".catpaw/rules/dancedb.md"
+    ],
+    "impact": {
+      "tech": "Avoid LanceDB type inference errors",
+      "biz": "Prevent data migration failure"
+    }
+  },
+  {
+    "id": "ENG-0018",
+    "title": "Docker Image Build Package Dependency Priority",
+    "type": "Constraint",
+    "context": "pnpm monorepo Docker image build needs correct dependency order.",
+    "decision": "Docker build order must package workspace dependencies first.",
+    "evidence": [
+      ".catpaw/rules/docker.md"
+    ],
+    "impact": {
+      "tech": "Ensure build artifacts complete",
+      "biz": "Avoid build failure"
+    }
+  },
+  {
+    "id": "ENG-0019",
+    "title": "Production Image Use Frozen-lockfile and --prod",
+    "type": "Constraint",
+    "context": "Production images need deterministic dependencies and minimal size.",
+    "decision": "Production image must use pnpm install --prod --frozen-lockfile.",
+    "evidence": [
+      ".catpaw/rules/docker.md"
+    ],
+    "impact": {
+      "tech": "Smaller image size",
+      "biz": "Reduce image storage cost"
+    }
+  },
+  {
+    "id": "ENG-0020",
+    "title": "Turbo Build Cache Force Rebuild",
+    "type": "Constraint",
+    "context": "Turbo caches build results.",
+    "decision": "When needing full rebuild, use turbo run build --force.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Ensure complete build",
+      "biz": "Improve build trustworthiness"
+    }
+  },
+  {
+    "id": "ENG-0021",
+    "title": "Page-Level Service Unified Registration",
+    "type": "Constraint",
+    "context": "Frontend page Service and child component Service management needs clear hierarchy.",
+    "decision": "Page-level component Service should be registered in page-level bindServices.",
+    "evidence": [
+      ".catpaw/rules/page-component-service.md"
+    ],
+    "impact": {
+      "tech": "Clarify Service lifecycle",
+      "biz": "Reduce frontend logic complexity"
+    }
+  },
+  {
+    "id": "ENG-0022",
+    "title": "Unit Test Files Cannot Be Deleted",
+    "type": "Constraint",
+    "context": "Test code is important part of code quality assurance.",
+    "decision": "Unit test files cannot be deleted. Test file location: src/__tests__/.",
+    "evidence": [
+      ".catpaw/rules/unit-test.md"
+    ],
+    "impact": {
+      "tech": "Maintain test coverage",
+      "biz": "Improve product quality"
+    }
+  },
+  {
+    "id": "ENG-0023",
+    "title": "No Foreign Keys - Application Layer Integrity",
+    "type": "Constraint",
+    "context": "MySQL database design follows specific foreign key strategy.",
+    "decision": "No foreign key constraints at database level. All relational integrity validation must be implemented in application layer.",
+    "evidence": [
+      "CLAUDE.md",
+      ".catpaw/rules/base.md"
+    ],
+    "impact": {
+      "tech": "Application layer needs to implement relational data consistency checks",
+      "biz": "Prevent cascade delete causing data loss"
+    }
+  },
+  {
+    "id": "ENG-0024",
+    "title": "pnpm Workspace Unified Package Management",
+    "type": "Constraint",
+    "context": "Project uses pnpm monorepo structure.",
+    "decision": "All npm package installation must use pnpm. Never use npm or yarn.",
+    "evidence": [
+      ".catpaw/rules/base.md"
+    ],
+    "impact": {
+      "tech": "Ensure all developers have consistent dependency tree",
+      "biz": "Guarantee build reproducibility"
+    }
+  },
+  {
+    "id": "ENG-0025",
+    "title": "All Logs Must Use Unified Logger Package",
+    "type": "Constraint",
+    "context": "Backend service logs need unified management.",
+    "decision": "All backend service log output must use @echoe/logger package. Never use console.log.",
+    "evidence": [
+      ".catpaw/rules/base.md"
+    ],
+    "impact": {
+      "tech": "Unified log format",
+      "biz": "Easier problem diagnosis"
+    }
+  },
+  {
+    "id": "ENG-0026",
+    "title": "Database Migration Must Complete via Scripts",
+    "type": "Constraint",
+    "context": "Database table structure changes need version control.",
+    "decision": "Any database schema changes must be implemented via migration scripts.",
+    "evidence": [
+      ".catpaw/rules/base.md"
+    ],
+    "impact": {
+      "tech": "Version control database changes",
+      "biz": "Auditable database change history"
+    }
+  },
+  {
+    "id": "ENG-0027",
+    "title": "MySQL VARCHAR Primary Key and Relation Field Max Length",
+    "type": "Constraint",
+    "context": "MySQL has 191 character limit for single column index under utf8mb4 charset.",
+    "decision": "VARCHAR primary key and relation ID field max length is 191 characters.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Limit ID generation length",
+      "biz": "Constraints on global unique identifier generation strategy"
+    }
+  },
+  {
+    "id": "ENG-0028",
+    "title": "Timestamp Fields Use Millisecond Precision",
+    "type": "Constraint",
+    "context": "System needs precise event order recording.",
+    "decision": "Timestamp fields use timestamp('created_at', { mode: 'date', fsp: 3 }) format.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Improve event recording precision",
+      "biz": "More accurate business timeline"
+    }
+  },
+  {
+    "id": "ENG-0029",
+    "title": "Drizzle Migration Must Build TypeScript First",
+    "type": "Constraint",
+    "context": "Drizzle Kit reads schema definitions from compiled JavaScript output.",
+    "decision": "Must run pnpm build before generating database migrations.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Ensure schema changes are correctly detected",
+      "biz": "Prevent database inconsistency from misoperation"
+    }
+  },
+  {
+    "id": "ENG-0030",
+    "title": "Backend and Frontend Service Cannot Be Confused",
+    "type": "Constraint",
+    "context": "Project has two Service concepts.",
+    "decision": "Backend Service (TypeDI) for business logic, Frontend Service (@rabjs/react) for state management.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Clear architecture layering",
+      "biz": "Improve code maintainability"
+    }
+  },
+  {
+    "id": "BIZ-0001",
+    "title": "User Workspace Initialization Requirement",
+    "type": "SourceOfTruth",
+    "context": "Echoe feature requires initialized workspace per user.",
+    "decision": "EchoeSeedService.ensureUserWorkspace(uid) creates default workspace if missing.",
+    "evidence": [
+      "apps/server/src/middlewares/ensure-user-workspace.ts"
+    ],
+    "impact": {
+      "tech": "Workspace is prerequisite",
+      "biz": "Seamless onboarding"
+    }
+  },
+  {
+    "id": "BIZ-0002",
+    "title": "API Token Authentication for Integrations",
+    "type": "SourceOfTruth",
+    "context": "API tokens allow external integrations to authenticate.",
+    "decision": "validateToken(plaintextToken) checks token validity and returns associated uid.",
+    "evidence": [
+      "apps/server/src/middlewares/api-token-auth.middleware.ts"
+    ],
+    "impact": {
+      "tech": "Dual auth system",
+      "biz": "Integration support"
+    }
+  },
+  {
+    "id": "BIZ-0003",
+    "title": "Media Storage Key Architecture",
+    "type": "SourceOfTruth",
+    "context": "Media files need persistent location tracking.",
+    "decision": "EchoeMediaDto includes storageKey field for dynamic URL generation.",
+    "evidence": [
+      "packages/dto/src/echoe.ts"
+    ],
+    "impact": {
+      "tech": "Enables temporal URL generation",
+      "biz": "Supports both local and cloud deployment"
+    }
+  },
+  {
+    "id": "BIZ-0004",
+    "title": "Anki Compatible Fields and Rich Text Fields Parallel Model",
+    "type": "SourceOfTruth",
+    "context": "System supports Anki import/export while providing rich text editing capability.",
+    "decision": "System uses parallel model: traditional Anki fields + richTextFields.",
+    "evidence": [
+      ".catpaw/rules/anki.md"
+    ],
+    "impact": {
+      "tech": "Support complete Anki compatibility",
+      "biz": "Keep Anki user migration path"
+    }
+  },
+  {
+    "id": "BIZ-0005",
+    "title": "Data Fields Unified JSON Object as Default Value",
+    "type": "SourceOfTruth",
+    "context": "System data field used for flexible business data storage.",
+    "decision": "All table data fields unified use '{}' as empty value.",
+    "evidence": [
+      ".catpaw/rules/anki.md"
+    ],
+    "impact": {
+      "tech": "Avoid JSON type mixing",
+      "biz": "Improve data consistency"
+    }
+  },
+  {
+    "id": "BIZ-0006",
+    "title": "Search Based on First Field sfld",
+    "type": "SourceOfTruth",
+    "context": "System needs note search functionality.",
+    "decision": "Search function based on sfld using LIKE query.",
+    "evidence": [
+      ".catpaw/rules/anki.md",
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Full-text search based on sfld field",
+      "biz": "Provide fast note retrieval"
+    }
+  },
+  {
+    "id": "BIZ-0007",
+    "title": "Deduplication Check Based on flds/sfld/csum Semantics",
+    "type": "SourceOfTruth",
+    "context": "System needs to detect and handle duplicate notes.",
+    "decision": "Deduplication logic directly reads flds, sfld, csum for duplicate comparison.",
+    "evidence": [
+      ".catpaw/rules/anki.md"
+    ],
+    "impact": {
+      "tech": "Deduplication depends on traditional Anki fields",
+      "biz": "Provide duplicate detection and deduplication suggestions"
+    }
+  },
+  {
+    "id": "BIZ-0008",
+    "title": "Import/Export Uses Traditional notes Table Structure",
+    "type": "SourceOfTruth",
+    "context": "System supports Anki format import/export.",
+    "decision": "Import/export uses traditional SQLite notes table structure.",
+    "evidence": [
+      ".catpaw/rules/anki.md"
+    ],
+    "impact": {
+      "tech": "Fully compatible with Anki format",
+      "biz": "Support Anki ecosystem seamless migration"
+    }
+  },
+  {
+    "id": "BIZ-0009",
+    "title": "Frontend Web Application Fixed Width Design",
+    "type": "SourceOfTruth",
+    "context": "Web application positioned as PC management tool.",
+    "decision": "Web frontend uses fixed width design, main container sets max-w-[600px].",
+    "evidence": [
+      ".catpaw/rules/web.md"
+    ],
+    "impact": {
+      "tech": "Simplify CSS design",
+      "biz": "Clear user group positioning"
+    }
+  },
+  {
+    "id": "BIZ-0010",
+    "title": "Web Application Supports Dark and Light Themes",
+    "type": "SourceOfTruth",
+    "context": "Users need to switch themes based on usage scenario.",
+    "decision": "Web application supports two themes: light mode and dark mode.",
+    "evidence": [
+      ".catpaw/rules/web.md"
+    ],
+    "impact": {
+      "tech": "Support dark: prefix dual themes",
+      "biz": "Improve user experience"
+    }
+  },
+  {
+    "id": "BIZ-0011",
+    "title": "Web Application Icons Unified lucide-react",
+    "type": "SourceOfTruth",
+    "context": "UI components need consistent icon library.",
+    "decision": "Web application all icons must use lucide-react library.",
+    "evidence": [
+      ".catpaw/rules/web.md"
+    ],
+    "impact": {
+      "tech": "Unified icon library",
+      "biz": "Maintain UI design consistency"
+    }
+  },
+  {
+    "id": "BIZ-0012",
+    "title": "Web Application Search via Ctrl+K Shortcut",
+    "type": "SourceOfTruth",
+    "context": "Users need quick access to search function.",
+    "decision": "Shortcut Ctrl+K or Cmd+K quickly opens search dialog.",
+    "evidence": [
+      ".catpaw/rules/web.md"
+    ],
+    "impact": {
+      "tech": "Shortcut improves operation efficiency",
+      "biz": "Improve user search efficiency"
+    }
+  },
+  {
+    "id": "BIZ-0013",
+    "title": "Frontend State Management Unified @rabjs/react",
+    "type": "SourceOfTruth",
+    "context": "Frontend needs unified reactive state management solution.",
+    "decision": "All frontend state management must use @rabjs/react.",
+    "evidence": [
+      ".catpaw/rules/web.md",
+      ".catpaw/rules/page-component-service.md"
+    ],
+    "impact": {
+      "tech": "Unified state management solution",
+      "biz": "Reduce state management complexity"
+    }
+  },
+  {
+    "id": "BIZ-0014",
+    "title": "Backend Startup Sequence and Dependencies",
+    "type": "SourceOfTruth",
+    "context": "Backend services have dependencies between modules.",
+    "decision": "Backend startup sequence: IOC Container -> MySQL -> Migrations -> LanceDB -> Scheduler -> Express.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Ensure dependency injection complete",
+      "biz": "Guarantee service complete functionality"
+    }
+  },
+  {
+    "id": "BIZ-0015",
+    "title": "API Routes Follow v1 Versioning",
+    "type": "SourceOfTruth",
+    "context": "System needs to support API version management.",
+    "decision": "All API controllers use @JsonController('/api/v1/resource') format.",
+    "evidence": [
+      "CLAUDE.md"
+    ],
+    "impact": {
+      "tech": "Support multiple API versions coexistence",
+      "biz": "Guarantee API compatibility"
+    }
+  }
+]

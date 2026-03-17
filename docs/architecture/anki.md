@@ -1,33 +1,42 @@
-This document contains a brief description of the Anki2 database structure as of version 11 (see ver field of the col table).
+> [!IMPORTANT]
+> Pending updates to this document are explained in [the planned changes document.](https://github.com/ankidroid/Anki-Android/wiki/Database-Structure-Planned-Changes.md)
 
-Thanks to @sartak and @fasiha for starting to make this. Additional thanks to @bibstha for more documentation
+This document contains a brief description of the Anki2 database structure as of version 11 (see `ver` field of the `col` table). 
 
-Anki database structure
-Anki uses a single SQLite database to store information on all of its decks, templates, fields and cards. This file can be found inside the Anki package file (the .apkg file) with the extension .anki2.
+Thanks to @sartak and @fasiha for [starting to make this](https://gist.github.com/sartak/3921255).
+Additional thanks to @bibstha for [more documentation](https://github.com/bibstha/Anki-Android/wiki/Anki2-database-documentation)
 
-Extracting example.apkg we have the following structure.
+# Anki database structure
 
-.
-├── example
-│   ├── example.anki2
-│   └── media
-└── example.apkg
-In linux sqliteman or sqlite3 can be used to read and modify the .anki2 files.
+Anki uses a single [SQLite](https://sqlite.org/index.html) database to store information on all of its decks, templates, fields and cards. This file can be found inside the Anki package file (the `.apkg` file) with the extension `.anki2`.
 
-Terminology
+Extracting `example.apkg` we have the following structure.
+
+	.
+	├── example
+	│   ├── example.anki2
+	│   └── media
+	└── example.apkg
+
+In linux `sqliteman` or `sqlite3` can be used to read and modify the `.anki2` files.
+
+# Terminology
+
 Anki contains basically the following types:
 
-Cards
-Decks
-Notes
-Templates
-Collection
-More information on what these represent are clearly explained in Key Concepts.
+1. Cards
+2. Decks
+3. Notes
+4. Templates
+5. Collection
 
-This document often refers to "epoch seconds/milliseconds". This is the amount of time that has passed since the Unix Epoch (1 January 1970 00:00:00 UT).
+More information on what these represent are clearly explained in [Key Concepts](https://docs.ankiweb.net/getting-started.html#key-concepts).
 
-Database schema
-Cards
+This document often refers to "epoch seconds/milliseconds". This is the amount of time that has passed since the [Unix Epoch](https://en.wikipedia.org/wiki/Epoch_(computing)) (1 January 1970 00:00:00 UT).
+
+# Database schema
+## Cards
+```sql
 -- Cards are what you review. 
 -- There can be multiple cards for each note, as determined by the Template.
 CREATE TABLE cards (
@@ -81,7 +90,7 @@ CREATE TABLE cards (
       -- for example: '2004' means 2 reps left today and 4 reps till graduation
     odue            integer not null,
       -- original due: In filtered decks, it's the original due date that the card had before moving to filtered.
-                    -- If the card lapsed in scheduler1, then it's the value before the lapse. (This is used when switching to scheduler 2. At this time, cards in learning becomes due again, with their previous due date)
+                    -- If the card lapsed in scheduler1, then it's the value before the lapse. (This is used when switching to scheduler 2. At this time, cards in learning becomes due again, with their previous due date)
                     -- In any other case it's 0.
     odid            integer not null,
       -- original did: only used when the card is currently in filtered deck
@@ -90,7 +99,9 @@ CREATE TABLE cards (
     data            text not null
       -- currently unused
 );
-Collection
+```
+## Collection
+```sql
 -- col contains a single row that holds various information about the collection
 CREATE TABLE col (
     id              integer primary key,
@@ -128,7 +139,9 @@ CREATE TABLE col (
     tags            text not null
       -- a cache of tags used in the collection (This list is displayed in the browser. Potentially at other place)
 );
-Graves
+```
+## Graves
+```sql
 -- Contains deleted cards, notes, and decks that need to be synced. 
 -- usn should be set to -1, 
 -- oid is the original id.
@@ -138,7 +151,9 @@ CREATE TABLE graves (
     oid             integer not null,
     type            integer not null
 );
-Notes
+```
+## Notes
+```sql
 -- Notes contain the raw information that is formatted into a number of cards
 -- according to the models
 CREATE TABLE notes (
@@ -168,7 +183,9 @@ CREATE TABLE notes (
     data            text not null
       -- unused
 );
-Review Log
+```
+## Review Log
+```sql
 -- revlog is a review history; it has a row for every review you've ever done!
 CREATE TABLE revlog (
     id              integer primary key,
@@ -195,7 +212,9 @@ CREATE TABLE revlog (
     type            integer not null
        --  0=learn, 1=review, 2=relearn, 3=filtered, 4=manual, 5=rescheduled
 );
-Indexes
+```
+## Indexes
+```sql
 CREATE INDEX ix_cards_nid on cards (nid);
 CREATE INDEX ix_cards_sched on cards (did, queue, due);
 CREATE INDEX ix_cards_usn on cards (usn);
@@ -203,9 +222,11 @@ CREATE INDEX ix_notes_csum on notes (csum);
 CREATE INDEX ix_notes_usn on notes (usn);
 CREATE INDEX ix_revlog_cid on revlog (cid);
 CREATE INDEX ix_revlog_usn on revlog (usn);
-Models JSONObjects
-Here is an annotated description of the JSONObjects in the models field of the col table. Each object is the value of a key that's a model id (epoch time in milliseconds):
+```
 
+# Models JSONObjects
+Here is an annotated description of the JSONObjects in the models field of the `col` table. Each object is the value of a key that's a model id (epoch time in milliseconds):
+``` java
 {
 "model id (epoch time in milliseconds)" :
   {
@@ -268,11 +289,14 @@ Here is an annotated description of the JSONObjects in the models field of the c
     vers : "Legacy version number (unused), use an empty array []"
   }
 }
-Decks JSONObjects
-Here is an annotated description of the JSONObjects in the decks field of the col table:
+```
+
+# Decks JSONObjects
+Here is an annotated description of the JSONObjects in the decks field of the `col` table:
 
 See: https://github.com/ankidroid/Anki-Android/blob/main/libanki/src/main/java/com/ichi2/anki/libanki/Deck.kt
 
+```java
 {
 "deck id (creation time in epoch milliseconds for most decks, '1' for the default deck)"
   {
@@ -298,9 +322,12 @@ See: https://github.com/ankidroid/Anki-Android/blob/main/libanki/src/main/java/c
     md: "(markdown description; optional boolean; default: false)": "false -> render description with legacy HTML rendering. true (Anki 2.1.41+) -> use Markdown rendering (with img tags stripped). If true, description is also included on the 'congrats' screen"
   }
 }
-DConf JSONObjects
-Here is an annotated description of the JSONObjects in the dconf field of the col.decks table:
+```
 
+# DConf JSONObjects
+Here is an annotated description of the JSONObjects in the dconf field of the `col.decks` table:
+
+```java
 {
 "deck config id (creation time in epoch milliseconds for most option groups, '1' for the default option group)" :
   {
@@ -345,9 +372,11 @@ played when the question is shown"
         usn : "See usn in cards table for details."
   }
 }
-configuration JSONObject
-Here is an annotated description of the JSONObject in the conf field of the col table when the collection is started. More values may be added to it by any add-on. Unlike the models, decks, and dconf JSONObjects, there should be only one conf JSONObject per collection.
+```
 
+# configuration JSONObject
+Here is an annotated description of the JSONObject in the conf field of the `col` table when the collection is started. More values may be added to it by any add-on. Unlike the `models`, `decks`, and `dconf` JSONObjects, there should be only one `conf` JSONObject per collection.
+```java
 {
     "curDeck": "The id (as int) of the last deck selected (during review, adding card, changing the deck of a card)",
     "activeDecks": "The list containing the current deck id and its descendant (as ints)",
@@ -389,3 +418,4 @@ Here is an annotated description of the JSONObject in the conf field of the col 
     This is not in the json at creation. It's added when the browser is open.
      "
 }
+```
