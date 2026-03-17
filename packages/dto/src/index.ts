@@ -27,3 +27,6 @@ export * from './inbox-report.dto.js';
 
 // Inbox To Card DTOs
 export * from './inbox-to-card.dto.js';
+
+// Inbox Source and Category DTOs
+export * from './inbox-source-category.dto.js';
