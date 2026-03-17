@@ -49,10 +49,10 @@ export interface InboxDto {
   front: string;
   /** 背面/答案内容 */
   back: string;
-  /** 来源 (manual, web, api, extension, other) */
-  source: InboxSource;
-  /** 类别/标签 (backend, frontend, design, product, life, other) */
-  category: InboxCategory;
+  /** 来源 (动态字符串值) */
+  source: string | null;
+  /** 类别/标签 (动态字符串值) */
+  category: string | null;
   /** 已读状态 (false = 未读, true = 已读) */
   isRead: boolean;
   /** 软删除时间戳 (0 = 未删除, >0 = 已删除) */
@@ -73,10 +73,10 @@ export interface InboxListItemDto {
   front: string;
   /** 背面/答案内容 */
   back: string;
-  /** 来源 */
-  source: InboxSource;
-  /** 类别 */
-  category: InboxCategory;
+  /** 来源 (动态字符串值) */
+  source: string | null;
+  /** 类别 (动态字符串值) */
+  category: string | null;
   /** 已读状态 */
   isRead: boolean;
   /** 创建时间 */
@@ -93,10 +93,10 @@ export interface CreateInboxDto {
   front: string;
   /** 背面/答案内容 */
   back: string;
-  /** 来源 (可选, 默认为 manual) */
-  source?: InboxSource;
-  /** 类别 (可选, 默认为 backend) */
-  category?: InboxCategory;
+  /** 来源 (可选, 动态字符串值) */
+  source?: string;
+  /** 类别 (可选, 动态字符串值) */
+  category?: string;
 }
 
 /**
@@ -107,10 +107,10 @@ export interface UpdateInboxDto {
   front?: string;
   /** 背面/答案内容 */
   back?: string;
-  /** 来源 */
-  source?: InboxSource;
-  /** 类别 */
-  category?: InboxCategory;
+  /** 来源 (动态字符串值) */
+  source?: string | null;
+  /** 类别 (动态字符串值) */
+  category?: string | null;
   /** 已读状态 */
   isRead?: boolean;
 }
@@ -121,10 +121,10 @@ export interface UpdateInboxDto {
 export interface InboxQueryParams {
   /** 用户 ID */
   uid: string;
-  /** 按来源筛选 */
-  source?: InboxSource;
-  /** 按类别筛选 */
-  category?: InboxCategory;
+  /** 按来源筛选 (动态字符串值) */
+  source?: string;
+  /** 按类别筛选 (动态字符串值) */
+  category?: string;
   /** 筛选已读状态 (false = 未读, true = 已读) */
   isRead?: boolean;
   /** 搜索关键词 (搜索 front 和 back 内容) */
@@ -149,7 +149,7 @@ export interface BulkUpdateInboxDto {
   action: 'markRead' | 'markUnread' | 'delete' | 'updateCategory';
   /** 操作参数 (用于 updateCategory) */
   payload?: {
-    category?: InboxCategory;
+    category?: string;
   };
 }
 

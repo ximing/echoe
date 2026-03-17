@@ -2,7 +2,6 @@ import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { InboxService } from '../../services/inbox.service.js';
 import type { InboxListItemDto } from '@echoe/dto';
-import { InboxCategory } from '@echoe/dto';
 import {
   Plus,
   Edit,
@@ -109,7 +108,7 @@ export const InboxPage = view(() => {
                   onChange={(e) =>
                     inboxService.setFilters({
                       ...inboxService.filters,
-                      category: e.target.value as InboxCategory | undefined,
+                      category: e.target.value || undefined,
                     })
                   }
                   className="px-3 py-1.5 bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-600 rounded-lg text-sm"
@@ -369,11 +368,11 @@ const CreateInboxDialog = view(
     onSubmit,
   }: {
     onClose: () => void;
-    onSubmit: (data: { front: string; back?: string; category: InboxCategory }) => Promise<void>;
+    onSubmit: (data: { front: string; back?: string; category?: string }) => Promise<void>;
   }) => {
     const [front, setFront] = useState('');
     const [back, setBack] = useState('');
-    const [category, setCategory] = useState<InboxCategory>('backend');
+    const [category, setCategory] = useState<string>('backend');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -432,7 +431,7 @@ const CreateInboxDialog = view(
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as InboxCategory)}
+                onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="backend">后端</option>
@@ -477,11 +476,11 @@ const EditInboxDialog = view(
   }: {
     item: InboxListItemDto;
     onClose: () => void;
-    onSubmit: (data: { front?: string; back?: string; category?: InboxCategory }) => Promise<void>;
+    onSubmit: (data: { front?: string; back?: string; category?: string | null }) => Promise<void>;
   }) => {
     const [front, setFront] = useState(item.front);
     const [back, setBack] = useState(item.back ?? '');
-    const [category, setCategory] = useState<InboxCategory>(item.category);
+    const [category, setCategory] = useState<string>(item.category || 'backend');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -542,7 +541,7 @@ const EditInboxDialog = view(
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as InboxCategory)}
+                onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="backend">后端</option>

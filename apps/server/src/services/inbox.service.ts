@@ -20,8 +20,8 @@ export interface CreateInboxParams {
 export interface UpdateInboxParams {
   front?: string;
   back?: string;
-  source?: string;
-  category?: string;
+  source?: string | null;
+  category?: string | null;
   isRead?: boolean;
 }
 

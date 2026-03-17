@@ -5,7 +5,6 @@ import type {
   UpdateInboxDto,
   InboxQueryParams,
 } from '@echoe/dto';
-import { InboxCategory } from '@echoe/dto';
 import * as inboxApi from '../api/inbox.js';
 import { toast } from './toast.service.js';
 
@@ -28,7 +27,7 @@ export class InboxService extends Service {
 
   isLoading = false;
   error: string | null = null;
-  filters: { category?: InboxCategory; isRead?: boolean } = {};
+  filters: { category?: string; isRead?: boolean } = {};
 
   async loadInboxItems(params?: InboxQueryParams) {
     this.isLoading = true;
@@ -146,7 +145,7 @@ export class InboxService extends Service {
     }
   }
 
-  setFilters(filters: { category?: InboxCategory; isRead?: boolean }) {
+  setFilters(filters: { category?: string; isRead?: boolean }) {
     this.filters = filters;
     this.list.page = 1; // Reset to first page when filters change
     this.loadInboxItems();
