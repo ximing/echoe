@@ -115,6 +115,55 @@ export class EchoeMediaService {
   }
 
   /**
+   * Get media metadata by filename
+   * Returns media metadata with dynamically generated access URL
+   * Validates that the user owns the media file
+   */
+  async getMediaMetadata(uid: string, filename: string): Promise<EchoeMediaDto | null> {
+    const db = getDatabase();
+
+    try {
+      const mediaRecord = await db
+        .select()
+        .from(echoeMedia)
+        .where(and(eq(echoeMedia.uid, uid), eq(echoeMedia.filename, filename)))
+        .limit(1);
+
+      if (mediaRecord.length === 0) {
+        logger.warn(`Media not found: uid=${uid}, filename=${filename}`);
+        return null;
+      }
+
+      const record = mediaRecord[0];
+      let url: string | undefined;
+
+      // Generate temporary access URL if storageKey exists
+      if (record.storageKey) {
+        try {
+          url = await this.storageAdapter.generateAccessUrl(record.storageKey, this.getStorageMetadata());
+        } catch (error) {
+          logger.warn(`Failed to generate access URL for ${record.filename}:`, error);
+        }
+      }
+
+      return {
+        id: record.mediaId,
+        filename: record.filename,
+        originalFilename: record.originalFilename,
+        size: record.size,
+        mimeType: record.mimeType,
+        hash: record.hash,
+        createdAt: record.createdAt,
+        usedInCards: Boolean(record.usedInCards),
+        url,
+      };
+    } catch (error) {
+      logger.error('Error getting media metadata:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get a media file by filename
    * Returns the file buffer and content type
    * Validates that the user owns the media file

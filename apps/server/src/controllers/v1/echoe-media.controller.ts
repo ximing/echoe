@@ -99,6 +99,31 @@ export class EchoeMediaController {
   }
 
   /**
+   * GET /api/v1/media/:filename/metadata
+   * Get media file metadata with temporary access URL
+   */
+  @Get('/:filename/metadata')
+  async getMediaMetadata(@Param('filename') filename: string, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      const decodedFilename = decodeURIComponent(filename);
+      const media = await this.mediaService.getMediaMetadata(userDto.uid, decodedFilename);
+
+      if (!media) {
+        return ResponseUtil.error(ErrorCode.NOT_FOUND, 'Media file not found');
+      }
+
+      return ResponseUtil.success(media);
+    } catch (error) {
+      logger.error('Get media metadata error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
    * GET /api/v1/media/:filename
    * Serve a media file
    */
