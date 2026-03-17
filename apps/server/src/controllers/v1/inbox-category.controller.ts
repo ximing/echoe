@@ -1,4 +1,4 @@
-import { JsonController, Get, Post, Body, CurrentUser } from 'routing-controllers';
+import { JsonController, Get, Post, Delete, Body, Param, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -56,6 +56,30 @@ export class InboxCategoryController {
       return ResponseUtil.success(category);
     } catch (error) {
       logger.error('Create inbox category error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/inbox/categories/:id
+   * Delete a category and clear related inbox records
+   */
+  @Delete('/:id')
+  async deleteCategory(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      const categoryId = parseInt(id, 10);
+      if (isNaN(categoryId)) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
+      }
+
+      await this.inboxCategoryService.delete(userDto.uid, categoryId);
+      return ResponseUtil.success({ message: 'Category deleted successfully' });
+    } catch (error) {
+      logger.error('Delete inbox category error:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }

@@ -167,4 +167,38 @@ describe('InboxCategoryController', () => {
       expect(result.code).toBe(ErrorCode.DB_ERROR);
     });
   });
+
+  describe('deleteCategory', () => {
+    it('should delete a category successfully', async () => {
+      mockInboxCategoryService.delete.mockResolvedValue(undefined);
+
+      const result = await controller.deleteCategory('1', mockUser);
+
+      expect(mockInboxCategoryService.delete).toHaveBeenCalledWith('test-user-uid', 1);
+      expect(result.code).toBe(ErrorCode.SUCCESS);
+      expect(result.data).toEqual({ message: 'Category deleted successfully' });
+    });
+
+    it('should return unauthorized when user is not authenticated', async () => {
+      const result = await controller.deleteCategory('1', undefined);
+
+      expect(mockInboxCategoryService.delete).not.toHaveBeenCalled();
+      expect(result.code).toBe(ErrorCode.UNAUTHORIZED);
+    });
+
+    it('should return params error when id is invalid', async () => {
+      const result = await controller.deleteCategory('invalid', mockUser);
+
+      expect(mockInboxCategoryService.delete).not.toHaveBeenCalled();
+      expect(result.code).toBe(ErrorCode.PARAMS_ERROR);
+    });
+
+    it('should return database error when service throws', async () => {
+      mockInboxCategoryService.delete.mockRejectedValue(new Error('Database error'));
+
+      const result = await controller.deleteCategory('1', mockUser);
+
+      expect(result.code).toBe(ErrorCode.DB_ERROR);
+    });
+  });
 });

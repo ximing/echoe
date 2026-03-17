@@ -1,4 +1,4 @@
-import { JsonController, Get, Post, Body, CurrentUser } from 'routing-controllers';
+import { JsonController, Get, Post, Delete, Body, Param, CurrentUser } from 'routing-controllers';
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
@@ -56,6 +56,30 @@ export class InboxSourceController {
       return ResponseUtil.success(source);
     } catch (error) {
       logger.error('Create inbox source error:', error);
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/inbox/sources/:id
+   * Delete a source and clear related inbox records
+   */
+  @Delete('/:id')
+  async deleteSource(@Param('id') id: string, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      const sourceId = parseInt(id, 10);
+      if (isNaN(sourceId)) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
+      }
+
+      await this.inboxSourceService.delete(userDto.uid, sourceId);
+      return ResponseUtil.success({ message: 'Source deleted successfully' });
+    } catch (error) {
+      logger.error('Delete inbox source error:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }

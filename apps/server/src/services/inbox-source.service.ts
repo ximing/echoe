@@ -3,6 +3,7 @@ import { eq, and, sql } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { inboxSource } from '../db/schema/inbox-source.js';
+import { inbox } from '../db/schema/inbox.js';
 import { logger } from '../utils/logger.js';
 
 import type { InboxSource, NewInboxSource } from '../db/schema/inbox-source.js';
@@ -94,18 +95,36 @@ export class InboxSourceService {
   }
 
   /**
-   * Delete a source by ID
+   * Delete a source by ID and clear related inbox records
    */
   async delete(uid: string, id: number): Promise<void> {
     try {
       const db = getDatabase();
+
+      // First, get the source to find its name
+      const [sourceToDelete] = await db
+        .select()
+        .from(inboxSource)
+        .where(and(eq(inboxSource.id, id), eq(inboxSource.uid, uid)))
+        .limit(1);
+
+      if (!sourceToDelete) {
+        logger.warn(`Inbox source not found: ${id} for user ${uid}`);
+        return;
+      }
+
+      // Clear related inbox records (set source to null)
+      await db
+        .update(inbox)
+        .set({ source: null })
+        .where(and(eq(inbox.uid, uid), eq(inbox.source, sourceToDelete.name)));
 
       // Delete the source (ensures uid scoping)
       await db
         .delete(inboxSource)
         .where(and(eq(inboxSource.id, id), eq(inboxSource.uid, uid)));
 
-      logger.info(`Inbox source deleted: ${id} for user ${uid}`);
+      logger.info(`Inbox source deleted: ${id} for user ${uid}, cleared related inbox records`);
     } catch (error) {
       logger.error('Error deleting inbox source:', error);
       throw error;

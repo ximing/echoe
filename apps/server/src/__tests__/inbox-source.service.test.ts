@@ -210,11 +210,33 @@ describe('InboxSourceService', () => {
   });
 
   describe('delete', () => {
-    it('should delete a source by ID', async () => {
-      const whereFn = jest.fn().mockResolvedValue(undefined);
-      const deleteFn = jest.fn().mockReturnValue({ where: whereFn });
+    it('should delete a source and clear related inbox records', async () => {
+      const mockSource = {
+        id: 1,
+        uid: 'test-uid',
+        name: 'manual',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Mock for getting source to delete
+      const limitFn = jest.fn().mockResolvedValue([mockSource]);
+      const whereFn1 = jest.fn().mockReturnValue({ limit: limitFn });
+      const fromFn1 = jest.fn().mockReturnValue({ where: whereFn1 });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn1 });
+
+      // Mock for updating inbox records
+      const whereFn2 = jest.fn().mockResolvedValue(undefined);
+      const setFn = jest.fn().mockReturnValue({ where: whereFn2 });
+      const updateFn = jest.fn().mockReturnValue({ set: setFn });
+
+      // Mock for deleting source
+      const whereFn3 = jest.fn().mockResolvedValue(undefined);
+      const deleteFn = jest.fn().mockReturnValue({ where: whereFn3 });
 
       const mockDb = {
+        select: selectFn,
+        update: updateFn,
         delete: deleteFn,
       };
 
@@ -222,8 +244,32 @@ describe('InboxSourceService', () => {
 
       await service.delete('test-uid', 1);
 
+      expect(mockDb.select).toHaveBeenCalled();
+      expect(mockDb.update).toHaveBeenCalled();
       expect(mockDb.delete).toHaveBeenCalled();
-      expect(whereFn).toHaveBeenCalled();
+      expect(setFn).toHaveBeenCalledWith({ source: null });
+    });
+
+    it('should not delete if source not found', async () => {
+      // Mock for getting source to delete (returns empty)
+      const limitFn = jest.fn().mockResolvedValue([]);
+      const whereFn = jest.fn().mockReturnValue({ limit: limitFn });
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        update: jest.fn(),
+        delete: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      await service.delete('test-uid', 999);
+
+      expect(mockDb.select).toHaveBeenCalled();
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(mockDb.delete).not.toHaveBeenCalled();
     });
   });
 });

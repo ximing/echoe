@@ -167,4 +167,38 @@ describe('InboxSourceController', () => {
       expect(result.code).toBe(ErrorCode.DB_ERROR);
     });
   });
+
+  describe('deleteSource', () => {
+    it('should delete a source successfully', async () => {
+      mockInboxSourceService.delete.mockResolvedValue(undefined);
+
+      const result = await controller.deleteSource('1', mockUser);
+
+      expect(mockInboxSourceService.delete).toHaveBeenCalledWith('test-user-uid', 1);
+      expect(result.code).toBe(ErrorCode.SUCCESS);
+      expect(result.data).toEqual({ message: 'Source deleted successfully' });
+    });
+
+    it('should return unauthorized when user is not authenticated', async () => {
+      const result = await controller.deleteSource('1', undefined);
+
+      expect(mockInboxSourceService.delete).not.toHaveBeenCalled();
+      expect(result.code).toBe(ErrorCode.UNAUTHORIZED);
+    });
+
+    it('should return params error when id is invalid', async () => {
+      const result = await controller.deleteSource('invalid', mockUser);
+
+      expect(mockInboxSourceService.delete).not.toHaveBeenCalled();
+      expect(result.code).toBe(ErrorCode.PARAMS_ERROR);
+    });
+
+    it('should return database error when service throws', async () => {
+      mockInboxSourceService.delete.mockRejectedValue(new Error('Database error'));
+
+      const result = await controller.deleteSource('1', mockUser);
+
+      expect(result.code).toBe(ErrorCode.DB_ERROR);
+    });
+  });
 });

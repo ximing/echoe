@@ -3,6 +3,7 @@ import { eq, and, sql } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { inboxCategory } from '../db/schema/inbox-category.js';
+import { inbox } from '../db/schema/inbox.js';
 import { logger } from '../utils/logger.js';
 
 import type { InboxCategory, NewInboxCategory } from '../db/schema/inbox-category.js';
@@ -94,18 +95,36 @@ export class InboxCategoryService {
   }
 
   /**
-   * Delete a category by ID
+   * Delete a category by ID and clear related inbox records
    */
   async delete(uid: string, id: number): Promise<void> {
     try {
       const db = getDatabase();
+
+      // First, get the category to find its name
+      const [categoryToDelete] = await db
+        .select()
+        .from(inboxCategory)
+        .where(and(eq(inboxCategory.id, id), eq(inboxCategory.uid, uid)))
+        .limit(1);
+
+      if (!categoryToDelete) {
+        logger.warn(`Inbox category not found: ${id} for user ${uid}`);
+        return;
+      }
+
+      // Clear related inbox records (set category to null)
+      await db
+        .update(inbox)
+        .set({ category: null })
+        .where(and(eq(inbox.uid, uid), eq(inbox.category, categoryToDelete.name)));
 
       // Delete the category (ensures uid scoping)
       await db
         .delete(inboxCategory)
         .where(and(eq(inboxCategory.id, id), eq(inboxCategory.uid, uid)));
 
-      logger.info(`Inbox category deleted: ${id} for user ${uid}`);
+      logger.info(`Inbox category deleted: ${id} for user ${uid}, cleared related inbox records`);
     } catch (error) {
       logger.error('Error deleting inbox category:', error);
       throw error;
