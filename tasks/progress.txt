@@ -113,3 +113,23 @@ Started: 2026年 3月 17日 星期二 CST
   - The page is routed at /cards/import/apkg in App.tsx
   - Build verification passes with `pnpm build:web` from root directory
 ---
+## 2026-03-18 - US-007
+- Added comprehensive error handling for APKG import process
+- Implemented .apkg file format validation (ZIP structure and collection database presence)
+- Added SQLite database integrity checks to detect corrupted databases
+- Enhanced media import with graceful handling of missing/corrupted files
+- Improved error messages with user-friendly suggestions and categories
+- Updated frontend to display detailed error breakdown with collapsible error list
+- Refactored to use shared ImportResultDto and ImportErrorDetailDto types from @echoe/dto
+- Fixed TypeScript type issues with better-sqlite3 Database type
+- Files changed: apps/server/src/services/echoe-import.service.ts, apps/web/src/pages/cards/apkg-import.tsx, tasks/prd.json
+- **Learnings for future iterations:**
+  - Import error handling uses graceful degradation (partial imports) rather than full rollback
+  - This design is intentional: users prefer seeing 99/100 notes imported vs 0/100 on single error
+  - SQLite integrity checks use `pragma('integrity_check')` to validate database health
+  - Media import errors are tracked separately and don't fail the entire import
+  - better-sqlite3 Database type must be imported as `type Database as DatabaseType` to avoid namespace conflicts
+  - Frontend error display uses collapsible details element for long error lists
+  - Error categorization (general, media, notetype, etc.) helps users understand what failed
+  - User-friendly error messages should suggest actionable fixes (e.g., "re-export from Anki")
+---
