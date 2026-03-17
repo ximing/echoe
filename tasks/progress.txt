@@ -124,3 +124,18 @@ Started: 2026年 3月17日 星期二 CST
   - Mock user uid in tests must match the uid used in test assertions
 ---
 
+## 2026-03-17 10:15 - US-007
+- Updated inbox schema to support dynamic source and category values
+- Files changed:
+  - apps/server/src/db/schema/inbox.ts (changed source and category to nullable varchar(191))
+  - apps/server/src/services/inbox-ai.service.ts (updated calculateSimpleSimilarity to handle nullable categories)
+  - apps/server/drizzle/0008_majestic_mimic.sql (new migration)
+- **Learnings for future iterations:**
+  - When changing field types from NOT NULL to nullable, dependent code must be updated
+  - Nullable fields in Drizzle: omit .notNull() and .default() to make field nullable
+  - varchar(191) is the standard length for indexed string fields (MySQL utf8mb4 limit)
+  - Migration correctly generates ALTER TABLE MODIFY COLUMN for type changes
+  - When updating method signatures to accept nullable types, use `| null | undefined` for flexibility
+  - Check for null/undefined before using nullable fields (use `if (value && ...)` pattern)
+---
+
