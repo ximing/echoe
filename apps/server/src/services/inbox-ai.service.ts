@@ -407,13 +407,13 @@ export class InboxAiService {
   private calculateSimpleSimilarity(
     content1: string,
     content2: string,
-    category1: string,
-    category2: string
+    category1: string | null | undefined,
+    category2: string | null | undefined
   ): number {
     let score = 0;
 
     // Category match (weight: 0.4)
-    if (category1 === category2 && category1 !== '') {
+    if (category1 && category2 && category1 === category2) {
       score += 0.4;
     }
 
