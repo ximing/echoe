@@ -24,13 +24,15 @@
     "@tiptap/starter-kit": "^3.20.1",
     "axios": "^1.13.5",
     "dompurify": "^3.3.2",
+    "jszip": "^3.10.1",
     "katex": "^0.16.38",
     "lucide-react": "^0.563.0",
     "marked": "^17.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router": "^7.13.0",
-    "recharts": "^3.8.0"
+    "recharts": "^3.8.0",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@echoe/typescript-config": "workspace:*",
