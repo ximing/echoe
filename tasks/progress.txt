@@ -20,6 +20,8 @@ Started: 2026年 3月17日 星期二 CST
 - Controller delete: Use @Delete('/:id') with @Param('id'), parse and validate ID, return success message
 - Controller responses: Use ResponseUtil.success() and ResponseUtil.error() for consistency
 - Controller tests: Mock services, test happy path + error cases, use ! operator for result.data after null check
+- Media storage: Save storageKey (format: echoe-media/{uid}/{filename}) to database, use generateAccessUrl for temporary URLs (6h expiry)
+- Dynamic URLs: All metadata endpoints return DTOs with optional url field, file-serving endpoints return buffers directly
 
 ## 2026-03-17 15:30 - US-001
 - Added storageKey column to echoe_media table
