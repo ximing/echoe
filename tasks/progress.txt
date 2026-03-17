@@ -81,3 +81,35 @@ Started: 2026年 3月 17日 星期二 CST
   - Revlog import validates card existence before inserting (prevents orphaned records)
   - All revlog imports are scoped by uid (user ID) for multi-tenant isolation
 ---
+## 2026-03-18 - US-005
+- Implemented media file import with URL replacement in note content
+- Refactored import flow to upload media files BEFORE importing notes
+- Built mapping from original filenames to stored filenames (timestamp-hash format)
+- Updated replaceMediaReferences() to handle both [sound:...] and <img src="..."> patterns
+- Media references in notes now use stored filenames instead of original filenames
+- Files changed: apps/server/src/services/echoe-import.service.ts
+- **Learnings for future iterations:**
+  - Media must be uploaded BEFORE notes are imported to get the filename mapping
+  - EchoeMediaService.uploadMedia() returns { filename: storedFilename, url }
+  - Stored filenames use format: timestamp-hash.extension (e.g., 1234567890-abc123de.mp3)
+  - Anki media references come in two formats: numeric (123) and original filenames
+  - The import flow: numeric filename → original filename (via manifest) → stored filename (via upload)
+  - replaceMediaReferences() must handle both [sound:...] and <img src="..."> patterns
+  - Both standard Anki and legacy Echoe formats share the same media import logic
+  - The filenameMap is passed through the import pipeline: importMedia → importNotes → importNotesRows → replaceMediaReferences
+---
+## 2026-03-18 - US-006
+- Added drag-and-drop support to existing APKG import UI
+- Enhanced file upload area with drag events (dragEnter, dragLeave, dragOver, drop)
+- Added visual feedback when dragging files over the upload area
+- Improved user experience with "Drop APKG file here" message during drag
+- Files changed: apps/web/src/pages/cards/apkg-import.tsx
+- **Learnings for future iterations:**
+  - The APKG import page was already implemented at apps/web/src/pages/cards/apkg-import.tsx
+  - The page already had file validation, import progress, and statistics display
+  - Only drag-and-drop handlers were missing from the original implementation
+  - React drag events need preventDefault() and stopPropagation() to work correctly
+  - Drag state (isDragging) provides visual feedback during file drag operations
+  - The page is routed at /cards/import/apkg in App.tsx
+  - Build verification passes with `pnpm build:web` from root directory
+---
