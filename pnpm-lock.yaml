@@ -233,7 +233,7 @@ importers:
         version: 16.6.1
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.6.2)(mysql2@3.18.2(@types/node@22.19.10))(sql.js@1.14.1)
+        version: 0.45.1(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(@types/sql.js@1.4.9)(better-sqlite3@12.6.2)(mysql2@3.18.2(@types/node@22.19.10))(sql.js@1.14.1)
       express:
         specifier: ^4.21.2
         version: 4.22.1
@@ -485,6 +485,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.13)
+      '@types/sql.js':
+        specifier: ^1.4.9
+        version: 1.4.9
       '@vitejs/plugin-react':
         specifier: ^5.1.1
         version: 5.1.4(vite@7.3.1(@types/node@24.10.12)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -2903,6 +2906,9 @@ packages:
     resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
     deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
 
+  '@types/emscripten@1.41.5':
+    resolution: {integrity: sha512-cMQm7pxu6BxtHyqJ7mQZ2kXWV5SLmugybFdHCBbJ5eHzOo6VhBckEgAT3//rP5FwPHNPeEiq4SmQ5ucBwsOo4Q==}
+
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
@@ -3053,6 +3059,9 @@ packages:
 
   '@types/serve-static@2.2.0':
     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
+
+  '@types/sql.js@1.4.9':
+    resolution: {integrity: sha512-ep8b36RKHlgWPqjNG9ToUrPiwkhwh0AEzy883mO5Xnd+cL6VBH1EvSjBAAuxLUFF2Vn/moE3Me6v9E1Lo+48GQ==}
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
@@ -11503,6 +11512,8 @@ snapshots:
     dependencies:
       dompurify: 3.3.2
 
+  '@types/emscripten@1.41.5': {}
+
   '@types/estree@1.0.8': {}
 
   '@types/express-serve-static-core@5.1.1':
@@ -11678,6 +11689,11 @@ snapshots:
   '@types/serve-static@2.2.0':
     dependencies:
       '@types/http-errors': 2.0.5
+      '@types/node': 24.10.12
+
+  '@types/sql.js@1.4.9':
+    dependencies:
+      '@types/emscripten': 1.41.5
       '@types/node': 24.10.12
 
   '@types/stack-utils@2.0.3': {}
@@ -13252,10 +13268,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.6.2)(mysql2@3.18.2(@types/node@22.19.10))(sql.js@1.14.1):
+  drizzle-orm@0.45.1(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(@types/sql.js@1.4.9)(better-sqlite3@12.6.2)(mysql2@3.18.2(@types/node@22.19.10))(sql.js@1.14.1):
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@types/better-sqlite3': 7.6.13
+      '@types/sql.js': 1.4.9
       better-sqlite3: 12.6.2
       mysql2: 3.18.2(@types/node@22.19.10)
       sql.js: 1.14.1
