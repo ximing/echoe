@@ -161,26 +161,46 @@ export class EchoeMediaService {
     const db = getDatabase();
     const results = await db.select().from(echoeMedia).where(eq(echoeMedia.uid, uid));
 
-    return results.map((row: {
-      id: number;
-      mediaId: string;
-      filename: string;
-      originalFilename: string;
-      size: number;
-      mimeType: string;
-      hash: string;
-      createdAt: number;
-      usedInCards: number;
-    }) => ({
-      id: row.mediaId,
-      filename: row.filename,
-      originalFilename: row.originalFilename,
-      size: row.size,
-      mimeType: row.mimeType,
-      hash: row.hash,
-      createdAt: row.createdAt,
-      usedInCards: Boolean(row.usedInCards),
-    }));
+    // Generate temporary access URLs for each media file
+    const mediaWithUrls = await Promise.all(
+      results.map(async (row: {
+        id: number;
+        mediaId: string;
+        filename: string;
+        originalFilename: string;
+        size: number;
+        mimeType: string;
+        hash: string;
+        storageKey: string | null;
+        createdAt: number;
+        usedInCards: number;
+      }) => {
+        let url: string | undefined;
+
+        // Generate temporary access URL if storageKey exists
+        if (row.storageKey) {
+          try {
+            url = await this.storageAdapter.generateAccessUrl(row.storageKey, this.getStorageMetadata());
+          } catch (error) {
+            logger.warn(`Failed to generate access URL for ${row.filename}:`, error);
+          }
+        }
+
+        return {
+          id: row.mediaId,
+          filename: row.filename,
+          originalFilename: row.originalFilename,
+          size: row.size,
+          mimeType: row.mimeType,
+          hash: row.hash,
+          createdAt: row.createdAt,
+          usedInCards: Boolean(row.usedInCards),
+          url,
+        };
+      })
+    );
+
+    return mediaWithUrls;
   }
 
   /**

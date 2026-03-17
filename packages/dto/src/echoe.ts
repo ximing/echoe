@@ -741,6 +741,8 @@ export interface EchoeMediaDto {
   createdAt: number;
   /** Whether file is referenced in any card */
   usedInCards: boolean;
+  /** Temporary access URL (generated dynamically, expires in 6 hours) */
+  url?: string;
 }
 
 export interface UploadMediaDto {
