@@ -106,6 +106,7 @@ export class EchoeMediaService {
       size: buffer.length,
       mimeType,
       hash: fileHash,
+      storageKey, // Save storage key for dynamic URL generation
       createdAt: Math.floor(Date.now() / 1000),
       usedInCards: 0,
     });
