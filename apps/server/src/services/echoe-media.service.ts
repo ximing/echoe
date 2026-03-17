@@ -155,6 +155,7 @@ export class EchoeMediaService {
         hash: record.hash,
         createdAt: record.createdAt,
         usedInCards: Boolean(record.usedInCards),
+        storageKey: record.storageKey,
         url,
       };
     } catch (error) {
