@@ -25,21 +25,57 @@ const ApkgImportPageContent = view(() => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Validate file extension
+  const validateFile = (file: File): boolean => {
+    const validExtensions = ['.apkg'];
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+
+    if (!validExtensions.includes(ext)) {
+      toastService.error('Please select an .apkg file');
+      return false;
+    }
+    return true;
+  };
 
   // Handle file selection
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const validExtensions = ['.apkg'];
-    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-
-    if (!validExtensions.includes(ext)) {
-      toastService.error('Please select an .apkg file');
-      return;
+    if (validateFile(file)) {
+      setSelectedFile(file);
     }
+  };
 
-    setSelectedFile(file);
+  // Handle drag events
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && validateFile(file)) {
+      setSelectedFile(file);
+    }
   };
 
   // Handle import
@@ -220,11 +256,19 @@ const ApkgImportPageContent = view(() => {
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-colors"
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                isDragging
+                  ? 'border-primary-500 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10'
+              }`}
             >
               <FileArchive className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600 dark:text-gray-300 mb-2">
-                Click to select an APKG file
+                {isDragging ? 'Drop APKG file here' : 'Click or drag to select an APKG file'}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Supports .apkg files (Anki deck export)
