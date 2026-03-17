@@ -3,7 +3,7 @@
  * Handles importing .apkg files (both Standard Anki and Echoe Legacy formats)
  */
 
-import Database from 'better-sqlite3';
+import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import JSZip from 'jszip';
 import { Service, Inject } from 'typedi';
 import { eq, and } from 'drizzle-orm';
@@ -19,30 +19,9 @@ import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
 import { generateTypeId } from '../utils/id.js';
 import { OBJECT_TYPE } from '../models/constant/type.js';
-
-export interface ImportResultDto {
-  notesAdded: number;
-  notesUpdated: number;
-  notesSkipped: number;
-  cardsAdded: number;
-  cardsUpdated: number;
-  decksAdded: number;
-  notetypesAdded: number;
-  revlogImported: number;
-  mediaImported: number;
-  errors: string[];
-  errorDetails?: ImportErrorDetail[];
-  fsrsBackfilledFromRevlog?: number;
-  fsrsNewCards?: number;
-  fsrsHeuristic?: number;
-}
+import type { ImportResultDto, ImportErrorDetailDto } from '@echoe/dto';
 
 type PackageType = 'standard-anki' | 'echoe-legacy' | 'unknown';
-
-interface ImportErrorDetail {
-  category: 'notetype' | 'deck' | 'note' | 'card' | 'revlog' | 'media' | 'general';
-  message: string;
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SECOND_MS = 1000;
@@ -203,6 +182,39 @@ export class EchoeImportService {
   }
 
   /**
+   * Validate .apkg file format
+   */
+  private async validateApkgFormat(buffer: Buffer): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Try to load as ZIP
+      const zip = await JSZip.loadAsync(buffer);
+
+      // Check for required collection file
+      const hasCollection = zip.file('collection.anki21') || zip.file('collection.anki2');
+      if (!hasCollection) {
+        return {
+          valid: false,
+          error: 'Invalid .apkg format: Missing collection database file. Please ensure this is a valid Anki deck export.',
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      logger.error('APKG validation error:', error);
+      if (error instanceof Error && error.message.includes('invalid zip')) {
+        return {
+          valid: false,
+          error: 'Invalid file format: The file is not a valid ZIP archive. Please export your deck from Anki again.',
+        };
+      }
+      return {
+        valid: false,
+        error: 'Invalid .apkg file: Unable to read file contents. The file may be corrupted.',
+      };
+    }
+  }
+
+  /**
    * Import an .apkg file
    */
   async importApkg(uid: string, buffer: Buffer): Promise<ImportResultDto> {
@@ -217,9 +229,21 @@ export class EchoeImportService {
       revlogImported: 0,
       mediaImported: 0,
       errors: [],
+      errorDetails: [],
     };
 
     try {
+      // Validate .apkg format before processing
+      const validation = await this.validateApkgFormat(buffer);
+      if (!validation.valid) {
+        result.errors.push(validation.error || 'Invalid .apkg file');
+        result.errorDetails?.push({
+          category: 'general',
+          message: validation.error || 'Invalid .apkg file',
+        });
+        return result;
+      }
+
       // Unzip the .apkg file
       const zip = await JSZip.loadAsync(buffer);
 
@@ -234,10 +258,49 @@ export class EchoeImportService {
       }
     } catch (error) {
       logger.error('Import error:', error);
-      result.errors.push(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = this.getReadableErrorMessage(error);
+      result.errors.push(errorMessage);
+      result.errorDetails?.push({
+        category: 'general',
+        message: errorMessage,
+      });
     }
 
     return result;
+  }
+
+  /**
+   * Convert technical errors to user-friendly messages
+   */
+  private getReadableErrorMessage(error: unknown): string {
+    if (!(error instanceof Error)) {
+      return 'Import failed: Unknown error occurred';
+    }
+
+    const message = error.message.toLowerCase();
+
+    // SQLite errors
+    if (message.includes('sqlite') || message.includes('database')) {
+      return 'Database error: The collection database is corrupted or incompatible. Try exporting your deck from Anki again.';
+    }
+
+    // ZIP/extraction errors
+    if (message.includes('zip') || message.includes('inflate') || message.includes('decompress')) {
+      return 'File extraction error: The .apkg file is corrupted. Please re-export your deck from Anki.';
+    }
+
+    // Media errors
+    if (message.includes('media')) {
+      return 'Media import error: Some media files could not be imported. Your notes have been imported, but media may be missing.';
+    }
+
+    // Memory/size errors
+    if (message.includes('memory') || message.includes('heap')) {
+      return 'File too large: The .apkg file is too large to process. Try splitting your deck into smaller parts.';
+    }
+
+    // Generic fallback
+    return `Import failed: ${error.message}`;
   }
 
   /**
@@ -245,16 +308,36 @@ export class EchoeImportService {
    * Supports both official format (collection.anki2/anki21) and legacy col.json.
    */
   private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
+    let db: DatabaseType | null = null;
+
     try {
       // Find the collection file (required for Standard Anki)
       const collectionFile = zip.file('collection.anki21') || zip.file('collection.anki2');
       if (!collectionFile) {
-        result.errors.push('No collection file found in .apkg');
+        const error = 'No collection file found in .apkg';
+        result.errors.push(error);
+        result.errorDetails?.push({ category: 'general', message: error });
         return result;
       }
 
       const collectionBuffer = await collectionFile.async('nodebuffer');
-      const db = new Database(collectionBuffer, { readonly: true });
+
+      // Try to open SQLite database with error handling
+      try {
+        db = new Database(collectionBuffer, { readonly: true });
+
+        // Validate database integrity
+        const integrityCheck = db.pragma('integrity_check', { simple: true });
+        if (integrityCheck !== 'ok') {
+          throw new Error('Database integrity check failed');
+        }
+      } catch (dbError) {
+        logger.error('SQLite database error:', dbError);
+        const error = 'Corrupted database: The collection database is damaged or incompatible. Please export your deck from Anki again.';
+        result.errors.push(error);
+        result.errorDetails?.push({ category: 'general', message: error });
+        return result;
+      }
 
       // Read col.json if exists (optional, for backwards compatibility)
       const colJsonFile = zip.file('col.json');
@@ -307,6 +390,14 @@ export class EchoeImportService {
         const mediaResult = await this.importMediaFromStandardAnki(uid, zip, mediaManifest);
         result.mediaImported = mediaResult.count;
         const mediaFilenameMap = mediaResult.filenameMap;
+        // Add media errors but don't fail the whole import
+        if (mediaResult.errors.length > 0) {
+          result.errors.push(...mediaResult.errors);
+          result.errorDetails?.push({
+            category: 'media',
+            message: `${mediaResult.errors.length} media files could not be imported. Notes have been imported successfully.`,
+          });
+        }
 
         // Import notes from SQLite (with media filename mapping)
         const noteResult = await this.importNotesFromStandardAnki(uid, db, col, mediaManifest, mediaFilenameMap, referenceMap);
@@ -329,11 +420,15 @@ export class EchoeImportService {
         const revlogResult = await this.importRevlogFromStandardAnki(uid, db, referenceMap);
         result.revlogImported = revlogResult;
       } finally {
-        db.close();
+        if (db) {
+          db.close();
+        }
       }
     } catch (error) {
       logger.error('Standard Anki import error:', error);
-      result.errors.push(`Standard Anki import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = this.getReadableErrorMessage(error);
+      result.errors.push(errorMessage);
+      result.errorDetails?.push({ category: 'general', message: errorMessage });
     }
 
     return result;
@@ -343,25 +438,43 @@ export class EchoeImportService {
    * Import Echoe Legacy format
    */
   private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
-    // Find the collection file (collection.anki21 or collection.anki2)
-    let collectionFile = zip.file('collection.anki21');
-    if (!collectionFile) {
-      collectionFile = zip.file('collection.anki2');
-    }
-    if (!collectionFile) {
-      result.errors.push('No collection file found in .apkg');
-      return result;
-    }
-
-    // Get the collection as a buffer
-    const collectionBuffer = await collectionFile.async('nodebuffer');
-
-    // Open the SQLite database
-    const db = new Database(collectionBuffer, { readonly: true });
-
-    const referenceMap = this.createImportReferenceMap();
+    let db: DatabaseType | null = null;
 
     try {
+      // Find the collection file (collection.anki21 or collection.anki2)
+      let collectionFile = zip.file('collection.anki21');
+      if (!collectionFile) {
+        collectionFile = zip.file('collection.anki2');
+      }
+      if (!collectionFile) {
+        const error = 'No collection file found in .apkg';
+        result.errors.push(error);
+        result.errorDetails?.push({ category: 'general', message: error });
+        return result;
+      }
+
+      // Get the collection as a buffer
+      const collectionBuffer = await collectionFile.async('nodebuffer');
+
+      // Try to open SQLite database with error handling
+      try {
+        db = new Database(collectionBuffer, { readonly: true });
+
+        // Validate database integrity
+        const integrityCheck = db.pragma('integrity_check', { simple: true });
+        if (integrityCheck !== 'ok') {
+          throw new Error('Database integrity check failed');
+        }
+      } catch (dbError) {
+        logger.error('SQLite database error:', dbError);
+        const error = 'Corrupted database: The collection database is damaged or incompatible. Please export your deck from Anki again.';
+        result.errors.push(error);
+        result.errorDetails?.push({ category: 'general', message: error });
+        return result;
+      }
+
+      const referenceMap = this.createImportReferenceMap();
+
       // Import notetypes first
       const notetypeResult = await this.importNotetypes(uid, db, referenceMap);
       result.notetypesAdded = notetypeResult.added;
@@ -396,8 +509,23 @@ export class EchoeImportService {
       // Import media files
       const mediaResult = await this.importMedia(uid, zip);
       result.mediaImported = mediaResult.count;
+      // Add media errors but don't fail the whole import
+      if (mediaResult.errors.length > 0) {
+        result.errors.push(...mediaResult.errors);
+        result.errorDetails?.push({
+          category: 'media',
+          message: `${mediaResult.errors.length} media files could not be imported. Notes have been imported successfully.`,
+        });
+      }
+    } catch (error) {
+      logger.error('Legacy Echoe import error:', error);
+      const errorMessage = this.getReadableErrorMessage(error);
+      result.errors.push(errorMessage);
+      result.errorDetails?.push({ category: 'general', message: errorMessage });
     } finally {
-      db.close();
+      if (db) {
+        db.close();
+      }
     }
 
     return result;
@@ -595,7 +723,7 @@ export class EchoeImportService {
    */
   private async importNotesFromStandardAnki(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     col: Record<string, unknown>,
     mediaManifest: Map<string, string>,
     mediaFilenameMap: Map<string, string>,
@@ -683,7 +811,7 @@ export class EchoeImportService {
    */
   private async importCardsFromStandardAnki(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     _col: Record<string, unknown>,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
@@ -695,7 +823,7 @@ export class EchoeImportService {
    */
   private async importRevlogFromStandardAnki(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<number> {
     try {
@@ -712,7 +840,7 @@ export class EchoeImportService {
    * Supports both official format (numeric filenames + media manifest) and legacy format (media/ subdirectory).
    * Returns count of imported files and mapping of original filenames to stored filenames.
    */
-  private async importMediaFromStandardAnki(uid: string, zip: JSZip, mediaManifest: Map<string, string>): Promise<{ count: number; filenameMap: Map<string, string> }> {
+  private async importMediaFromStandardAnki(uid: string, zip: JSZip, mediaManifest: Map<string, string>): Promise<{ count: number; filenameMap: Map<string, string>; errors: string[] }> {
     const mediaFiles = this.collectMediaPaths(zip, true);
     return this.importMediaEntries(uid, zip, mediaFiles, mediaManifest);
   }
@@ -722,7 +850,7 @@ export class EchoeImportService {
    */
   private async importNotetypes(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
@@ -795,7 +923,7 @@ export class EchoeImportService {
    */
   private async importDecks(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; errors: string[] }> {
     const errors: string[] = [];
@@ -880,7 +1008,7 @@ export class EchoeImportService {
    * Build a map of notetype id → ordered field names by reading from the source database.
    * Anki's notetypes.flds is a JSON array of field definition objects, each with a "name" property.
    */
-  private buildNotetypeFieldsMap(sourceDb: Database.Database): Map<string, string[]> {
+  private buildNotetypeFieldsMap(sourceDb: DatabaseType): Map<string, string[]> {
     try {
       const rows = sourceDb.prepare('SELECT id, flds FROM notetypes').all() as { id: number; flds: unknown }[];
       return this.buildNotetypeFieldsMapFromRows(rows);
@@ -894,7 +1022,7 @@ export class EchoeImportService {
    */
   private async importNotes(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; skipped: number; errors: string[] }> {
     try {
@@ -920,7 +1048,7 @@ export class EchoeImportService {
    */
   private async importCards(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
     return this.importCardsRows(uid, sourceDb, 'Could not read revlog for FSRS backfill in legacy import', referenceMap);
@@ -958,7 +1086,7 @@ export class EchoeImportService {
    */
   private async importRevlog(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     referenceMap: ImportReferenceMap
   ): Promise<number> {
     try {
@@ -973,7 +1101,7 @@ export class EchoeImportService {
   /**
    * Import media files from the zip archive (legacy format)
    */
-  private async importMedia(uid: string, zip: JSZip): Promise<{ count: number; filenameMap: Map<string, string> }> {
+  private async importMedia(uid: string, zip: JSZip): Promise<{ count: number; filenameMap: Map<string, string>; errors: string[] }> {
     const mediaFiles = this.collectMediaPaths(zip, false);
     return this.importMediaEntries(uid, zip, mediaFiles);
   }
@@ -1144,7 +1272,7 @@ export class EchoeImportService {
     return revlogId * SECOND_MS;
   }
 
-  private buildLatestRevlogMap(sourceDb: Database.Database, warnMessage: string): Map<number, EchoeRevlogRow> {
+  private buildLatestRevlogMap(sourceDb: DatabaseType, warnMessage: string): Map<number, EchoeRevlogRow> {
     const latestRevlogMap = new Map<number, EchoeRevlogRow>();
 
     try {
@@ -1205,7 +1333,7 @@ export class EchoeImportService {
 
   private async importCardsRows(
     uid: string,
-    sourceDb: Database.Database,
+    sourceDb: DatabaseType,
     revlogWarnMessage: string,
     referenceMap: ImportReferenceMap
   ): Promise<{ added: number; updated: number; errors: string[]; fsrsBackfilledFromRevlog: number; fsrsNewCards: number; fsrsHeuristic: number }> {
@@ -1523,33 +1651,48 @@ export class EchoeImportService {
     zip: JSZip,
     mediaPaths: string[],
     mediaManifest?: Map<string, string>
-  ): Promise<{ count: number; filenameMap: Map<string, string> }> {
+  ): Promise<{ count: number; filenameMap: Map<string, string>; errors: string[] }> {
     let imported = 0;
     const filenameMap = new Map<string, string>(); // originalFilename -> storedFilename
+    const errors: string[] = [];
 
     try {
       for (const mediaPath of mediaPaths) {
         try {
           const file = zip.file(mediaPath);
           if (!file) {
+            const originalFilename = this.resolveImportMediaFilename(mediaPath, mediaManifest);
+            logger.warn(`Media file not found in .apkg: ${mediaPath} (${originalFilename})`);
+            errors.push(`Media file not found: ${originalFilename}`);
             continue;
           }
 
           const buffer = await file.async('nodebuffer');
           const originalFilename = this.resolveImportMediaFilename(mediaPath, mediaManifest);
+
+          // Validate media file is not empty
+          if (buffer.length === 0) {
+            logger.warn(`Empty media file: ${mediaPath} (${originalFilename})`);
+            errors.push(`Empty media file: ${originalFilename}`);
+            continue;
+          }
+
           const uploadResult = await this.mediaService.uploadMedia(uid, buffer, originalFilename);
 
           // Store mapping: originalFilename -> storedFilename
           filenameMap.set(originalFilename, uploadResult.filename);
           imported++;
         } catch (error) {
+          const originalFilename = this.resolveImportMediaFilename(mediaPath, mediaManifest);
           logger.warn(`Failed to import media ${mediaPath}:`, error);
+          errors.push(`Failed to import media ${originalFilename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
     } catch (error) {
       logger.error('Failed to import media:', error);
+      errors.push(`Media import error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    return { count: imported, filenameMap };
+    return { count: imported, filenameMap, errors };
   }
 }

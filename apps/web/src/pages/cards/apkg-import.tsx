@@ -89,10 +89,34 @@ const ApkgImportPageContent = view(() => {
     try {
       const response = await echoeApi.importApkg(selectedFile);
       setImportResult(response.data);
-      toastService.success('Import completed successfully');
+
+      // Show appropriate message based on results
+      if (response.data.errors.length === 0) {
+        toastService.success('Import completed successfully');
+      } else if (response.data.notesAdded > 0 || response.data.cardsAdded > 0) {
+        toastService.warning(`Import completed with ${response.data.errors.length} warnings. Check details below.`);
+      } else {
+        toastService.error('Import failed. Please check the error details below.');
+      }
     } catch (error: unknown) {
-      const err = error as { message?: string };
-      toastService.error(err.message || 'Import failed');
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = err.response?.data?.message || err.message || 'Import failed. Please try again.';
+      toastService.error(errorMessage);
+
+      // Set empty result to show error state
+      setImportResult({
+        notesAdded: 0,
+        notesUpdated: 0,
+        notesSkipped: 0,
+        cardsAdded: 0,
+        cardsUpdated: 0,
+        decksAdded: 0,
+        notetypesAdded: 0,
+        revlogImported: 0,
+        mediaImported: 0,
+        errors: [errorMessage],
+        errorDetails: [{ category: 'general', message: errorMessage }],
+      });
     } finally {
       setIsImporting(false);
     }
@@ -213,19 +237,41 @@ const ApkgImportPageContent = view(() => {
             </div>
 
             {importResult.errors.length > 0 && (
-              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200 mb-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="font-medium">{importResult.errors.length} errors</span>
+              <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200 mb-3">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-semibold">
+                    {importResult.errors.length} {importResult.errors.length === 1 ? 'issue' : 'issues'} found
+                  </span>
                 </div>
-                <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-                  {importResult.errors.slice(0, 5).map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                  {importResult.errors.length > 5 && (
-                    <li>...and {importResult.errors.length - 5} more</li>
-                  )}
-                </ul>
+
+                {/* Error categories */}
+                {importResult.errorDetails && importResult.errorDetails.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    {importResult.errorDetails.map((detail, i) => (
+                      <div key={i} className="p-2 bg-white dark:bg-gray-800 rounded border border-yellow-200 dark:border-yellow-700">
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300 uppercase px-2 py-1 bg-yellow-100 dark:bg-yellow-900/40 rounded">
+                            {detail.category}
+                          </span>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 flex-1">{detail.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Detailed error list */}
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium">
+                    View all errors ({importResult.errors.length})
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-yellow-700 dark:text-yellow-300 pl-4">
+                    {importResult.errors.map((err, i) => (
+                      <li key={i} className="list-disc">{err}</li>
+                    ))}
+                  </ul>
+                </details>
               </div>
             )}
 
