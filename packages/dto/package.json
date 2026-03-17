@@ -25,9 +25,6 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests"
   },
-  "jest": {
-    "preset": "@echoe/jest-presets/node"
-  },
   "devDependencies": {
     "@echoe/eslint-config": "workspace:*",
     "@echoe/jest-presets": "workspace:*",

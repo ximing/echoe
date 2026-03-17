@@ -64,6 +64,16 @@ export interface InboxReportQueryParams {
 }
 
 /**
+ * Insight item with text and evidence references
+ */
+export interface InsightItemDto {
+  /** Insight text */
+  text: string;
+  /** Inbox IDs that support this insight */
+  evidenceIds: string[];
+}
+
+/**
  * 结构化 AI 摘要内容 DTO
  */
 export interface InboxReportSummaryDto {
@@ -86,7 +96,7 @@ export interface InboxReportSummaryDto {
     count: number;
   }[];
   /** AI 生成的洞察 */
-  insights: string[];
+  insights: InsightItemDto[];
 }
 
 /**
