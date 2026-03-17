@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { InboxService } from '../../services/inbox.service.js';
 import type { InboxListItemDto } from '@echoe/dto';
+import * as inboxSourceCategoryApi from '../../api/inbox-source-category.js';
+import { toast } from '../../services/toast.service.js';
 import {
   Plus,
   Edit,
@@ -373,6 +375,7 @@ export const InboxPage = view(() => {
           onClose={() => setShowCreateDialog(false)}
           onSubmit={async (data) => {
             await inboxService.createInboxItem(data);
+            await inboxService.loadSourcesAndCategories();
             setShowCreateDialog(false);
           }}
         />
@@ -388,6 +391,7 @@ export const InboxPage = view(() => {
           }}
           onSubmit={async (data) => {
             await inboxService.updateInboxItem(selectedItem.inboxId, data);
+            await inboxService.loadSourcesAndCategories();
             setShowEditDialog(false);
             setSelectedItem(null);
           }}
@@ -436,12 +440,57 @@ const CreateInboxDialog = view(
     onSubmit,
   }: {
     onClose: () => void;
-    onSubmit: (data: { front: string; back?: string; category?: string }) => Promise<void>;
+    onSubmit: (data: {
+      front: string;
+      back?: string;
+      source?: string;
+      category?: string;
+    }) => Promise<void>;
   }) => {
+    const inboxService = useService(InboxService);
     const [front, setFront] = useState('');
     const [back, setBack] = useState('');
-    const [category, setCategory] = useState<string>('backend');
+    const [source, setSource] = useState<string>('');
+    const [category, setCategory] = useState<string>('');
+    const [newSourceInput, setNewSourceInput] = useState('');
+    const [newCategoryInput, setNewCategoryInput] = useState('');
+    const [isCreatingSource, setIsCreatingSource] = useState(false);
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleCreateSource = async () => {
+      if (!newSourceInput.trim()) return;
+      setIsCreatingSource(true);
+      try {
+        const response = await inboxSourceCategoryApi.createInboxSource({
+          name: newSourceInput.trim(),
+        });
+        await inboxService.loadSourcesAndCategories();
+        setSource(response.data.name);
+        setNewSourceInput('');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create source');
+      } finally {
+        setIsCreatingSource(false);
+      }
+    };
+
+    const handleCreateCategory = async () => {
+      if (!newCategoryInput.trim()) return;
+      setIsCreatingCategory(true);
+      try {
+        const response = await inboxSourceCategoryApi.createInboxCategory({
+          name: newCategoryInput.trim(),
+        });
+        await inboxService.loadSourcesAndCategories();
+        setCategory(response.data.name);
+        setNewCategoryInput('');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create category');
+      } finally {
+        setIsCreatingCategory(false);
+      }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -449,7 +498,12 @@ const CreateInboxDialog = view(
 
       setIsSubmitting(true);
       try {
-        await onSubmit({ front: front.trim(), back: back.trim() || undefined, category });
+        await onSubmit({
+          front: front.trim(),
+          back: back.trim() || undefined,
+          source: source || undefined,
+          category: category || undefined,
+        });
       } finally {
         setIsSubmitting(false);
       }
@@ -495,19 +549,99 @@ const CreateInboxDialog = view(
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                来源
+              </label>
+              <div className="space-y-2">
+                <select
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={inboxService.isLoadingOptions}
+                >
+                  <option value="">选择来源</option>
+                  {inboxService.sources.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSourceInput}
+                    onChange={(e) => setNewSourceInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateSource();
+                      }
+                    }}
+                    placeholder="或输入新来源名称..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateSource}
+                    disabled={!newSourceInput.trim() || isCreatingSource}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isCreatingSource ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-700 dark:border-gray-300"></div>
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    添加
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 分类
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="backend">后端</option>
-                <option value="frontend">前端</option>
-                <option value="design">设计</option>
-                <option value="product">产品</option>
-                <option value="other">其他</option>
-              </select>
+              <div className="space-y-2">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={inboxService.isLoadingOptions}
+                >
+                  <option value="">选择分类</option>
+                  {inboxService.categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCategoryInput}
+                    onChange={(e) => setNewCategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateCategory();
+                      }
+                    }}
+                    placeholder="或输入新分类名称..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryInput.trim() || isCreatingCategory}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isCreatingCategory ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-700 dark:border-gray-300"></div>
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    添加
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-4">
               <button
@@ -544,12 +678,57 @@ const EditInboxDialog = view(
   }: {
     item: InboxListItemDto;
     onClose: () => void;
-    onSubmit: (data: { front?: string; back?: string; category?: string | null }) => Promise<void>;
+    onSubmit: (data: {
+      front?: string;
+      back?: string;
+      source?: string | null;
+      category?: string | null;
+    }) => Promise<void>;
   }) => {
+    const inboxService = useService(InboxService);
     const [front, setFront] = useState(item.front);
     const [back, setBack] = useState(item.back ?? '');
-    const [category, setCategory] = useState<string>(item.category || 'backend');
+    const [source, setSource] = useState<string>(item.source || '');
+    const [category, setCategory] = useState<string>(item.category || '');
+    const [newSourceInput, setNewSourceInput] = useState('');
+    const [newCategoryInput, setNewCategoryInput] = useState('');
+    const [isCreatingSource, setIsCreatingSource] = useState(false);
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleCreateSource = async () => {
+      if (!newSourceInput.trim()) return;
+      setIsCreatingSource(true);
+      try {
+        const response = await inboxSourceCategoryApi.createInboxSource({
+          name: newSourceInput.trim(),
+        });
+        await inboxService.loadSourcesAndCategories();
+        setSource(response.data.name);
+        setNewSourceInput('');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create source');
+      } finally {
+        setIsCreatingSource(false);
+      }
+    };
+
+    const handleCreateCategory = async () => {
+      if (!newCategoryInput.trim()) return;
+      setIsCreatingCategory(true);
+      try {
+        const response = await inboxSourceCategoryApi.createInboxCategory({
+          name: newCategoryInput.trim(),
+        });
+        await inboxService.loadSourcesAndCategories();
+        setCategory(response.data.name);
+        setNewCategoryInput('');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create category');
+      } finally {
+        setIsCreatingCategory(false);
+      }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -560,7 +739,8 @@ const EditInboxDialog = view(
         await onSubmit({
           front: front.trim(),
           back: back.trim() || undefined,
-          category,
+          source: source || undefined,
+          category: category || undefined,
         });
       } finally {
         setIsSubmitting(false);
@@ -605,19 +785,99 @@ const EditInboxDialog = view(
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                来源
+              </label>
+              <div className="space-y-2">
+                <select
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={inboxService.isLoadingOptions}
+                >
+                  <option value="">选择来源</option>
+                  {inboxService.sources.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSourceInput}
+                    onChange={(e) => setNewSourceInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateSource();
+                      }
+                    }}
+                    placeholder="或输入新来源名称..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateSource}
+                    disabled={!newSourceInput.trim() || isCreatingSource}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isCreatingSource ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-700 dark:border-gray-300"></div>
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    添加
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 分类
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="backend">后端</option>
-                <option value="frontend">前端</option>
-                <option value="design">设计</option>
-                <option value="product">产品</option>
-                <option value="other">其他</option>
-              </select>
+              <div className="space-y-2">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={inboxService.isLoadingOptions}
+                >
+                  <option value="">选择分类</option>
+                  {inboxService.categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCategoryInput}
+                    onChange={(e) => setNewCategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateCategory();
+                      }
+                    }}
+                    placeholder="或输入新分类名称..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryInput.trim() || isCreatingCategory}
+                    className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isCreatingCategory ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-700 dark:border-gray-300"></div>
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    添加
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-4">
               <button
