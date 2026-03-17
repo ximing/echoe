@@ -1,0 +1,239 @@
+{
+  "project": "Echoe",
+  "branchName": "ralph/inbox-dynamic-source-category",
+  "description": "收件箱来源与类别动态化 - 将固定枚举改为可动态创建的数据库实体，支持自动创建、获取、删除功能",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create inbox_source and inbox_category database tables",
+      "description": "As a backend developer, I need database tables to store user-defined source and category values.",
+      "acceptanceCriteria": [
+        "Create inbox_source table: id(PK), uid, name, created_at, updated_at",
+        "Create inbox_category table: id(PK), uid, name, created_at, updated_at",
+        "Add unique index on (uid, name) for each table",
+        "Export schemas from apps/server/src/db/schema/index.ts",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Completed: Created inbox_source and inbox_category schemas with proper indexes and exports"
+    },
+    {
+      "id": "US-002",
+      "title": "Generate migration for source and category tables",
+      "description": "As a release engineer, I need migration artifacts so the new tables can be applied safely.",
+      "acceptanceCriteria": [
+        "Run pnpm --filter @echoe/server build before migration",
+        "Run pnpm --filter @echoe/server migrate:generate",
+        "Migration creates inbox_source and inbox_category tables with proper indexes",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Completed: Generated migration 0007_sad_micromacro.sql with proper table and index definitions"
+    },
+    {
+      "id": "US-003",
+      "title": "Create source and category DTOs",
+      "description": "As a shared package maintainer, I need DTO contracts for source and category API operations.",
+      "acceptanceCriteria": [
+        "Add source DTOs: SourceDto, CreateSourceDto, SourceListResponse",
+        "Add category DTOs: CategoryDto, CreateCategoryDto, CategoryListResponse",
+        "Export from packages/dto/src/index.ts",
+        "Run pnpm --filter @echoe/dto build",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Completed: Created inbox-source-category.dto.ts with all required DTOs"
+    },
+    {
+      "id": "US-004",
+      "title": "Implement source and category service with seed data",
+      "description": "As a backend developer, I need service logic to manage sources and categories with default seed data.",
+      "acceptanceCriteria": [
+        "Implement InboxSourceService with CRUD operations",
+        "Implement InboxCategoryService with CRUD operations",
+        "Add seedDefaultData method to create default sources (manual, web, api, extension, other) and categories (backend, frontend, design, product, life, other) on first access",
+        "Ensure uid scoping for all operations",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Completed: Implemented InboxSourceService and InboxCategoryService with full CRUD, auto-seeding, and comprehensive tests"
+    },
+    {
+      "id": "US-005",
+      "title": "Add source and category endpoints for list and create",
+      "description": "As a frontend developer, I need API endpoints to list and create sources and categories.",
+      "acceptanceCriteria": [
+        "GET /api/v1/inbox/sources - list all sources for current user",
+        "GET /api/v1/inbox/categories - list all categories for current user",
+        "POST /api/v1/inbox/sources - create new source",
+        "POST /api/v1/inbox/categories - create new category",
+        "Validate name uniqueness per tenant",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Completed: Implemented InboxSourceController and InboxCategoryController with GET and POST endpoints, comprehensive tests, and proper validation"
+    },
+    {
+      "id": "US-006",
+      "title": "Add source and category delete endpoints",
+      "description": "As a user, I want to delete unused sources and categories.",
+      "acceptanceCriteria": [
+        "DELETE /api/v1/inbox/sources/:id - delete source and clear related inbox records",
+        "DELETE /api/v1/inbox/categories/:id - delete category and clear related inbox records",
+        "When deleted, set inbox.source or inbox.category to null (not delete inbox)",
+        "Ensure uid scoping for all operations",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Completed: Implemented DELETE endpoints for source and category with proper inbox record cleanup"
+    },
+    {
+      "id": "US-007",
+      "title": "Update inbox schema to support dynamic source/category",
+      "description": "As a backend developer, I need the inbox table to accept dynamic source/category values.",
+      "acceptanceCriteria": [
+        "Change inbox.source field type to varchar(191) nullable",
+        "Change inbox.category field type to varchar(191) nullable",
+        "Generate migration for field type change",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Completed: Updated inbox schema and generated migration 0008_majestic_mimic.sql"
+    },
+    {
+      "id": "US-008",
+      "title": "Update inbox DTOs to support dynamic source/category",
+      "description": "As a shared package maintainer, I need DTOs that accept string source/category values.",
+      "acceptanceCriteria": [
+        "Update CreateInboxDto: source and category become optional string type",
+        "Update UpdateInboxDto: source and category become optional string type",
+        "Update InboxQueryParams: source and category become optional string type",
+        "Build dto package",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Completed: Updated all inbox DTOs to use string types for source/category, updated frontend components and services to match"
+    },
+    {
+      "id": "US-009",
+      "title": "Update inbox service to auto-create source/category on inbox creation",
+      "description": "As a user, I want the system to automatically create source/category when creating inbox with new values.",
+      "acceptanceCriteria": [
+        "When creating inbox, if source string doesn't exist in inbox_source, create it automatically",
+        "When creating inbox, if category string doesn't exist in inbox_category, create it automatically",
+        "Maintain backward compatibility with existing enum values",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Completed: Updated InboxService to inject InboxSourceService and InboxCategoryService, added auto-creation logic in create() method, added comprehensive tests"
+    },
+    {
+      "id": "US-010",
+      "title": "Update inbox service to support dynamic source/category on update",
+      "description": "As a user, I want to update inbox with new source/category values that get auto-created.",
+      "acceptanceCriteria": [
+        "When updating inbox source/category, auto-create if value doesn't exist",
+        "Support setting source/category to null",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Completed: Updated InboxService.update() method to auto-create source/category when provided (non-null values), supports setting to null, added 4 comprehensive tests"
+    },
+    {
+      "id": "US-011",
+      "title": "Update inbox list endpoint to filter by source/category name",
+      "description": "As a user, I want to filter inbox list by source or category name.",
+      "acceptanceCriteria": [
+        "List endpoint supports filtering by source name (string)",
+        "List endpoint supports filtering by category name (string)",
+        "Support filtering where source/category is null",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Completed: Updated InboxService.list() and InboxController to support source/category filtering with null support, added 4 new tests"
+    },
+    {
+      "id": "US-012",
+      "title": "Add frontend API clients for source and category",
+      "description": "As a frontend developer, I need typed API functions to consume source/category endpoints.",
+      "acceptanceCriteria": [
+        "Add getInboxSources() API function",
+        "Add getInboxCategories() API function",
+        "Add createInboxSource() API function",
+        "Add createInboxCategory() API function",
+        "Add deleteInboxSource() API function",
+        "Add deleteInboxCategory() API function",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Completed: Created inbox-source-category.ts API client with all 6 required functions"
+    },
+    {
+      "id": "US-013",
+      "title": "Add source/category dropdown filters to inbox list page",
+      "description": "As a user, I want to filter inbox list by source or category using dropdown menus.",
+      "acceptanceCriteria": [
+        "Add source dropdown filter to inbox list page",
+        "Add category dropdown filter to inbox list page",
+        "Dropdown options loaded from API",
+        "Filter state persisted in URL params",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Completed: Added source and category dropdown filters with dynamic options from API, URL param persistence"
+    },
+    {
+      "id": "US-014",
+      "title": "Update inbox create/edit form with source/category dropdown and quick create",
+      "description": "As a user, I want to select source/category from dropdown or enter new value to create on-the-fly.",
+      "acceptanceCriteria": [
+        "Source field becomes dropdown with options from API",
+        "Category field becomes dropdown with options from API",
+        "Support typing new value and pressing Enter or clicking add button to create",
+        "Newly created option is automatically selected",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "Completed: Updated CreateInboxDialog and EditInboxDialog with dynamic source/category dropdowns, added quick create functionality with Enter key and add button"
+    },
+    {
+      "id": "US-015",
+      "title": "Create source/category management page",
+      "description": "As a user, I want a settings page to view, create, and delete my sources and categories.",
+      "acceptanceCriteria": [
+        "Create /settings/inbox-categories page",
+        "Display list of all sources with inbox count",
+        "Display list of all categories with inbox count",
+        "Allow creating new source/category via form",
+        "Allow deleting source/category with confirmation dialog",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": "Completed: Created InboxCategoriesSettings component with full CRUD functionality, inbox counts, and confirmation dialogs. Added route to App.tsx and menu item to settings-menu.tsx. Fixed InboxService to use correct DTO field names (sources/categories instead of items)."
+    }
+  ]
+}
