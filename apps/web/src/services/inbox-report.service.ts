@@ -11,7 +11,7 @@ interface InboxReportListState {
   items: InboxReportListItemDto[];
   total: number;
   page: number;
-  limit: number;
+  pageSize: number;
   totalPages: number;
 }
 
@@ -20,7 +20,7 @@ export class InboxReportService extends Service {
     items: [],
     total: 0,
     page: 1,
-    limit: 20,
+    pageSize: 20,
     totalPages: 0,
   };
 
@@ -35,7 +35,7 @@ export class InboxReportService extends Service {
     try {
       const response = await inboxReportApi.getInboxReports({
         page: params?.page ?? this.list.page,
-        limit: params?.limit ?? this.list.limit,
+        limit: params?.limit ?? this.list.pageSize,
         date: params?.date,
         startDate: params?.startDate,
         endDate: params?.endDate,
@@ -43,7 +43,14 @@ export class InboxReportService extends Service {
         order: params?.order ?? 'desc',
       });
       if (response.data) {
-        this.list = response.data;
+        // Map API response (pageSize) to local state (pageSize)
+        this.list = {
+          items: response.data.items,
+          total: response.data.total,
+          page: response.data.page,
+          pageSize: response.data.pageSize,
+          totalPages: response.data.totalPages,
+        };
       }
     } catch (err) {
       this.error = err instanceof Error ? err.message : 'Failed to load reports';
@@ -82,9 +89,10 @@ export class InboxReportService extends Service {
       }
     } catch (err: unknown) {
       // Handle 409 conflict (report already exists)
-      const error = err as { response?: { status?: number; data?: { data?: unknown } } };
-      if (error.response?.status === 409) {
-        const existingReport = error.response?.data?.data;
+      // API throws { status: 409, message: '...', existingReport }
+      const error = err as { status?: number; existingReport?: unknown };
+      if (error.status === 409) {
+        const existingReport = error.existingReport;
         if (existingReport) {
           toast.warning(`${date} 的日报已存在`);
           await this.loadReports();
