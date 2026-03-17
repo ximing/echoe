@@ -6,6 +6,8 @@ import { inbox } from '../db/schema/inbox.js';
 import { generateInboxId } from '../utils/id.js';
 import { logger } from '../utils/logger.js';
 import { InboxMetricsService } from './inbox-metrics.service.js';
+import { InboxSourceService } from './inbox-source.service.js';
+import { InboxCategoryService } from './inbox-category.service.js';
 
 import type { Inbox, NewInbox } from '../db/schema/inbox.js';
 
@@ -42,7 +44,11 @@ export interface ListInboxResult {
 
 @Service()
 export class InboxService {
-  constructor(private metricsService: InboxMetricsService) {}
+  constructor(
+    private metricsService: InboxMetricsService,
+    private sourceService: InboxSourceService,
+    private categoryService: InboxCategoryService,
+  ) {}
 
   /**
    * Create a new inbox item
@@ -53,13 +59,25 @@ export class InboxService {
 
       const inboxId = generateInboxId();
 
+      // Auto-create source if provided and doesn't exist
+      let sourceValue = data.source ?? 'manual';
+      if (data.source) {
+        await this.sourceService.create(uid, data.source);
+      }
+
+      // Auto-create category if provided and doesn't exist
+      let categoryValue = data.category ?? 'backend';
+      if (data.category) {
+        await this.categoryService.create(uid, data.category);
+      }
+
       const newInboxItem: NewInbox = {
         inboxId,
         uid,
         front: data.front,
         back: data.back,
-        source: data.source ?? 'manual',
-        category: data.category ?? 'backend',
+        source: sourceValue,
+        category: categoryValue,
         isRead: data.isRead ?? false,
       };
 

@@ -26,12 +26,20 @@ const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>
 describe('InboxService', () => {
   let service: InboxService;
   let mockMetricsService: any;
+  let mockSourceService: any;
+  let mockCategoryService: any;
 
   beforeEach(() => {
     mockMetricsService = {
       trackInboxCreate: jest.fn(),
     };
-    service = new InboxService(mockMetricsService);
+    mockSourceService = {
+      create: jest.fn().mockResolvedValue({ id: 1, uid: 'test-uid', name: 'test-source' }),
+    };
+    mockCategoryService = {
+      create: jest.fn().mockResolvedValue({ id: 1, uid: 'test-uid', name: 'test-category' }),
+    };
+    service = new InboxService(mockMetricsService, mockSourceService, mockCategoryService);
     mockedGetDatabase.mockClear();
   });
 
@@ -130,6 +138,110 @@ describe('InboxService', () => {
       expect(insertedData.source).toBe('manual');
       expect(insertedData.category).toBe('backend');
       expect(insertedData.isRead).toBe(false);
+    });
+
+    it('should auto-create source when provided', async () => {
+      const mockDb = {
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{
+              inboxId: 'i123',
+              uid: 'test-uid',
+              front: 'Front',
+              back: 'Back',
+              source: 'new-source',
+              category: 'backend',
+              isRead: false,
+            }]),
+          }),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Front',
+        back: 'Back',
+        source: 'new-source',
+      };
+
+      await service.create('test-uid', params);
+
+      expect(mockSourceService.create).toHaveBeenCalledWith('test-uid', 'new-source');
+    });
+
+    it('should auto-create category when provided', async () => {
+      const mockDb = {
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{
+              inboxId: 'i123',
+              uid: 'test-uid',
+              front: 'Front',
+              back: 'Back',
+              source: 'manual',
+              category: 'new-category',
+              isRead: false,
+            }]),
+          }),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Front',
+        back: 'Back',
+        category: 'new-category',
+      };
+
+      await service.create('test-uid', params);
+
+      expect(mockCategoryService.create).toHaveBeenCalledWith('test-uid', 'new-category');
+    });
+
+    it('should auto-create both source and category when provided', async () => {
+      const mockDb = {
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{
+              inboxId: 'i123',
+              uid: 'test-uid',
+              front: 'Front',
+              back: 'Back',
+              source: 'new-source',
+              category: 'new-category',
+              isRead: false,
+            }]),
+          }),
+        }),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockResolvedValue(undefined),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Front',
+        back: 'Back',
+        source: 'new-source',
+        category: 'new-category',
+      };
+
+      await service.create('test-uid', params);
+
+      expect(mockSourceService.create).toHaveBeenCalledWith('test-uid', 'new-source');
+      expect(mockCategoryService.create).toHaveBeenCalledWith('test-uid', 'new-category');
     });
   });
 
