@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 
 // Paths that don't require authentication even if they match protected prefixes
 const AUTH_EXCLUDED_PATHS = [
+  '/auth',
   '/api/v1/auth/login',
   '/api/v1/auth/register',
   '/api/v1/memos/public',
@@ -24,6 +25,9 @@ const AUTH_EXCLUDED_PATHS = [
  * Check if the request path requires authentication
  */
 const requiresAuth = (path: string): boolean => {
+  if (path === '/') {
+    return false;
+  }
   // First check if path is explicitly excluded from auth
   if (AUTH_EXCLUDED_PATHS.some((excluded) => path === excluded || path.startsWith(excluded))) {
     return false;
