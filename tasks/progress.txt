@@ -243,3 +243,21 @@ Started: 2026年 3月17日 星期二 CST
   - Enter key handling: Use onKeyDown with e.preventDefault() to prevent form submission when adding new option
 ---
 
+## 2026-03-17 - US-015
+- Created source/category management settings page with full CRUD functionality
+- Files changed:
+  - apps/web/src/pages/settings/components/inbox-categories-settings.tsx (new)
+  - apps/web/src/pages/settings/components/settings-menu.tsx (added inbox-categories menu item)
+  - apps/web/src/App.tsx (added inbox-categories route)
+  - apps/web/src/services/inbox.service.ts (fixed DTO field names: sources/categories instead of items)
+- **Learnings for future iterations:**
+  - Settings page pattern: Create component in pages/settings/components/, add to settings-menu.tsx, add route in App.tsx
+  - Inbox count pattern: Query inbox API with filter params (page=1, limit=1) and use response.data.total for count
+  - Load counts in parallel: Use Promise.all with array.map to load counts for all items simultaneously
+  - Delete confirmation: Store item info in state, show dialog, handle delete in separate function
+  - DTO field names: SourceListResponse uses `sources` array, CategoryListResponse uses `categories` array (NOT `items`)
+  - Reload after mutations: Call loadData() and inboxService.loadSourcesAndCategories() after create/delete to sync state
+  - Settings menu sections: Use cardManagementItems array for card-related settings, menuItems for general settings
+  - Icon imports: Import from lucide-react at top of file when adding new menu items
+---
+

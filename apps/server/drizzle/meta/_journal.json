@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1773638419992,
-      "tag": "0000_parallel_nick_fury",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1773649594071,
-      "tag": "0001_known_dagger",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1773676083446,
-      "tag": "0002_cold_kat_farrell",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1773676610880,
-      "tag": "0003_slimy_owl",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1773676998337,
-      "tag": "0004_open_the_hood",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1773677291160,
-      "tag": "0005_chief_susan_delgado",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1773677517849,
-      "tag": "0006_robust_nitro",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1773712309848,
-      "tag": "0007_sad_micromacro",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1773713475651,
-      "tag": "0008_majestic_mimic",
+      "when": 1773732091345,
+      "tag": "0000_late_piledriver",
       "breakpoints": true
     }
   ]

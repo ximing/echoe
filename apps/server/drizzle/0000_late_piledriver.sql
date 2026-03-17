@@ -15,6 +15,18 @@ CREATE TABLE `users` (
 	CONSTRAINT `users_uid` PRIMARY KEY(`uid`)
 );
 --> statement-breakpoint
+CREATE TABLE `api_token` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`token_id` varchar(191) NOT NULL,
+	`uid` varchar(191) NOT NULL,
+	`name` varchar(100) NOT NULL,
+	`token_hash` varchar(255) NOT NULL,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
+	`created_at` timestamp(3) NOT NULL DEFAULT (now()),
+	`updated_at` timestamp(3) NOT NULL DEFAULT (now()),
+	CONSTRAINT `api_token_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
 CREATE TABLE `table_migrations` (
 	`table_name` varchar(191) NOT NULL,
 	`current_version` int NOT NULL,
@@ -245,9 +257,64 @@ CREATE TABLE `echoe_config` (
 	CONSTRAINT `echoe_config_uid_key_pk` PRIMARY KEY(`uid`,`key`)
 );
 --> statement-breakpoint
+CREATE TABLE `inbox` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`inbox_id` varchar(191) NOT NULL,
+	`uid` varchar(191) NOT NULL,
+	`front` text NOT NULL,
+	`back` text,
+	`source` varchar(191),
+	`category` varchar(191),
+	`is_read` boolean NOT NULL DEFAULT false,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
+	`created_at` timestamp(3) NOT NULL DEFAULT (now()),
+	`updated_at` timestamp(3) NOT NULL DEFAULT (now()),
+	CONSTRAINT `inbox_id` PRIMARY KEY(`id`),
+	CONSTRAINT `inbox_id_unique` UNIQUE(`inbox_id`)
+);
+--> statement-breakpoint
+CREATE TABLE `inbox_report` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`inbox_report_id` varchar(191) NOT NULL,
+	`uid` varchar(191) NOT NULL,
+	`date` varchar(20) NOT NULL,
+	`content` text NOT NULL,
+	`summary` text,
+	`deleted_at` bigint NOT NULL DEFAULT 0,
+	`created_at` timestamp(3) NOT NULL DEFAULT (now()),
+	`updated_at` timestamp(3) NOT NULL DEFAULT (now()),
+	CONSTRAINT `inbox_report_id` PRIMARY KEY(`id`),
+	CONSTRAINT `inbox_report_id_unique` UNIQUE(`inbox_report_id`),
+	CONSTRAINT `uid_date_unique` UNIQUE(`uid`,`date`)
+);
+--> statement-breakpoint
+CREATE TABLE `inbox_source` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`uid` varchar(191) NOT NULL,
+	`name` varchar(191) NOT NULL,
+	`created_at` timestamp(3) NOT NULL DEFAULT (now()),
+	`updated_at` timestamp(3) NOT NULL DEFAULT (now()),
+	CONSTRAINT `inbox_source_id` PRIMARY KEY(`id`),
+	CONSTRAINT `uid_name_unique` UNIQUE(`uid`,`name`)
+);
+--> statement-breakpoint
+CREATE TABLE `inbox_category` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`uid` varchar(191) NOT NULL,
+	`name` varchar(191) NOT NULL,
+	`created_at` timestamp(3) NOT NULL DEFAULT (now()),
+	`updated_at` timestamp(3) NOT NULL DEFAULT (now()),
+	CONSTRAINT `inbox_category_id` PRIMARY KEY(`id`),
+	CONSTRAINT `uid_name_unique` UNIQUE(`uid`,`name`)
+);
+--> statement-breakpoint
 CREATE INDEX `email_idx` ON `users` (`email`);--> statement-breakpoint
 CREATE INDEX `phone_idx` ON `users` (`phone`);--> statement-breakpoint
 CREATE INDEX `deleted_at_idx` ON `users` (`deleted_at`);--> statement-breakpoint
+CREATE INDEX `token_id_unique` ON `api_token` (`token_id`);--> statement-breakpoint
+CREATE INDEX `uid_idx` ON `api_token` (`uid`);--> statement-breakpoint
+CREATE INDEX `token_hash_idx` ON `api_token` (`token_hash`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `api_token` (`deleted_at`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_col` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_col_id_idx` ON `echoe_col` (`uid`,`col_id`);--> statement-breakpoint
 CREATE INDEX `guid_idx` ON `echoe_notes` (`guid`);--> statement-breakpoint
@@ -303,4 +370,14 @@ CREATE INDEX `oid_idx` ON `echoe_graves` (`oid`);--> statement-breakpoint
 CREATE INDEX `type_idx` ON `echoe_graves` (`type`);--> statement-breakpoint
 CREATE INDEX `usn_idx` ON `echoe_graves` (`usn`);--> statement-breakpoint
 CREATE INDEX `uid_grave_id_idx` ON `echoe_graves` (`uid`,`grave_id`);--> statement-breakpoint
-CREATE INDEX `uid_oid_type_idx` ON `echoe_graves` (`uid`,`oid`,`type`);
+CREATE INDEX `uid_oid_type_idx` ON `echoe_graves` (`uid`,`oid`,`type`);--> statement-breakpoint
+CREATE INDEX `uid_idx` ON `inbox` (`uid`);--> statement-breakpoint
+CREATE INDEX `category_idx` ON `inbox` (`category`);--> statement-breakpoint
+CREATE INDEX `is_read_idx` ON `inbox` (`is_read`);--> statement-breakpoint
+CREATE INDEX `uid_is_read_idx` ON `inbox` (`uid`,`is_read`);--> statement-breakpoint
+CREATE INDEX `uid_category_idx` ON `inbox` (`uid`,`category`);--> statement-breakpoint
+CREATE INDEX `deleted_at_idx` ON `inbox` (`deleted_at`);--> statement-breakpoint
+CREATE INDEX `uid_idx` ON `inbox_report` (`uid`);--> statement-breakpoint
+CREATE INDEX `date_idx` ON `inbox_report` (`date`);--> statement-breakpoint
+CREATE INDEX `uid_idx` ON `inbox_source` (`uid`);--> statement-breakpoint
+CREATE INDEX `uid_idx` ON `inbox_category` (`uid`);

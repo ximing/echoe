@@ -232,8 +232,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Created InboxCategoriesSettings component with full CRUD functionality, inbox counts, and confirmation dialogs. Added route to App.tsx and menu item to settings-menu.tsx. Fixed InboxService to use correct DTO field names (sources/categories instead of items)."
     }
   ]
 }

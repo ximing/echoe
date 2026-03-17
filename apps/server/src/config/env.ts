@@ -8,11 +8,9 @@ import { logger } from '../utils/logger.js';
 const environment = process.env.NODE_ENV || 'development';
 
 // 获取项目根路径
-// In Jest/CommonJS, __dirname is available as a global
-// In ESM runtime, we need to derive it from import.meta.url, but we can't reference
-// import.meta in a file that Jest will transform to CommonJS, so we just use __dirname
-// which will be available in both contexts (Node provides it, Jest injects it)
-const projectRoot = path.resolve(__dirname, '../..');
+// In ESM runtime __dirname is unavailable; using cwd keeps this file compatible
+// with both ESM runtime and Jest's CommonJS transform in this repository.
+const projectRoot = path.resolve(process.cwd());
 
 // 加载环境变量
 const loadEnvironment = () => {
