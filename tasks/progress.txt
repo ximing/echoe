@@ -228,3 +228,18 @@ Started: 2026年 3月17日 星期二 CST
   - Backend pre-existing issues (like __dirname in ESM) are not related to frontend feature implementation
 ---
 
+## 2026-03-17 - US-014
+- Updated inbox create/edit forms with dynamic source/category dropdowns and quick create functionality
+- Files changed:
+  - apps/web/src/pages/inbox/inbox-page.tsx (updated CreateInboxDialog and EditInboxDialog components)
+- **Learnings for future iterations:**
+  - Dialog pattern: Use useService(InboxService) to access shared sources/categories arrays
+  - Quick create pattern: Provide input field + button below dropdown, support Enter key for submission
+  - Auto-select after create: Call API, reload options, then set selected value to newly created item's name
+  - Loading states: Add isCreating flag for each quick create operation, disable button during creation
+  - Import pattern: Import API functions and toast service at component level when needed in dialogs
+  - After create/update: Reload sources/categories to keep dropdown options in sync across all components
+  - Dropdown options: Map over inboxService.sources/categories arrays, disable during isLoadingOptions
+  - Enter key handling: Use onKeyDown with e.preventDefault() to prevent form submission when adding new option
+---
+

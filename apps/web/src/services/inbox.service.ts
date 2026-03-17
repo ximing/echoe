@@ -65,8 +65,8 @@ export class InboxService extends Service {
         inboxSourceCategoryApi.getInboxSources(),
         inboxSourceCategoryApi.getInboxCategories(),
       ]);
-      this.sources = sourcesResponse.data.items;
-      this.categories = categoriesResponse.data.items;
+      this.sources = sourcesResponse.data.sources;
+      this.categories = categoriesResponse.data.categories;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sources and categories';
       toast.error(message);

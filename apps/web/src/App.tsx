@@ -25,6 +25,7 @@ import { DisplaySettings } from './pages/settings/components/display-settings';
 import { AudioSettings } from './pages/settings/components/audio-settings';
 import { DataSettings } from './pages/settings/components/data-settings';
 import { PresetSettings } from './pages/settings/components/preset-settings';
+import { InboxCategoriesSettings } from './pages/settings/components/inbox-categories-settings';
 import DashboardPage from './pages/dashboard';
 import { InboxPage } from './pages/inbox/inbox-page';
 import { InboxReportsPage } from './pages/inbox/inbox-reports-page';
@@ -280,6 +281,7 @@ function App() {
           <Route path="audio" element={<AudioSettings />} />
           <Route path="data" element={<DataSettings />} />
           <Route path="presets" element={<PresetSettings />} />
+          <Route path="inbox-categories" element={<InboxCategoriesSettings />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

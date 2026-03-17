@@ -1,5 +1,19 @@
 import { NavLink } from 'react-router';
-import { User, Bot, Palette, Info, Upload, Copy, BookOpen, Monitor, Volume2, Database, Layers, Key } from 'lucide-react';
+import {
+  User,
+  Bot,
+  Palette,
+  Info,
+  Upload,
+  Copy,
+  BookOpen,
+  Monitor,
+  Volume2,
+  Database,
+  Layers,
+  Key,
+  Tags,
+} from 'lucide-react';
 
 export const SettingsMenu = () => {
   const cardManagementItems: Array<{ id: string; label: string; icon: React.ReactNode; to: string }> = [
@@ -44,6 +58,12 @@ export const SettingsMenu = () => {
       label: '预设配置',
       icon: <Layers className="w-5 h-5" />,
       to: '/settings/presets',
+    },
+    {
+      id: 'inbox-categories',
+      label: '收件箱分类',
+      icon: <Tags className="w-5 h-5" />,
+      to: '/settings/inbox-categories',
     },
   ];
 
