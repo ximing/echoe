@@ -22,6 +22,7 @@ export const echoeMedia = mysqlTable(
     size: int('size').notNull(), // File size in bytes
     mimeType: varchar('mime_type', { length: 100 }).notNull(), // MIME type
     hash: varchar('hash', { length: 64 }).notNull(), // SHA1 hash of file
+    storageKey: varchar('storage_key', { length: 500 }), // Storage key for dynamic URL generation (e.g., echoe-media/{uid}/{filename})
     createdAt: int('created_at').notNull(), // Creation timestamp (Unix timestamp in seconds)
     usedInCards: tinyint('used_in_cards').notNull().default(0), // Whether file is referenced in any card
   },

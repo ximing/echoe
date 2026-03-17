@@ -1,0 +1,1 @@
+ALTER TABLE `echoe_media` ADD `storage_key` varchar(500);
