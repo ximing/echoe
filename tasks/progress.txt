@@ -139,3 +139,31 @@ Started: 2026年 3月17日 星期二 CST
   - Check for null/undefined before using nullable fields (use `if (value && ...)` pattern)
 ---
 
+## 2026-03-17 10:20 - US-008
+- Updated inbox DTOs to support dynamic source and category values
+- Files changed:
+  - packages/dto/src/inbox.dto.ts (changed source/category from enum to string | null in InboxDto, InboxListItemDto, CreateInboxDto, UpdateInboxDto, InboxQueryParams, BulkUpdateInboxDto)
+  - apps/server/src/services/inbox.service.ts (updated UpdateInboxParams to accept string | null for source/category)
+  - apps/web/src/services/inbox.service.ts (removed InboxCategory import, updated filters to use string)
+  - apps/web/src/pages/inbox/inbox-page.tsx (removed InboxCategory import, updated all type references to use string)
+- **Learnings for future iterations:**
+  - When changing DTO field types, must update both backend service interfaces AND frontend components
+  - Frontend state management (Service classes) must be updated to match DTO changes
+  - Remove unused enum imports after converting to string types
+  - Nullable fields in DTOs should be `string | null`, while optional fields can be `string | undefined`
+  - Pre-existing type errors in the web app are not related to this change - focus on errors specific to the task
+  - When a migration file gets auto-reordered by drizzle-kit, restore it if it's already applied to avoid confusion
+---
+
+## 2026-03-17 10:25 - US-009
+- Updated InboxService to auto-create source and category on inbox creation
+- Files changed:
+  - apps/server/src/services/inbox.service.ts (added InboxSourceService and InboxCategoryService injection, added auto-creation logic)
+  - apps/server/src/__tests__/inbox.service.test.ts (added mocks for new services, added 3 new test cases)
+- **Learnings for future iterations:**
+  - Service dependency injection: Inject related services via constructor to enable cross-service operations
+  - Auto-create pattern: Call service.create() before using the value - the service handles idempotency (returns existing if found)
+  - Backward compatibility: Maintain default values ('manual', 'backend') when source/category not provided
+  - Test pattern: Mock injected services in beforeEach, verify service method calls with toHaveBeenCalledWith()
+  - The InboxSourceService.create() and InboxCategoryService.create() methods are idempotent - they check if entity exists first
+---

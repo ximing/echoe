@@ -122,8 +122,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Updated all inbox DTOs to use string types for source/category, updated frontend components and services to match"
     },
     {
       "id": "US-009",
@@ -137,8 +137,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Updated InboxService to inject InboxSourceService and InboxCategoryService, added auto-creation logic in create() method, added comprehensive tests"
     },
     {
       "id": "US-010",
