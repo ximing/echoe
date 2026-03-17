@@ -43,6 +43,9 @@ export class ApiTokenService extends Service {
       const response = await apiTokenApi.createApiToken({ name });
       // Reload tokens to get the updated list (without plaintext token)
       await this.loadTokens();
+      if (!response.data) {
+        throw new Error('Failed to create API token: no data returned');
+      }
       return response.data;
     } catch (error) {
       console.error('Failed to create API token:', error);

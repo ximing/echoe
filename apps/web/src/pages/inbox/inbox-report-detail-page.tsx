@@ -1,3 +1,4 @@
+import type { InboxReportSummaryDto } from '@echoe/dto';
 import { view, useService } from '@rabjs/react';
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
@@ -11,6 +12,16 @@ marked.setOptions({
   breaks: true,
   gfm: true,
 });
+
+// Parse summary JSON string
+const parseSummary = (summary: string | null): InboxReportSummaryDto | null => {
+  if (!summary) return null;
+  try {
+    return JSON.parse(summary) as InboxReportSummaryDto;
+  } catch {
+    return null;
+  }
+};
 
 export const InboxReportDetailPage = view(() => {
   const { reportId } = useParams<{ reportId: string }>();
@@ -88,80 +99,83 @@ export const InboxReportDetailPage = view(() => {
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto p-6 space-y-6">
           {/* Summary Section */}
-          {report.summary && (
-            <div className="bg-white dark:bg-dark-800 rounded-lg border border-gray-200 dark:border-dark-700 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">
-                报告摘要
-              </h2>
-              <div className="space-y-4">
-                {/* Topics */}
-                {report.summary.topics && report.summary.topics.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        主题
-                      </h3>
+          {(() => {
+            const summary = parseSummary(report.summary);
+            return summary && (
+              <div className="bg-white dark:bg-dark-800 rounded-lg border border-gray-200 dark:border-dark-700 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">
+                  报告摘要
+                </h2>
+                <div className="space-y-4">
+                  {/* Topics */}
+                  {summary.topics && summary.topics.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          主题
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {summary.topics.map((topic: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                          >
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {report.summary.topics.map((topic, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                        >
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Mistakes */}
-                {report.summary.mistakes && report.summary.mistakes.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        需要注意
-                      </h3>
+                  {/* Mistakes */}
+                  {summary.mistakes && summary.mistakes.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          需要注意
+                        </h3>
+                      </div>
+                      <ul className="space-y-1">
+                        {summary.mistakes.map((mistake: string, idx: number) => (
+                          <li
+                            key={idx}
+                            className="text-sm text-gray-600 dark:text-gray-400 pl-4 before:content-['•'] before:mr-2 before:text-orange-600 dark:before:text-orange-400"
+                          >
+                            {mistake}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="space-y-1">
-                      {report.summary.mistakes.map((mistake, idx) => (
-                        <li
-                          key={idx}
-                          className="text-sm text-gray-600 dark:text-gray-400 pl-4 before:content-['•'] before:mr-2 before:text-orange-600 dark:before:text-orange-400"
-                        >
-                          {mistake}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                  )}
 
-                {/* Actions */}
-                {report.summary.actions && report.summary.actions.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        行动建议
-                      </h3>
+                  {/* Actions */}
+                  {summary.actions && summary.actions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          行动建议
+                        </h3>
+                      </div>
+                      <ul className="space-y-1">
+                        {summary.actions.map((action: string, idx: number) => (
+                          <li
+                            key={idx}
+                            className="text-sm text-gray-600 dark:text-gray-400 pl-4 before:content-['✓'] before:mr-2 before:text-green-600 dark:before:text-green-400"
+                          >
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="space-y-1">
-                      {report.summary.actions.map((action, idx) => (
-                        <li
-                          key={idx}
-                          className="text-sm text-gray-600 dark:text-gray-400 pl-4 before:content-['✓'] before:mr-2 before:text-green-600 dark:before:text-green-400"
-                        >
-                          {action}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Markdown Content */}
           <div className="bg-white dark:bg-dark-800 rounded-lg border border-gray-200 dark:border-dark-700 p-6">

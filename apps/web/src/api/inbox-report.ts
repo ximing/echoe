@@ -66,7 +66,8 @@ export const generateInboxReport = async (date: string, async?: boolean) => {
       };
     }
     // Handle 503 AI service unavailable
-    if (error?.response?.status === 503) {
+    const axiosErrorFor503 = error as { response?: { status?: number } };
+    if (axiosErrorFor503?.response?.status === 503) {
       throw new Error('AI service is temporarily unavailable. Please try again later.');
     }
     throw error;

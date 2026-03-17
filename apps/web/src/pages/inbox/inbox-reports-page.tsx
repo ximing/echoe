@@ -1,8 +1,19 @@
+import type { InboxReportSummaryDto } from '@echoe/dto';
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { InboxReportService } from '../../services/inbox-report.service.js';
 import { Plus, FileText, Calendar, X } from 'lucide-react';
+
+// Parse summary JSON string
+const parseSummary = (summary: string | null): InboxReportSummaryDto | null => {
+  if (!summary) return null;
+  try {
+    return JSON.parse(summary) as InboxReportSummaryDto;
+  } catch {
+    return null;
+  }
+};
 
 export const InboxReportsPage = view(() => {
   const reportService = useService(InboxReportService);
@@ -66,29 +77,30 @@ export const InboxReportsPage = view(() => {
           </div>
         ) : (
           <div className="space-y-4">
-            {reportService.list.items.map((report) => (
-              <div
-                key={report.inboxReportId}
-                onClick={() => handleReportClick(report.inboxReportId)}
-                className="bg-white dark:bg-dark-800 rounded-lg border border-gray-200 dark:border-dark-700 p-4 hover:shadow-md transition-shadow cursor-pointer"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">
-                        {report.date}
-                      </h3>
-                    </div>
-                    {report.summary && (
-                      <div className="mt-3 space-y-2">
-                        {report.summary.topics && report.summary.topics.length > 0 && (
+            {reportService.list.items.map((report) => {
+              const summary = parseSummary(report.summary);
+              return (
+                <div
+                  key={report.inboxReportId}
+                  onClick={() => handleReportClick(report.inboxReportId)}
+                  className="bg-white dark:bg-dark-800 rounded-lg border border-gray-200 dark:border-dark-700 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+                          {report.date}
+                        </h3>
+                      </div>
+                      {summary && summary.topics && summary.topics.length > 0 && (
+                        <div className="mt-3 space-y-2">
                           <div className="flex items-start gap-2">
                             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium min-w-[60px]">
                               主题:
                             </span>
                             <div className="flex flex-wrap gap-1">
-                              {report.summary.topics.slice(0, 3).map((topic, idx) => (
+                              {summary.topics.slice(0, 3).map((topic: string, idx: number) => (
                                 <span
                                   key={idx}
                                   className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
@@ -96,24 +108,24 @@ export const InboxReportsPage = view(() => {
                                   {topic}
                                 </span>
                               ))}
-                              {report.summary.topics.length > 3 && (
+                              {summary.topics.length > 3 && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  +{report.summary.topics.length - 3} 更多
+                                  +{summary.topics.length - 3} 更多
                                 </span>
                               )}
                             </div>
                           </div>
-                        )}
+                        </div>
+                      )}
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        创建于 {new Date(report.createdAt).toLocaleString('zh-CN')}
                       </div>
-                    )}
-                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      创建于 {new Date(report.createdAt).toLocaleString('zh-CN')}
                     </div>
+                    <FileText className="w-5 h-5 text-gray-400 dark:text-gray-500 ml-4" />
                   </div>
-                  <FileText className="w-5 h-5 text-gray-400 dark:text-gray-500 ml-4" />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

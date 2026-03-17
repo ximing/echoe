@@ -40,25 +40,25 @@ export const InboxCategoriesSettings = view(() => {
 
       // Load inbox counts for each source
       const sourcesWithCounts = await Promise.all(
-        sourcesResponse.data.sources.map(async (source) => {
+        (sourcesResponse.data?.sources ?? []).map(async (source) => {
           const countResponse = await inboxApi.getInboxItems({
             page: 1,
             limit: 1,
             source: source.name,
           });
-          return { ...source, inboxCount: countResponse.data.total };
+          return { ...source, inboxCount: countResponse.data?.total ?? 0 };
         })
       );
 
       // Load inbox counts for each category
       const categoriesWithCounts = await Promise.all(
-        categoriesResponse.data.categories.map(async (category) => {
+        (categoriesResponse.data?.categories ?? []).map(async (category) => {
           const countResponse = await inboxApi.getInboxItems({
             page: 1,
             limit: 1,
             category: category.name,
           });
-          return { ...category, inboxCount: countResponse.data.total };
+          return { ...category, inboxCount: countResponse.data?.total ?? 0 };
         })
       );
 

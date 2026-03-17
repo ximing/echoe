@@ -442,7 +442,7 @@ const CreateInboxDialog = view(
     onClose: () => void;
     onSubmit: (data: {
       front: string;
-      back?: string;
+      back: string;
       source?: string;
       category?: string;
     }) => Promise<void>;
@@ -466,7 +466,9 @@ const CreateInboxDialog = view(
           name: newSourceInput.trim(),
         });
         await inboxService.loadSourcesAndCategories();
-        setSource(response.data.name);
+        if (response.data) {
+          setSource(response.data.name);
+        }
         setNewSourceInput('');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to create source');
@@ -483,7 +485,9 @@ const CreateInboxDialog = view(
           name: newCategoryInput.trim(),
         });
         await inboxService.loadSourcesAndCategories();
-        setCategory(response.data.name);
+        if (response.data) {
+          setCategory(response.data.name);
+        }
         setNewCategoryInput('');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to create category');
@@ -500,7 +504,7 @@ const CreateInboxDialog = view(
       try {
         await onSubmit({
           front: front.trim(),
-          back: back.trim() || undefined,
+          back: back.trim(),
           source: source || undefined,
           category: category || undefined,
         });
@@ -704,7 +708,9 @@ const EditInboxDialog = view(
           name: newSourceInput.trim(),
         });
         await inboxService.loadSourcesAndCategories();
-        setSource(response.data.name);
+        if (response.data) {
+          setSource(response.data.name);
+        }
         setNewSourceInput('');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to create source');
@@ -721,7 +727,9 @@ const EditInboxDialog = view(
           name: newCategoryInput.trim(),
         });
         await inboxService.loadSourcesAndCategories();
-        setCategory(response.data.name);
+        if (response.data) {
+          setCategory(response.data.name);
+        }
         setNewCategoryInput('');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to create category');
@@ -738,7 +746,7 @@ const EditInboxDialog = view(
       try {
         await onSubmit({
           front: front.trim(),
-          back: back.trim() || undefined,
+          back: back.trim(),
           source: source || undefined,
           category: category || undefined,
         });

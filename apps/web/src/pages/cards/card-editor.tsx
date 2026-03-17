@@ -190,8 +190,11 @@ const [tags, setTags] = useState<string[]>([]);
       return true;
     }
 
-    if (node.type === 'image' && typeof node.attrs?.src === 'string' && node.attrs.src.trim() !== '') {
-      return true;
+    if (node.type === 'image') {
+      const attrs = node.attrs as { src?: string } | undefined;
+      if (typeof attrs?.src === 'string' && attrs.src.trim() !== '') {
+        return true;
+      }
     }
 
     if (Array.isArray(node.content)) {
