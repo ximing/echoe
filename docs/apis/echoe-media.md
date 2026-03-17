@@ -14,6 +14,29 @@
 GET /api/v1/media
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface EchoeMediaDto {
+  /** Media file ID */
+  id: string;
+  /** Stored filename */
+  filename: string;
+  /** Original uploaded filename */
+  originalFilename: string;
+  /** File size in bytes */
+  size: number;
+  /** MIME type */
+  mimeType: string;
+  /** SHA1 hash of file */
+  hash: string;
+  /** Creation timestamp */
+  createdAt: number;
+  /** Whether file is referenced in any card */
+  usedInCards: boolean;
+}
+```
+
 **响应示例**
 
 ```json
@@ -22,9 +45,14 @@ GET /api/v1/media
   "msg": "success",
   "data": [
     {
+      "id": "media_xxx",
       "filename": "image.png",
+      "originalFilename": "image.png",
       "size": 1024,
-      "createdAt": "2024-01-01T00:00:00Z"
+      "mimeType": "image/png",
+      "hash": "abc123",
+      "createdAt": 1704067200000,
+      "usedInCards": true
     }
   ]
 }
@@ -44,7 +72,7 @@ GET /api/v1/media/:filename
 |------|------|------|
 | filename | string | 文件名（URL 编码） |
 
-**响应**: 返回文件二进制内容
+**响应**: 返回文件二进制内容，Content-Type 根据文件 MIME 类型设置
 
 ---
 
@@ -62,6 +90,17 @@ POST /api/v1/media/upload
 |------|------|------|------|
 | file | file | 是 | 媒体文件（图片/音频/视频/PDF） |
 
+**TypeScript 类型定义**
+
+```typescript
+interface UploadMediaResultDto {
+  /** Stored filename */
+  filename: string;
+  /** URL to access the file */
+  url: string;
+}
+```
+
 **响应示例**
 
 ```json
@@ -69,8 +108,8 @@ POST /api/v1/media/upload
   "code": 0,
   "msg": "success",
   "data": {
-    "filename": "image.png",
-    "url": "/api/v1/media/image.png"
+    "filename": "image_1704067200000.png",
+    "url": "/api/v1/media/image_1704067200000.png"
   }
 }
 ```
@@ -81,6 +120,15 @@ POST /api/v1/media/upload
 
 ```http
 POST /api/v1/media/check-unused
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface CheckUnusedMediaResultDto {
+  /** List of unused media filenames */
+  unusedFiles: string[];
+}
 ```
 
 **响应示例**
@@ -108,6 +156,15 @@ DELETE /api/v1/media/bulk
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | filenames | string[] | 是 | 要删除的文件名列表 |
+
+**TypeScript 类型定义**
+
+```typescript
+interface DeleteMediaBulkDto {
+  /** List of filenames to delete */
+  filenames: string[];
+}
+```
 
 **响应示例**
 

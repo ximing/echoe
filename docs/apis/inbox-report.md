@@ -26,6 +26,37 @@ GET /api/v1/inbox/reports
 | sortBy | string | 否 | 排序字段：`date` \| `createdAt` |
 | order | string | 否 | 排序方向：`asc` \| `desc` |
 
+**TypeScript 类型**
+
+```typescript
+interface InboxReportQueryParams {
+  uid: string;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: 'date' | 'createdAt';
+  order?: 'asc' | 'desc';
+}
+
+interface InboxReportListItemDto {
+  inboxReportId: string;
+  date: string;
+  summary: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface InboxReportListResponse {
+  items: InboxReportListItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+```
+
 **响应示例**
 
 ```json
@@ -64,6 +95,21 @@ GET /api/v1/inbox/reports/:reportId
 |------|------|------|
 | reportId | string | 报告ID |
 
+**TypeScript 类型**
+
+```typescript
+interface InboxReportDto {
+  inboxReportId: string;
+  uid: string;
+  date: string;
+  content: string;
+  summary: string | null;
+  deletedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
 **响应示例**
 
 ```json
@@ -98,6 +144,38 @@ POST /api/v1/inbox/reports/generate
 | timezone | string | 否 | 时区（如 `Asia/Shanghai`） |
 | async | boolean | 否 | 是否异步执行（默认 false） |
 
+**TypeScript 类型**
+
+```typescript
+interface GenerateReportBody {
+  date: string;
+  timezone?: string;
+  async?: boolean;
+}
+
+interface UpsertInboxReportDto {
+  date: string;
+  content: string;
+  summary?: string;
+}
+
+interface InboxReportSummaryDto {
+  totalInbox: number;
+  newInbox: number;
+  processedInbox: number;
+  deletedInbox: number;
+  categoryBreakdown: Array<{
+    category: string;
+    count: number;
+  }>;
+  sourceBreakdown: Array<{
+    source: string;
+    count: number;
+  }>;
+  insights: string[];
+}
+```
+
 **响应示例（同步）**
 
 ```json
@@ -124,6 +202,19 @@ POST /api/v1/inbox/reports/generate
   "data": {
     "inboxReportId": "ir_xxx",
     "date": "2024-01-01"
+  }
+}
+```
+
+**响应示例（异步任务已入队）**
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "jobId": "job_xxx",
+    "status": "queued"
   }
 }
 ```

@@ -32,3 +32,31 @@ GET /api/v1/export/apkg
 Content-Type: application/apkg
 Content-Disposition: attachment; filename="deck_xxx.apkg"
 ```
+
+**TypeScript 类型定义**
+
+```typescript
+interface ExportOptions {
+  /** Deck ID to export, undefined for all decks */
+  deckId?: string;
+  /** Whether to include FSRS scheduling data */
+  includeScheduling: boolean;
+  /** Export format: 'anki' or 'legacy' */
+  format: 'anki' | 'legacy';
+}
+
+interface ExportResult {
+  /** Generated filename */
+  filename: string;
+  /** Buffer containing the .apkg file */
+  buffer: Buffer;
+}
+```
+
+**请求示例**
+
+```bash
+curl -X GET "http://localhost:3200/api/v1/export/apkg?deckId=deck_123&includeScheduling=true&format=anki" \
+  -H "Authorization: Bearer <token>" \
+  -o deck_export.apkg
+```

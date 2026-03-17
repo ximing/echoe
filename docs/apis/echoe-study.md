@@ -42,6 +42,38 @@ GET /api/v1/study/queue
 }
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface StudyQueueParams {
+  deckId?: string;
+  limit?: number;
+  reviewAhead?: number;
+  preview?: boolean;
+}
+
+interface StudyQueueItemDto {
+  cardId: string;
+  noteId: string;
+  deckId: string;
+  cardType: number;
+  queue: number;
+  due: number;
+  interval: number;
+  factor: number;
+  reps: number;
+  lapses: number;
+  left: number;
+  notetypeId: string;
+  front: string;
+  back: string;
+  templateOrd: number;
+  notetypeType: number;
+  clozeOrdinal: number;
+  retrievability: number | null;
+}
+```
+
 ---
 
 ### Submit Review - 提交复习结果
@@ -80,6 +112,28 @@ POST /api/v1/study/review
 }
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface ReviewSubmissionDto {
+  cardId: string;
+  rating: 1 | 2 | 3 | 4;
+  timeTaken: number;
+  reviewId?: string;
+  preview?: boolean;
+}
+
+interface ReviewResultDto {
+  card: EchoeCardWithNoteDto;
+  nextDue: number;
+  nextInterval: number;
+  nextFactor: number;
+  graduated: boolean;
+  isLeech?: boolean;
+  reviewId?: string;
+}
+```
+
 ---
 
 ### Undo - 撤销上次复习
@@ -93,6 +147,15 @@ POST /api/v1/study/undo
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | reviewId | string | 否 | 复习记录ID |
+
+**TypeScript 类型定义**
+
+```typescript
+interface UndoResultDto {
+  success: boolean;
+  message: string;
+}
+```
 
 ---
 
@@ -109,6 +172,15 @@ POST /api/v1/study/bury
 | cardIds | string[] | 是 | 卡片ID数组 |
 | mode | string | 否 | 模式：`card`（埋单张）或 `note`（埋整笔记） |
 
+**TypeScript 类型定义**
+
+```typescript
+interface BuryCardsDto {
+  cardIds: string[];
+  mode?: 'card' | 'note';
+}
+```
+
 ---
 
 ### Forget Cards - 遗忘卡片
@@ -123,6 +195,14 @@ POST /api/v1/study/forget
 |------|------|------|------|
 | cardIds | string[] | 是 | 卡片ID数组 |
 
+**TypeScript 类型定义**
+
+```typescript
+interface ForgetCardsDto {
+  cardIds: string[];
+}
+```
+
 ---
 
 ### Delete Cards - 删除卡片
@@ -136,6 +216,14 @@ POST /api/v1/study/delete
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | cardIds | string[] | 是 | 卡片ID数组 |
+
+**TypeScript 类型定义**
+
+```typescript
+interface DeleteCardsDto {
+  cardIds: string[];
+}
+```
 
 ---
 
@@ -166,6 +254,17 @@ GET /api/v1/study/counts
 }
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface StudyCountsDto {
+  newCount: number;
+  learnCount: number;
+  reviewCount: number;
+  totalCount: number;
+}
+```
+
 ---
 
 ### Get Options - 获取卡片复习选项
@@ -192,5 +291,24 @@ GET /api/v1/study/options
     "good": { "interval": 4, "ease": 1.3 },
     "easy": { "interval": 7, "ease": 1.4 }
   }
+}
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface StudyOptionsDto {
+  cardId: string;
+  options: RatingOptionDto[];
+  retrievability: number | null;
+}
+
+interface RatingOptionDto {
+  rating: 1 | 2 | 3 | 4;
+  label: string;
+  interval: number;
+  due: number;
+  stability: number;
+  difficulty: number;
 }
 ```

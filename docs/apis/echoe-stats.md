@@ -27,13 +27,32 @@ GET /api/v1/stats/today
   "code": 0,
   "msg": "success",
   "data": {
-    "newCount": 10,
-    "learningCount": 5,
-    "reviewCount": 20,
-    "totalReviews": 150,
-    "averageTime": 1200,
-    "retention": 0.92
+    "studied": 10,
+    "timeSpent": 150000,
+    "again": 2,
+    "hard": 3,
+    "good": 4,
+    "easy": 1
   }
+}
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface StudyTodayStatsDto {
+  /** Number of cards studied today */
+  studied: number;
+  /** Total time spent in milliseconds */
+  timeSpent: number;
+  /** Number of Again ratings */
+  again: number;
+  /** Number of Hard ratings */
+  hard: number;
+  /** Number of Good ratings */
+  good: number;
+  /** Number of Easy ratings */
+  easy: number;
 }
 ```
 
@@ -61,12 +80,23 @@ GET /api/v1/stats/history
   "data": [
     {
       "date": "2024-01-01",
-      "newCount": 5,
-      "reviewCount": 30,
-      "totalTime": 1800,
-      "retention": 0.95
+      "count": 30,
+      "timeSpent": 1800000
     }
   ]
+}
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface StudyHistoryDayDto {
+  /** Date string (YYYY-MM-DD) */
+  date: string;
+  /** Number of reviews */
+  count: number;
+  /** Total time spent in milliseconds */
+  timeSpent: number;
 }
 ```
 
@@ -99,6 +129,21 @@ GET /api/v1/stats/maturity
 }
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface CardMaturityDto {
+  /** Number of new cards (stability = 0 or never reviewed) */
+  new: number;
+  /** Number of learning cards (stability < 21 days) */
+  learning: number;
+  /** Number of young cards (stability 21-89 days) */
+  young: number;
+  /** Number of mature cards (stability >= 90 days) */
+  mature: number;
+}
+```
+
 ---
 
 ### Get Forecast - 获取未来待复习预测
@@ -123,13 +168,24 @@ GET /api/v1/stats/forecast
   "data": [
     {
       "date": "2024-01-02",
-      "due": 25
+      "dueCount": 25
     },
     {
       "date": "2024-01-03",
-      "due": 18
+      "dueCount": 18
     }
   ]
+}
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface ForecastDayDto {
+  /** Date string (YYYY-MM-DD) */
+  date: string;
+  /** Number of cards due on this date */
+  dueCount: number;
 }
 ```
 
@@ -153,6 +209,15 @@ GET /api/v1/stats/streak
 }
 ```
 
+**TypeScript 类型定义**
+
+```typescript
+interface StreakResponseDto {
+  /** Consecutive days of study */
+  streak: number;
+}
+```
+
 ---
 
 ### Get Maturity Batch - 批量获取各卡组成熟度
@@ -168,12 +233,34 @@ GET /api/v1/stats/maturity/batch
   "code": 0,
   "msg": "success",
   "data": {
-    "deck_xxx": {
-      "new": 10,
-      "learning": 5,
-      "young": 20,
-      "mature": 100
-    }
+    "decks": [
+      {
+        "deckId": "deck_xxx",
+        "new": 10,
+        "learning": 5,
+        "young": 20,
+        "mature": 100
+      }
+    ]
   }
+}
+```
+
+**TypeScript 类型定义**
+
+```typescript
+interface MaturityBatchResponseDto {
+  decks: Array<{
+    /** Deck ID */
+    deckId: string;
+    /** Number of new cards */
+    new: number;
+    /** Number of learning cards */
+    learning: number;
+    /** Number of young cards */
+    young: number;
+    /** Number of mature cards */
+    mature: number;
+  }>;
 }
 ```

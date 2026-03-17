@@ -14,6 +14,12 @@ API Token 管理
 GET /api/v1/api-tokens
 ```
 
+**请求头**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| Authorization | string | 是 | JWT Token (Bearer) |
+
 **响应示例**
 
 ```json
@@ -34,6 +40,30 @@ GET /api/v1/api-tokens
 }
 ```
 
+**TypeScript 类型**
+
+```typescript
+interface UserInfoDto {
+  uid: string;
+  email?: string;
+  nickname?: string;
+  avatar?: string;
+}
+
+interface ApiTokenListItemDto {
+  tokenId: string;
+  name: string;
+  deletedAt: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ListTokensResponse {
+  tokens: ApiTokenListItemDto[];
+  total: number;
+}
+```
+
 ---
 
 ### Create Token - 创建 Token
@@ -41,6 +71,12 @@ GET /api/v1/api-tokens
 ```http
 POST /api/v1/api-tokens
 ```
+
+**请求头**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| Authorization | string | 是 | JWT Token (Bearer) |
 
 **请求体**
 
@@ -68,6 +104,26 @@ POST /api/v1/api-tokens
 
 **注意**：Token 仅在创建时返回一次，之后无法再次查看，请妥善保存。
 
+**TypeScript 类型**
+
+```typescript
+interface CreateApiTokenDto {
+  name: string;
+}
+
+interface CreateApiTokenResponseDto {
+  tokenId: string;
+  token: string;
+  name: string;
+  createdAt: Date;
+}
+
+interface CreateTokenResponse {
+  message: string;
+  token: CreateApiTokenResponseDto;
+}
+```
+
 ---
 
 ### Delete Token - 删除 Token
@@ -75,6 +131,12 @@ POST /api/v1/api-tokens
 ```http
 DELETE /api/v1/api-tokens/:tokenId
 ```
+
+**请求头**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| Authorization | string | 是 | JWT Token (Bearer) |
 
 **参数**
 
@@ -94,9 +156,27 @@ DELETE /api/v1/api-tokens/:tokenId
 }
 ```
 
+**TypeScript 类型**
+
+```typescript
+interface DeleteTokenResponse {
+  message: string;
+}
+```
+
 ---
 
 ## 认证方式
+
+### 管理接口 (JWT)
+
+以下接口需要使用 JWT Token 认证：
+
+```http
+Authorization: Bearer <jwt_token>
+```
+
+### 调用接口 (API Token)
 
 API Token 可用于以下请求认证：
 
@@ -109,3 +189,5 @@ Authorization: Bearer <token>
 ```http
 X-API-Token: <token>
 ```
+
+**注意**：管理 API Token 的接口（列表、创建、删除）仅支持 JWT 认证，不支持 API Token 认证，以防止 Token 锁定场景。

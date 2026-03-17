@@ -14,6 +14,8 @@
 GET /api/v1/system/open/version
 ```
 
+**认证**: 需要登录
+
 **响应示例**
 
 ```json
@@ -26,6 +28,14 @@ GET /api/v1/system/open/version
 }
 ```
 
+**TypeScript 类型**
+
+```typescript
+interface GetVersionResponse {
+  version: string;
+}
+```
+
 ---
 
 ### Get App Versions - 获取应用版本信息
@@ -33,6 +43,8 @@ GET /api/v1/system/open/version
 ```http
 GET /api/v1/system/open/app-versions
 ```
+
+**认证**: 无需认证（公开接口）
 
 **响应示例**
 
@@ -44,6 +56,16 @@ GET /api/v1/system/open/app-versions
 }
 ```
 
+**TypeScript 类型**
+
+```typescript
+interface GetAppVersionsResponse {
+  // Currently returns empty object
+  // Reserved for future use: mobile app version info
+  [key: string]: any;
+}
+```
+
 ---
 
 ### Get Config - 获取公开系统配置
@@ -51,6 +73,8 @@ GET /api/v1/system/open/app-versions
 ```http
 GET /api/v1/system/open/config
 ```
+
+**认证**: 无需认证（公开接口）
 
 **响应示例**
 
@@ -61,5 +85,14 @@ GET /api/v1/system/open/config
   "data": {
     "allowRegistration": true
   }
+}
+```
+
+**TypeScript 类型**
+
+```typescript
+interface GetConfigResponse {
+  /** Whether user registration is allowed */
+  allowRegistration: boolean;
 }
 ```

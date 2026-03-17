@@ -23,6 +23,16 @@ POST /api/v1/auth/register
 | nickname | string | 否 | 昵称 |
 | phone | string | 否 | 手机号 |
 
+**请求体类型 (TypeScript)**
+```typescript
+interface RegisterDto {
+  email: string;
+  password: string;
+  nickname?: string;
+  phone?: string;
+}
+```
+
 **响应示例**
 
 ```json
@@ -36,6 +46,17 @@ POST /api/v1/auth/register
       "nickname": "Test User"
     }
   }
+}
+```
+
+**响应体类型 (TypeScript)**
+```typescript
+interface RegisterResponseDto {
+  user: {
+    uid: string;
+    email: string;
+    nickname?: string;
+  };
 }
 ```
 
@@ -54,6 +75,14 @@ POST /api/v1/auth/login
 | email | string | 是 | 用户邮箱 |
 | password | string | 是 | 密码 |
 
+**请求体类型 (TypeScript)**
+```typescript
+interface LoginDto {
+  email: string;
+  password: string;
+}
+```
+
 **响应示例**
 
 ```json
@@ -68,6 +97,21 @@ POST /api/v1/auth/login
       "nickname": "Test User"
     }
   }
+}
+```
+
+**响应体类型 (TypeScript)**
+```typescript
+interface UserInfoDto {
+  uid: string;
+  email?: string;
+  nickname?: string;
+  avatar?: string;
+}
+
+interface LoginResponseDto {
+  token: string;
+  user: UserInfoDto;
 }
 ```
 
