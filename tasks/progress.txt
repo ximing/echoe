@@ -1,3 +1,37 @@
 # Ralph Progress Log
 Started: 2026年 3月 17日 星期二 CST
+
+## Codebase Patterns
+- Frontend services extend `Service` from `@rabjs/react` for reactive state management
+- Type-only imports must use `type` keyword when `verbatimModuleSyntax` is enabled
+- Build verification: use `pnpm build:web` from root directory
+- Anki .apkg format: ZIP containing collection.anki21/anki2 (SQLite), media (JSON), and numbered media files
+
+---
+
+## 2026-03-18 - US-001
+- Added JSZip and sql.js dependencies to apps/web
+- Files changed: apps/web/package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - Dependencies are managed via pnpm workspaces at the monorepo root
+  - Typecheck is run via `pnpm typecheck` from the root directory
+  - Both packages installed successfully: jszip ^3.10.1, sql.js ^1.14.1
+---
+## 2026-03-18 - US-002
+- Created apkg-parser.service.ts in apps/web/src/services/
+- Implemented full APKG parsing functionality with JSZip and sql.js
+- Parses Anki database tables: notes, cards, models (note types), decks, and revlog (review history)
+- Extracts media files and media mapping from .apkg ZIP
+- Supports both anki21 and anki2 collection formats
+- Files changed: apps/web/src/services/apkg-parser.service.ts, apps/web/package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - sql.js requires WASM initialization with `initSqlJs()` before use
+  - Database type imports must use `type` keyword: `import { type Database }`
+  - Anki stores models and decks as JSON in the `col` table, not separate tables
+  - Anki note fields are stored as a single string separated by `\x1f` character
+  - Media files in .apkg are numbered (0, 1, 2...) with a JSON mapping to original filenames
+  - sql.js loads WASM from CDN: `https://sql.js.org/dist/`
+  - @types/sql.js package needed for TypeScript support
+  - Anki revlog timestamps are in milliseconds (id field)
+  - Build passes with `pnpm build:web` command
 ---
