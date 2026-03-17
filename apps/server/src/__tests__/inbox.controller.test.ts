@@ -114,6 +114,7 @@ describe('InboxController', () => {
 
       // Call controller
       const result = await controller.getInboxItems(
+        undefined, // source
         undefined, // category
         undefined, // isRead
         1, // page
@@ -127,6 +128,7 @@ describe('InboxController', () => {
       expect(result.data!.items).toHaveLength(2);
       expect(result.data!.total).toBe(2);
       expect(mockInboxService.list).toHaveBeenCalledWith(mockUser.uid, {
+        source: undefined,
         category: undefined,
         isRead: undefined,
         page: 1,
@@ -146,6 +148,7 @@ describe('InboxController', () => {
 
       // Call controller
       const result = await controller.getInboxItems(
+        undefined, // source
         'backend', // category
         false, // isRead (unread)
         1,
@@ -156,6 +159,7 @@ describe('InboxController', () => {
       // Verify
       expect(result.code).toBe(ErrorCode.SUCCESS);
       expect(mockInboxService.list).toHaveBeenCalledWith(mockUser.uid, {
+        source: undefined,
         category: 'backend',
         isRead: false,
         page: 1,
@@ -165,6 +169,7 @@ describe('InboxController', () => {
 
     it('should return unauthorized when user is not authenticated', async () => {
       const result = await controller.getInboxItems(
+        undefined,
         undefined,
         undefined,
         1,
@@ -185,6 +190,7 @@ describe('InboxController', () => {
       });
 
       const result = await controller.getInboxItems(
+        undefined,
         undefined,
         undefined,
         1,

@@ -355,6 +355,111 @@ describe('InboxService', () => {
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
     });
+
+    it('should filter by source', async () => {
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        }),
+        insert: jest.fn(),
+        update: jest.fn(),
+      } as any);
+
+      const params: ListInboxParams = {
+        source: 'web',
+      };
+
+      await service.list('test-uid', params);
+
+      expect(mockedGetDatabase).toHaveBeenCalled();
+    });
+
+    it('should filter by null source', async () => {
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        }),
+        insert: jest.fn(),
+        update: jest.fn(),
+      } as any);
+
+      const params: ListInboxParams = {
+        source: null,
+      };
+
+      await service.list('test-uid', params);
+
+      expect(mockedGetDatabase).toHaveBeenCalled();
+    });
+
+    it('should filter by null category', async () => {
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        }),
+        insert: jest.fn(),
+        update: jest.fn(),
+      } as any);
+
+      const params: ListInboxParams = {
+        category: null,
+      };
+
+      await service.list('test-uid', params);
+
+      expect(mockedGetDatabase).toHaveBeenCalled();
+    });
+
+    it('should filter by both source and category', async () => {
+      mockedGetDatabase.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        }),
+        insert: jest.fn(),
+        update: jest.fn(),
+      } as any);
+
+      const params: ListInboxParams = {
+        source: 'web',
+        category: 'frontend',
+      };
+
+      await service.list('test-uid', params);
+
+      expect(mockedGetDatabase).toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {

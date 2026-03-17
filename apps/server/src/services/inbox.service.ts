@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, isNull } from 'drizzle-orm';
 
 import { getDatabase } from '../db/connection.js';
 import { inbox } from '../db/schema/inbox.js';
@@ -28,7 +28,8 @@ export interface UpdateInboxParams {
 }
 
 export interface ListInboxParams {
-  category?: string;
+  source?: string | null;
+  category?: string | null;
   isRead?: boolean;
   page?: number;
   pageSize?: number;
@@ -111,27 +112,29 @@ export class InboxService {
       const offset = (page - 1) * pageSize;
 
       // Build where conditions based on filters
-      let conditions: any[] = [eq(inbox.uid, uid), eq(inbox.deletedAt, 0)];
+      const conditions: any[] = [eq(inbox.uid, uid), eq(inbox.deletedAt, 0)];
 
-      if (params.category !== undefined && params.isRead !== undefined) {
-        conditions = [
-          eq(inbox.uid, uid),
-          eq(inbox.category, params.category),
-          eq(inbox.isRead, params.isRead),
-          eq(inbox.deletedAt, 0),
-        ];
-      } else if (params.category !== undefined) {
-        conditions = [
-          eq(inbox.uid, uid),
-          eq(inbox.category, params.category),
-          eq(inbox.deletedAt, 0),
-        ];
-      } else if (params.isRead !== undefined) {
-        conditions = [
-          eq(inbox.uid, uid),
-          eq(inbox.isRead, params.isRead),
-          eq(inbox.deletedAt, 0),
-        ];
+      // Filter by source (support null filtering)
+      if (params.source !== undefined) {
+        if (params.source === null) {
+          conditions.push(isNull(inbox.source));
+        } else {
+          conditions.push(eq(inbox.source, params.source));
+        }
+      }
+
+      // Filter by category (support null filtering)
+      if (params.category !== undefined) {
+        if (params.category === null) {
+          conditions.push(isNull(inbox.category));
+        } else {
+          conditions.push(eq(inbox.category, params.category));
+        }
+      }
+
+      // Filter by isRead
+      if (params.isRead !== undefined) {
+        conditions.push(eq(inbox.isRead, params.isRead));
       }
 
       // Get total count

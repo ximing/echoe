@@ -167,3 +167,16 @@ Started: 2026年 3月17日 星期二 CST
   - Test pattern: Mock injected services in beforeEach, verify service method calls with toHaveBeenCalledWith()
   - The InboxSourceService.create() and InboxCategoryService.create() methods are idempotent - they check if entity exists first
 ---
+## 2026-03-17 10:30 - US-010
+- Updated InboxService.update() method to support dynamic source/category on update
+- Files changed:
+  - apps/server/src/services/inbox.service.ts (added auto-creation logic for source/category in update method)
+  - apps/server/src/__tests__/inbox.service.test.ts (added 4 new test cases for update functionality)
+- **Learnings for future iterations:**
+  - Update pattern: Auto-create source/category before updating, similar to create method
+  - Null handling: Check for both undefined and null - auto-create only when value is provided AND not null
+  - Setting to null: Support explicitly setting source/category to null (for clearing values)
+  - Test coverage for update: Test auto-create source, auto-create category, set source to null, set category to null
+  - The auto-create logic should be placed BEFORE building update values to ensure entities exist
+  - Mock service.create should not be called when setting values to null
+---

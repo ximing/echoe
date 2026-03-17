@@ -30,6 +30,7 @@ export class InboxController {
    */
   @Get('/')
   async getInboxItems(
+    @QueryParam('source') source?: string,
     @QueryParam('category') category?: string,
     @QueryParam('isRead') isRead?: boolean,
     @QueryParam('page') page?: number,
@@ -42,6 +43,7 @@ export class InboxController {
       }
 
       const params = {
+        source,
         category,
         isRead,
         page: page || 1,

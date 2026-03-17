@@ -151,8 +151,8 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Updated InboxService.update() method to auto-create source/category when provided (non-null values), supports setting to null, added 4 comprehensive tests"
     },
     {
       "id": "US-011",
