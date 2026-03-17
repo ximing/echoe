@@ -53,8 +53,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Added getMediaMetadata method and GET /api/v1/media/:filename/metadata endpoint that returns metadata with dynamic URL. Preserved existing getMedia file-serving functionality."
     },
     {
       "id": "US-005",

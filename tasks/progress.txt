@@ -55,3 +55,16 @@ Started: 2026年 3月17日 星期二 CST
   - Temporary URLs expire in 6 hours (default behavior of generateAccessUrl)
   - Must include storageKey in database select to generate URLs (it's nullable for backwards compatibility)
 ---
+## 2026-03-17 17:00 - US-004
+- Added getMediaMetadata method and endpoint for returning single media metadata with URL
+- Files changed:
+  - apps/server/src/services/echoe-media.service.ts (added getMediaMetadata method)
+  - apps/server/src/controllers/v1/echoe-media.controller.ts (added GET /:filename/metadata endpoint)
+- **Learnings for future iterations:**
+  - Existing getMedia method serves file buffers (GET /api/v1/media/:filename) - preserved for backwards compatibility
+  - Added new getMediaMetadata method that returns EchoeMediaDto with URL field
+  - New endpoint is GET /api/v1/media/:filename/metadata (note the /metadata suffix to avoid route conflict)
+  - Route ordering matters: more specific routes (/:filename/metadata) must be defined BEFORE generic param routes (/:filename)
+  - Both methods validate user ownership via uid before returning data
+  - Pattern: file-serving endpoints return buffers, metadata endpoints return DTOs with URLs
+---
