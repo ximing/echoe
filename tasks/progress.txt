@@ -35,3 +35,49 @@ Started: 2026年 3月 17日 星期二 CST
   - Anki revlog timestamps are in milliseconds (id field)
   - Build passes with `pnpm build:web` command
 ---
+## 2026-03-18 - US-003
+- Verified import notes API endpoint already fully implemented
+- POST /api/v1/import/apkg endpoint handles .apkg file uploads
+- EchoeImportService.importApkg() processes the entire import pipeline:
+  - Detects package type (standard Anki vs legacy Echoe)
+  - Imports notetypes with templates (qfmt, afmt) and CSS
+  - Imports decks with hierarchy preservation
+  - Imports notes with field normalization and media references
+  - Imports cards with FSRS state
+  - Imports review history (revlog)
+  - Handles media files with deduplication
+- Fixed missing storageKey field in EchoeMediaDto return object
+- Files changed: apps/server/src/services/echoe-media.service.ts
+- **Learnings for future iterations:**
+  - The import service uses better-sqlite3 on the server side (not sql.js)
+  - Import endpoint accepts .apkg buffer directly, not pre-parsed JSON
+  - EchoeImportService is comprehensive - handles both standard Anki and legacy Echoe formats
+  - Media files are deduplicated by SHA1 hash before upload
+  - FSRS state is backfilled from Anki revlog data when available
+  - The service uses reference maps to track old ID -> new ID mappings during import
+  - All DTO interfaces must match exactly - missing fields cause typecheck errors
+---
+## 2026-03-18 - US-004
+- Verified import review history API endpoint is fully implemented
+- Review history import handled by importRevlogFromStandardAnki() and importRevlog() methods
+- Revlog entries converted to Echoe FSRS records with all required fields:
+  - stability, difficulty, lastReview (FSRS algorithm fields)
+  - ivl, lastIvl, factor (Anki ease factor and intervals preserved)
+  - Pre-review snapshot fields for undo functionality
+- Original timestamps preserved via resolveRevlogReviewTimestamp() helper
+- Difficulty conversion: Anki factor (permille) -> FSRS difficulty (factor/1000)
+- Timestamp handling supports multiple Anki revlog ID formats (microseconds, milliseconds, seconds)
+- Revlog import includes deduplication by sourceRevlogId to prevent duplicates
+- Files verified: apps/server/src/services/echoe-import.service.ts, apps/server/src/db/schema/echoe-revlog.ts
+- Tests passing: echoe-import.service.test.ts (8/8 tests pass)
+- Typecheck passes: both server and web builds successful
+- **Learnings for future iterations:**
+  - Revlog import is fully integrated into the main import pipeline - no separate endpoint needed
+  - The import service automatically imports revlog when processing .apkg files
+  - FSRS difficulty is calculated from Anki's ease factor (permille scale) divided by 1000
+  - Review timestamps are extracted from Anki's revlog ID field (timestamp-based IDs)
+  - Revlog records store both current state and pre-review snapshot for undo functionality
+  - The service uses FSRS_DIFFICULTY_FALLBACK (2.5) when factor is missing or zero
+  - Revlog import validates card existence before inserting (prevents orphaned records)
+  - All revlog imports are scoped by uid (user ID) for multi-tenant isolation
+---
