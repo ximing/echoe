@@ -18,6 +18,8 @@ import { EchoeDuplicateController } from './v1/echoe-duplicate.controller.js';
 import { InboxController } from './v1/inbox.controller.js';
 import { InboxReportController } from './v1/inbox-report.controller.js';
 import { InboxToCardController } from './v1/inbox-to-card.controller.js';
+import { InboxSourceController } from './v1/inbox-source.controller.js';
+import { InboxCategoryController } from './v1/inbox-category.controller.js';
 
 // Note: StaticController import should stay last to avoid catching API routes
 export const controllers = [
@@ -39,5 +41,7 @@ export const controllers = [
   InboxController,
   InboxReportController,
   InboxToCardController,
+  InboxSourceController,
+  InboxCategoryController,
   // StaticController,
 ];
