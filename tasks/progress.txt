@@ -3,3 +3,70 @@ Started: 2026年 3月17日 星期二 CST
 ---
 
 ## Codebase Patterns
+- Database schemas: Use int auto-increment for id, varchar(191) for uid/name (MySQL utf8mb4 index limit)
+- Tenant-scoped entities: Always add unique constraint on (uid, name) for multi-tenant name fields
+- Timestamps: Use `timestamp('created_at', { mode: 'date', fsp: 3 })` for millisecond precision
+- Schema exports: Must export from schema/index.ts using .js extension (drizzle-kit reads compiled JS)
+- Migrations: Always build server first (`pnpm --filter @echoe/server build`) before `migrate:generate`
+- DTOs: Create separate DTO file for related entities, export from index.ts with .js extension
+- DTO list responses: Include items array and total count
+- Services: Use @Service() decorator from typedi, ensure uid scoping in all queries
+- Auto-seeding: Check count on first list() call, seed defaults if count = 0
+- Idempotent create: Check if entity exists before inserting, return existing if found
+
+## 2026-03-17 09:50 - US-001
+- Implemented inbox_source and inbox_category database schemas
+- Files changed:
+  - apps/server/src/db/schema/inbox-source.ts (new)
+  - apps/server/src/db/schema/inbox-category.ts (new)
+  - apps/server/src/db/schema/index.ts (added exports)
+- **Learnings for future iterations:**
+  - Schema pattern: Use int auto-increment for id, varchar(191) for uid/name fields (MySQL utf8mb4 index limit)
+  - Always add unique constraint on (uid, name) for tenant-scoped name fields
+  - Timestamp pattern: `timestamp('created_at', { mode: 'date', fsp: 3 })` for millisecond precision
+  - Must export from schema/index.ts using .js extension (drizzle-kit reads compiled JS)
+  - Typecheck must pass before committing
+---
+
+## 2026-03-17 09:55 - US-002
+- Generated database migration for inbox_source and inbox_category tables
+- Files changed:
+  - apps/server/drizzle/0007_sad_micromacro.sql (new)
+- **Learnings for future iterations:**
+  - Always build server first: `pnpm --filter @echoe/server build` before `migrate:generate`
+  - Drizzle-kit reads from dist/ folder (compiled JS), not source TypeScript
+  - Migration SQL should be reviewed to verify proper table structure and indexes
+  - Unique constraints and indexes are correctly generated from schema definitions
+---
+
+## 2026-03-17 10:00 - US-003
+- Created DTOs for inbox source and category
+- Files changed:
+  - packages/dto/src/inbox-source-category.dto.ts (new)
+  - packages/dto/src/index.ts (added export)
+- **Learnings for future iterations:**
+  - DTO pattern: Create separate DTO file for related entities
+  - Always export from index.ts with .js extension (for compiled output)
+  - Build dto package after changes: `pnpm --filter @echoe/dto build`
+  - DTO interfaces should include all fields from database schema plus response wrappers
+  - List response DTOs typically include items array and total count
+---
+
+## 2026-03-17 10:05 - US-004
+- Implemented InboxSourceService and InboxCategoryService with full CRUD operations
+- Files changed:
+  - apps/server/src/services/inbox-source.service.ts (new)
+  - apps/server/src/services/inbox-category.service.ts (new)
+  - apps/server/src/__tests__/inbox-source.service.test.ts (new)
+  - apps/server/src/__tests__/inbox-category.service.test.ts (new)
+- **Learnings for future iterations:**
+  - Service pattern: Use @Service() decorator from typedi for dependency injection
+  - Auto-seeding pattern: Check count on first list() call, seed defaults if count = 0
+  - Idempotent create: Check if entity exists by (uid, name) before inserting
+  - Always ensure uid scoping in all database queries for multi-tenant safety
+  - Use sql<number>\`count(*)\` for count queries in Drizzle
+  - Service tests: Mock getDatabase() and chain methods (select, from, where, limit, orderBy)
+  - Test coverage: Test happy path, edge cases (not found, already exists), and seeding logic
+  - Default sources: manual, web, api, extension, other
+  - Default categories: backend, frontend, design, product, life, other
+---
