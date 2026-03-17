@@ -431,6 +431,200 @@ describe('InboxService', () => {
 
       await expect(service.update('test-uid', 'nonexistent', { front: 'New' })).rejects.toThrow('Inbox item not found');
     });
+
+    it('should auto-create source when updating with new source value', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        back: 'Back',
+        source: 'new-source',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      await service.update('test-uid', 'i123', {
+        source: 'new-source',
+      });
+
+      expect(mockSourceService.create).toHaveBeenCalledWith('test-uid', 'new-source');
+    });
+
+    it('should auto-create category when updating with new category value', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        back: 'Back',
+        source: 'manual',
+        category: 'new-category',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      await service.update('test-uid', 'i123', {
+        category: 'new-category',
+      });
+
+      expect(mockCategoryService.create).toHaveBeenCalledWith('test-uid', 'new-category');
+    });
+
+    it('should support setting source to null', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        back: 'Back',
+        source: null,
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        source: null,
+      });
+
+      expect(result.source).toBeNull();
+      expect(mockSourceService.create).not.toHaveBeenCalled();
+    });
+
+    it('should support setting category to null', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        back: 'Back',
+        source: 'manual',
+        category: null,
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        category: null,
+      });
+
+      expect(result.category).toBeNull();
+      expect(mockCategoryService.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

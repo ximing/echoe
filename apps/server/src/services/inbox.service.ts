@@ -177,6 +177,16 @@ export class InboxService {
         throw new Error('Inbox item not found');
       }
 
+      // Auto-create source if provided and not null
+      if (data.source !== undefined && data.source !== null) {
+        await this.sourceService.create(uid, data.source);
+      }
+
+      // Auto-create category if provided and not null
+      if (data.category !== undefined && data.category !== null) {
+        await this.categoryService.create(uid, data.category);
+      }
+
       // Build update values
       const updateValues: Partial<NewInbox> = {};
       if (data.front !== undefined) updateValues.front = data.front;
