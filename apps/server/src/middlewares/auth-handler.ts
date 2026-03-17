@@ -12,6 +12,7 @@ import { logger } from '../utils/logger.js';
 // Paths that don't require authentication even if they match protected prefixes
 const AUTH_EXCLUDED_PATHS = [
   '/auth',
+  '/assets',
   '/api/v1/auth/login',
   '/api/v1/auth/register',
   '/api/v1/memos/public',
