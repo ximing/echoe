@@ -13,6 +13,11 @@ Started: 2026年 3月17日 星期二 CST
 - Services: Use @Service() decorator from typedi, ensure uid scoping in all queries
 - Auto-seeding: Check count on first list() call, seed defaults if count = 0
 - Idempotent create: Check if entity exists before inserting, return existing if found
+- Controllers: Use @JsonController('/api/v1/resource'), inject services via constructor, must export from controllers/index.ts
+- Controller auth: Use @CurrentUser() decorator, always check if userDto?.uid exists before processing
+- Controller validation: Trim whitespace from user input, validate required fields, return proper error codes
+- Controller responses: Use ResponseUtil.success() and ResponseUtil.error() for consistency
+- Controller tests: Mock services, test happy path + error cases, use ! operator for result.data after null check
 
 ## 2026-03-17 09:50 - US-001
 - Implemented inbox_source and inbox_category database schemas
@@ -70,3 +75,27 @@ Started: 2026年 3月17日 星期二 CST
   - Default sources: manual, web, api, extension, other
   - Default categories: backend, frontend, design, product, life, other
 ---
+## 2026-03-17 10:05 - US-005
+- Implemented InboxSourceController and InboxCategoryController with list and create endpoints
+- Files changed:
+  - apps/server/src/controllers/v1/inbox-source.controller.ts (new)
+  - apps/server/src/controllers/v1/inbox-category.controller.ts (new)
+  - apps/server/src/controllers/index.ts (added exports)
+  - apps/server/src/__tests__/inbox-source.controller.test.ts (new)
+  - apps/server/src/__tests__/inbox-category.controller.test.ts (new)
+- **Learnings for future iterations:**
+  - Controller pattern: Use @JsonController('/api/v1/resource') for base route
+  - Use @Get() and @Post() decorators for HTTP methods
+  - Constructor injection for services: `constructor(private myService: MyService) {}`
+  - Use @CurrentUser() decorator to get authenticated user (returns UserInfoDto | undefined)
+  - Always check if user is authenticated before processing request
+  - Validate required fields (e.g., name not empty) before calling service
+  - Trim whitespace from user input before processing
+  - Return proper error codes: UNAUTHORIZED, PARAMS_ERROR, DB_ERROR
+  - Use ResponseUtil.success() and ResponseUtil.error() for consistent responses
+  - Controllers must be exported from controllers/index.ts to be auto-loaded by IOC container
+  - Test pattern: Mock services, test happy path + error cases (unauthorized, validation, db errors)
+  - Use non-null assertion operator (!) in tests when accessing result.data after checking it's not null
+  - List endpoints return wrapper objects with items array and total count
+---
+
