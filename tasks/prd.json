@@ -1,409 +1,239 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/inbox-api-token-ai-workflow",
-  "description": "收件箱与开放 API Token 功能：支持手动/API 推入、AI 整理、日报生成与卡片化。",
+  "branchName": "ralph/inbox-dynamic-source-category",
+  "description": "收件箱来源与类别动态化 - 将固定枚举改为可动态创建的数据库实体，支持自动创建、获取、删除功能",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add Inbox object types and ID generators",
-      "description": "As a backend developer, I want dedicated object types and centralized ID helpers so API token/inbox/report entities use consistent business IDs.",
+      "title": "Create inbox_source and inbox_category database tables",
+      "description": "As a backend developer, I need database tables to store user-defined source and category values.",
       "acceptanceCriteria": [
-        "Add OBJECT_TYPE entries: API_TOKEN, INBOX, INBOX_REPORT in apps/server/src/models/constant/type.ts",
-        "Add generateApiTokenId(), generateInboxId(), generateInboxReportId() in apps/server/src/utils/id.ts based on generateTypeId",
+        "Create inbox_source table: id(PK), uid, name, created_at, updated_at",
+        "Create inbox_category table: id(PK), uid, name, created_at, updated_at",
+        "Add unique index on (uid, name) for each table",
+        "Export schemas from apps/server/src/db/schema/index.ts",
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Create api_token schema and indexes",
-      "description": "As a backend developer, I want an api_token table so users can create and revoke API credentials safely.",
+      "title": "Generate migration for source and category tables",
+      "description": "As a release engineer, I need migration artifacts so the new tables can be applied safely.",
       "acceptanceCriteria": [
-        "Add apps/server/src/db/schema/api-token.ts with fields token_id, uid, name, token_hash, deleted_at, created_at, updated_at",
-        "Ensure token_id is unique and add indexes for uid and token_hash",
-        "Export api_token schema from apps/server/src/db/schema/index.ts",
+        "Run pnpm --filter @echoe/server build before migration",
+        "Run pnpm --filter @echoe/server migrate:generate",
+        "Migration creates inbox_source and inbox_category tables with proper indexes",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Create inbox schema and indexes",
-      "description": "As a backend developer, I want an inbox table so users can store captured content with read state and source metadata.",
+      "title": "Create source and category DTOs",
+      "description": "As a shared package maintainer, I need DTO contracts for source and category API operations.",
       "acceptanceCriteria": [
-        "Add apps/server/src/db/schema/inbox.ts with business field inbox_id and content fields front/back/source/category/is_read",
-        "Ensure source default manual, category default backend, and soft-delete field deleted_at",
-        "Add indexes for inbox_id(unique), uid, category, is_read",
-        "Export inbox schema from apps/server/src/db/schema/index.ts",
+        "Add source DTOs: SourceDto, CreateSourceDto, SourceListResponse",
+        "Add category DTOs: CategoryDto, CreateCategoryDto, CategoryListResponse",
+        "Export from packages/dto/src/index.ts",
+        "Run pnpm --filter @echoe/dto build",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Create inbox_report schema with summary memory",
-      "description": "As a backend developer, I want inbox reports to store both markdown content and structured summary for later AI retrieval.",
+      "title": "Implement source and category service with seed data",
+      "description": "As a backend developer, I need service logic to manage sources and categories with default seed data.",
       "acceptanceCriteria": [
-        "Add apps/server/src/db/schema/inbox-report.ts with fields inbox_report_id, date, content, summary, deleted_at",
-        "Add unique constraint on uid+date to prevent duplicate daily reports",
-        "Add indexes for inbox_report_id(unique), uid, date",
-        "Export inbox_report schema from apps/server/src/db/schema/index.ts",
+        "Implement InboxSourceService with CRUD operations",
+        "Implement InboxCategoryService with CRUD operations",
+        "Add seedDefaultData method to create default sources (manual, web, api, extension, other) and categories (backend, frontend, design, product, life, other) on first access",
+        "Ensure uid scoping for all operations",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Generate migration for inbox and token tables",
-      "description": "As a release engineer, I want deterministic migration artifacts so new tables and indexes can be applied safely.",
+      "title": "Add source and category endpoints for list and create",
+      "description": "As a frontend developer, I need API endpoints to list and create sources and categories.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/server build before migration generation",
-        "Run pnpm --filter @echoe/server migrate:generate and produce migration SQL for api_token/inbox/inbox_report",
-        "Migration includes uid+date unique constraint for inbox_report and required indexes",
-        "Drizzle meta files are updated consistently",
+        "GET /api/v1/inbox/sources - list all sources for current user",
+        "GET /api/v1/inbox/categories - list all categories for current user",
+        "POST /api/v1/inbox/sources - create new source",
+        "POST /api/v1/inbox/categories - create new category",
+        "Validate name uniqueness per tenant",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Add DTO contracts for token inbox report and card conversion",
-      "description": "As a shared package maintainer, I want typed DTO contracts so backend and frontend use the same API payload shape.",
+      "title": "Add source and category delete endpoints",
+      "description": "As a user, I want to delete unused sources and categories.",
       "acceptanceCriteria": [
-        "Add DTO files for API token, inbox, inbox report, and inbox-to-card in packages/dto/src",
-        "Define enums and response DTOs including AiOrganizeResponse fields optimizedFront optimizedBack reason confidence fallback",
-        "Export all new DTOs from packages/dto/src/index.ts",
+        "DELETE /api/v1/inbox/sources/:id - delete source and clear related inbox records",
+        "DELETE /api/v1/inbox/categories/:id - delete category and clear related inbox records",
+        "When deleted, set inbox.source or inbox.category to null (not delete inbox)",
+        "Ensure uid scoping for all operations",
+        "Tests pass",
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Build DTO package and align consumers",
-      "description": "As a maintainer, I want dto build output refreshed so server and web can compile against new inbox/token contracts.",
+      "title": "Update inbox schema to support dynamic source/category",
+      "description": "As a backend developer, I need the inbox table to accept dynamic source/category values.",
       "acceptanceCriteria": [
-        "Run pnpm --filter @echoe/dto build successfully",
-        "Server and web imports resolve new DTO exports without missing-symbol errors",
+        "Change inbox.source field type to varchar(191) nullable",
+        "Change inbox.category field type to varchar(191) nullable",
+        "Generate migration for field type change",
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Implement API token service core logic",
-      "description": "As a backend developer, I want token create/list/delete logic so users can manage API tokens with secure storage.",
+      "title": "Update inbox DTOs to support dynamic source/category",
+      "description": "As a shared package maintainer, I need DTOs that accept string source/category values.",
       "acceptanceCriteria": [
-        "Implement token creation that returns plaintext token once and stores only SHA256 hash",
-        "Implement list and delete operations scoped by uid with soft-delete semantics",
-        "Use generateApiTokenId for token business ID generation",
-        "Tests pass",
+        "Update CreateInboxDto: source and category become optional string type",
+        "Update UpdateInboxDto: source and category become optional string type",
+        "Update InboxQueryParams: source and category become optional string type",
+        "Build dto package",
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Implement ApiTokenAuth middleware and precedence",
-      "description": "As a backend developer, I want bearer token authentication integrated so API clients can access protected APIs without JWT cookies.",
+      "title": "Update inbox service to auto-create source/category on inbox creation",
+      "description": "As a user, I want the system to automatically create source/category when creating inbox with new values.",
       "acceptanceCriteria": [
-        "Add ApiTokenAuthMiddleware to parse Authorization Bearer token and validate token hash",
-        "Set authenticated user identity on request context after token validation",
-        "Authentication chain enforces precedence Token > JWT when both credentials are present",
-        "Invalid token returns explicit 401 response",
+        "When creating inbox, if source string doesn't exist in inbox_source, create it automatically",
+        "When creating inbox, if category string doesn't exist in inbox_category, create it automatically",
+        "Maintain backward compatibility with existing enum values",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-010",
-      "title": "Expose API token management endpoints",
-      "description": "As an authenticated user, I want to create view and delete my API tokens from dedicated endpoints.",
+      "title": "Update inbox service to support dynamic source/category on update",
+      "description": "As a user, I want to update inbox with new source/category values that get auto-created.",
       "acceptanceCriteria": [
-        "Implement GET /api/v1/api-tokens, POST /api/v1/api-tokens, DELETE /api/v1/api-tokens/:tokenId",
-        "DELETE endpoint uses tokenId business ID (not numeric auto-increment id)",
-        "Token management endpoints require JWT auth and reject token-auth self-management",
-        "Create response returns plaintext token only at creation time",
+        "When updating inbox source/category, auto-create if value doesn't exist",
+        "Support setting source/category to null",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-011",
-      "title": "Implement inbox CRUD and read-state service",
-      "description": "As a backend developer, I want inbox business logic so users can create edit read and soft-delete inbox items.",
+      "title": "Update inbox list endpoint to filter by source/category name",
+      "description": "As a user, I want to filter inbox list by source or category name.",
       "acceptanceCriteria": [
-        "Implement create/list/update/delete with uid scoping and deleted_at filtering",
-        "List supports pagination and filters for category and isRead",
-        "Implement mark-read and read-all with updatedCount response for read-all",
-        "Use generateInboxId for inbox business IDs",
+        "List endpoint supports filtering by source name (string)",
+        "List endpoint supports filtering by category name (string)",
+        "Support filtering where source/category is null",
         "Tests pass",
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-012",
-      "title": "Expose inbox CRUD and read-state endpoints",
-      "description": "As an authenticated user, I want REST endpoints for inbox operations so the web app and API clients can manage captured content.",
+      "title": "Add frontend API clients for source and category",
+      "description": "As a frontend developer, I need typed API functions to consume source/category endpoints.",
       "acceptanceCriteria": [
-        "Implement routes: GET/POST /api/v1/inbox, PUT/DELETE /api/v1/inbox/:inboxId, POST /api/v1/inbox/:inboxId/read, POST /api/v1/inbox/read-all",
-        "Request and query payloads are validated with DTOs",
-        "Not-found and validation failures return consistent 4xx codes",
-        "Tests pass",
+        "Add getInboxSources() API function",
+        "Add getInboxCategories() API function",
+        "Add createInboxSource() API function",
+        "Add createInboxCategory() API function",
+        "Add deleteInboxSource() API function",
+        "Add deleteInboxCategory() API function",
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-013",
-      "title": "Build AI organize context retrieval pipeline",
-      "description": "As a backend developer, I want organized context assembly so AI can rewrite inbox content using relevant short and mid-term memory.",
+      "title": "Add source/category dropdown filters to inbox list page",
+      "description": "As a user, I want to filter inbox list by source or category using dropdown menus.",
       "acceptanceCriteria": [
-        "Context assembly includes L0 current inbox item, L1 related inbox items from last 7 days (top 10), and L2 30-day report summaries",
-        "When context exceeds token budget, trim by similarity then recency then diversity",
-        "Prompt input payload follows PRD task/currentInput/retrievedContext/constraints structure",
-        "Tests pass",
-        "Typecheck passes"
+        "Add source dropdown filter to inbox list page",
+        "Add category dropdown filter to inbox list page",
+        "Dropdown options loaded from API",
+        "Filter state persisted in URL params",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-014",
-      "title": "Implement AI organize execution validation and fallback",
-      "description": "As an end user, I want reliable AI organize results so failures do not block inbox editing and output format remains machine-readable.",
+      "title": "Update inbox create/edit form with source/category dropdown and quick create",
+      "description": "As a user, I want to select source/category from dropdown or enter new value to create on-the-fly.",
       "acceptanceCriteria": [
-        "Call model with organize-specific parameters and timeout policy from PRD",
-        "Validate AI output schema includes optimizedFront optimizedBack reason confidence",
-        "On timeout or parse failure return original front/back with fallback=true",
-        "Record failure reason for observability",
-        "Tests pass",
-        "Typecheck passes"
+        "Source field becomes dropdown with options from API",
+        "Category field becomes dropdown with options from API",
+        "Support typing new value and pressing Enter or clicking add button to create",
+        "Newly created option is automatically selected",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-015",
-      "title": "Implement inbox report CRUD and idempotent generate",
-      "description": "As a backend developer, I want daily report APIs so users can list view and generate one report per day.",
+      "title": "Create source/category management page",
+      "description": "As a user, I want a settings page to view, create, and delete my sources and categories.",
       "acceptanceCriteria": [
-        "Implement GET /api/v1/inbox/reports and GET /api/v1/inbox/reports/:reportId",
-        "Implement POST /api/v1/inbox/reports/generate using user timezone day window",
-        "Duplicate generate request for same uid+date returns 409 with existing report reference",
-        "Tests pass",
-        "Typecheck passes"
+        "Create /settings/inbox-categories page",
+        "Display list of all sources with inbox count",
+        "Display list of all categories with inbox count",
+        "Allow creating new source/category via form",
+        "Allow deleting source/category with confirmation dialog",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
-      "passes": true,
+      "passes": false,
       "notes": ""
-    },
-    {
-      "id": "US-016",
-      "title": "Implement report AI pipeline with 30-day memory and evidence",
-      "description": "As a user, I want report insights grounded in recent history so suggestions are relevant and traceable.",
-      "acceptanceCriteria": [
-        "Report generation uses daily facts plus 30-day summary memory including weekly aggregates",
-        "Persist both markdown report content and summary JSON fields topics mistakes actions",
-        "Key insights in generated report include evidenceIds references",
-        "Repeat suggestions against last 7 days are replaced by alternative suggestions",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 16,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-017",
-      "title": "Implement inbox-to-card manual conversion",
-      "description": "As a user, I want to convert an inbox item into a card using selected deck and note type.",
-      "acceptanceCriteria": [
-        "Implement POST /api/v1/inbox/:inboxId/to-card with deckId and notetypeId path",
-        "Validate selected deck/notetype ownership and required field mapping before creation",
-        "Create note and card entities and return noteId cardId deckId notetypeId",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 17,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-018",
-      "title": "Implement AI-assisted inbox-to-card recommendation",
-      "description": "As a user, I want optional AI deck/notetype recommendation so I can convert inbox content quickly without manual configuration.",
-      "acceptanceCriteria": [
-        "When deckId/notetypeId is absent, choose target deck/notetype based on AI analysis and user preference memory",
-        "If AI recommendation fails, fallback to deterministic default mapping path",
-        "Response includes aiRecommended flag and chosen deck/notetype info",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 18,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-019",
-      "title": "Add async queue jobs for AI-heavy inbox tasks",
-      "description": "As a backend developer, I want queued execution for expensive AI jobs so retries and timeout policies are centrally managed.",
-      "acceptanceCriteria": [
-        "Add queue definitions for generate_report organize_inbox and to_card_ai jobs",
-        "Configure retry and timeout values matching PRD task schedule table",
-        "Expose service hooks to run sync fast path or enqueue async path",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 19,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-020",
-      "title": "Add scheduled jobs for weekly summary and cleanup",
-      "description": "As an operator, I want scheduled maintenance so AI memory stays fresh and deleted data does not accumulate indefinitely.",
-      "acceptanceCriteria": [
-        "Add weekly-summary-aggregation cron at 0 2 * * 0",
-        "Add cleanup-deleted-records cron at 0 3 * * * for records soft-deleted over 30 days",
-        "Scheduled jobs are idempotent and uid-safe",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 20,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-021",
-      "title": "Add metrics and structured logs for inbox AI flows",
-      "description": "As a maintainer, I want observable metrics and logs so token auth AI calls and report generation health can be monitored.",
-      "acceptanceCriteria": [
-        "Emit metrics for success rate and latency aligned with PRD 10.6 indicator names",
-        "Use @echoe/logger for all new logs and avoid console logging",
-        "Track AI fallback count and report generation conflicts as measurable events",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 21,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-022",
-      "title": "Add web API clients for token inbox and report endpoints",
-      "description": "As a frontend developer, I want typed API modules so pages can consume inbox/token/report features consistently.",
-      "acceptanceCriteria": [
-        "Add typed API functions in apps/web/src/api for token, inbox, report, organize, and to-card endpoints",
-        "Use shared DTO contracts from @echoe/dto for request and response typing",
-        "Handle 409 daily-report conflict and 503 AI unavailable responses explicitly in API layer",
-        "Typecheck passes"
-      ],
-      "priority": 22,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-023",
-      "title": "Implement settings API token management UI",
-      "description": "As a user, I want a settings page for token management so I can create view and revoke API tokens safely.",
-      "acceptanceCriteria": [
-        "Implement /settings/api-tokens page with token list, create, and delete actions",
-        "Show plaintext token only once immediately after creation with clear copy affordance",
-        "Register page-level service once and consume in child components via Domain pattern",
-        "Verify in browser using dev-browser skill",
-        "Typecheck passes"
-      ],
-      "priority": 23,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-024",
-      "title": "Implement inbox page UI with AI actions",
-      "description": "As a user, I want an inbox page where I can manage captures and trigger AI organize or card conversion actions.",
-      "acceptanceCriteria": [
-        "Implement /inbox page with list add edit delete mark-read read-all",
-        "Support filters for category/isRead and paginated list loading",
-        "Expose organize and to-card actions with success and error feedback",
-        "Verify in browser using dev-browser skill",
-        "Typecheck passes"
-      ],
-      "priority": 24,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-025",
-      "title": "Implement inbox reports UI",
-      "description": "As a user, I want report pages to generate browse and inspect daily inbox reports.",
-      "acceptanceCriteria": [
-        "Implement /inbox/reports list and detail page rendering markdown report content",
-        "Implement generate button flow with explicit handling of 409 already-generated response",
-        "Display report summary fields topics mistakes actions in detail view",
-        "Verify in browser using dev-browser skill",
-        "Typecheck passes"
-      ],
-      "priority": 25,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-026",
-      "title": "Add backend tests for token inbox and AI reliability",
-      "description": "As a backend developer, I want test coverage on critical flows so auth behavior and AI fallback logic remain stable.",
-      "acceptanceCriteria": [
-        "Add or update tests covering token precedence over JWT, inbox CRUD filters, organize fallback, and report generate idempotency",
-        "Keep tests scoped by uid to prevent cross-tenant behavior regressions",
-        "Tests pass",
-        "Typecheck passes"
-      ],
-      "priority": 26,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-027",
-      "title": "Add frontend tests and run full quality gates",
-      "description": "As a release engineer, I want frontend validation and global quality checks so inbox and token features are safe to ship.",
-      "acceptanceCriteria": [
-        "Add or update frontend tests for token page workflows, inbox actions, and report generation interactions",
-        "Run project quality checks for changed packages with no new failures",
-        "Tests pass",
-        "Verify in browser using dev-browser skill",
-        "Typecheck passes"
-      ],
-      "priority": 27,
-      "passes": true,
-      "notes": "Fixed test failures and lint errors. All 412 backend tests passing. Typecheck passes for both server and web."
     }
   ]
 }
