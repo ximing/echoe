@@ -25,8 +25,11 @@ export interface InboxListResponse {
 export const getInboxItems = (params?: {
   page?: number;
   limit?: number;
+  source?: string;
   category?: string;
-  isRead?: number;
+  isRead?: boolean;
+  sortBy?: 'createdAt' | 'updatedAt';
+  order?: 'asc' | 'desc';
 }) => {
   return request.get<unknown, ApiResponseDto<InboxListResponse>>('/api/v1/inbox', { params });
 };

@@ -49,7 +49,18 @@ export class InboxService extends Service {
         sortBy: params?.sortBy ?? 'createdAt',
         order: params?.order ?? 'desc',
       });
-      this.list = response.data;
+      const data = response.data;
+      if (!data) {
+        throw new Error(response.msg || 'Failed to load inbox items');
+      }
+
+      this.list = {
+        items: data.items,
+        total: data.total,
+        page: data.page,
+        limit: data.pageSize,
+        totalPages: data.totalPages,
+      };
     } catch (err) {
       this.error = err instanceof Error ? err.message : 'Failed to load inbox items';
       toast.error(this.error);
@@ -65,8 +76,9 @@ export class InboxService extends Service {
         inboxSourceCategoryApi.getInboxSources(),
         inboxSourceCategoryApi.getInboxCategories(),
       ]);
-      this.sources = sourcesResponse.data.sources;
-      this.categories = categoriesResponse.data.categories;
+      this.sources = sourcesResponse.data?.sources ?? [];
+      this.categories = categoriesResponse.data?.categories ?? [];
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sources and categories';
       toast.error(message);
@@ -114,7 +126,7 @@ export class InboxService extends Service {
 
   async markAsRead(inboxId: string) {
     try {
-      await inboxApi.markInboxAsRead(inboxId);
+      await inboxApi.markInboxItemRead(inboxId);
       toast.success('已标记为已读');
       await this.loadInboxItems();
     } catch (err) {
@@ -126,8 +138,11 @@ export class InboxService extends Service {
 
   async markAllAsRead() {
     try {
-      const response = await inboxApi.markAllInboxAsRead();
-      toast.success(`已将 ${response.data.updatedCount} 个项目标记为已读`);
+      const response = await inboxApi.markAllInboxItemsRead();
+      const updatedCount = response.data?.updatedCount;
+      toast.success(
+        typeof updatedCount === 'number' ? `已将 ${updatedCount} 个项目标记为已读` : '已全部标记为已读'
+      );
       await this.loadInboxItems();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to mark all as read';
@@ -139,13 +154,18 @@ export class InboxService extends Service {
   async organizeInboxItem(inboxId: string, async = false) {
     try {
       const response = await inboxApi.organizeInboxItem(inboxId, async);
-      if (response.data.fallback) {
+      const data = response.data;
+      if (!data) {
+        throw new Error(response.msg || 'Failed to organize inbox item');
+      }
+
+      if (data.fallback) {
         toast.warning('AI 整理服务暂时不可用，已保留原始内容');
       } else {
         toast.success('AI 整理完成');
       }
       await this.loadInboxItems();
-      return response.data;
+      return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to organize inbox item';
       toast.error(message);
@@ -155,14 +175,19 @@ export class InboxService extends Service {
 
   async convertToCard(inboxId: string, deckId?: string, notetypeId?: string) {
     try {
-      const response = await inboxApi.convertInboxToCard(inboxId, deckId, notetypeId);
-      if (response.data.aiRecommended) {
+      const response = await inboxApi.convertInboxToCard(inboxId, { deckId, notetypeId });
+      const data = response.data;
+      if (!data) {
+        throw new Error(response.msg || 'Failed to convert to card');
+      }
+
+      if (data.aiRecommended) {
         toast.success('已使用 AI 推荐转换为卡片');
       } else {
         toast.success('已转换为卡片');
       }
       await this.loadInboxItems();
-      return response.data;
+      return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to convert to card';
       toast.error(message);
