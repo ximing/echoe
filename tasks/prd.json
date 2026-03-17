@@ -166,8 +166,8 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed: Updated InboxService.list() and InboxController to support source/category filtering with null support, added 4 new tests"
     },
     {
       "id": "US-012",

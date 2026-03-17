@@ -180,3 +180,19 @@ Started: 2026年 3月17日 星期二 CST
   - The auto-create logic should be placed BEFORE building update values to ensure entities exist
   - Mock service.create should not be called when setting values to null
 ---
+## 2026-03-17 10:35 - US-011
+- Updated inbox list endpoint to support filtering by source/category name
+- Files changed:
+  - apps/server/src/services/inbox.service.ts (added source field to ListInboxParams, updated filtering logic with isNull support)
+  - apps/server/src/controllers/v1/inbox.controller.ts (added source query parameter)
+  - apps/server/src/__tests__/inbox.service.test.ts (added 4 new filtering tests)
+  - apps/server/src/__tests__/inbox.controller.test.ts (updated test calls to match new signature)
+- **Learnings for future iterations:**
+  - Query parameter filtering: Add field to interface, import isNull from drizzle-orm for null filtering
+  - Null filtering pattern: Check `if (param === null)` then use `isNull(column)`, else use `eq(column, param)`
+  - When adding query params to controller, all existing tests must be updated to match new signature
+  - Controller test pattern: Add undefined for new optional params in existing test calls
+  - Filtering logic: Use array of conditions with push() for cleaner code vs nested if/else
+  - isNull() from drizzle-orm is used to filter for NULL database values
+---
+
