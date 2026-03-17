@@ -196,3 +196,35 @@ Started: 2026年 3月17日 星期二 CST
   - isNull() from drizzle-orm is used to filter for NULL database values
 ---
 
+## 2026-03-17 - US-012
+- Implemented frontend API clients for inbox sources and categories
+- Files changed:
+  - apps/web/src/api/inbox-source-category.ts (new)
+- **Learnings for future iterations:**
+  - Frontend API client pattern: Create separate file for related endpoints
+  - Import DTOs from @echoe/dto package for type safety
+  - Use request.get/post/delete with proper type parameters: `request.get<RequestType, ResponseType>(url)`
+  - API response wrapper: All endpoints return `ApiResponseDto<T>` structure
+  - Delete endpoints accept numeric IDs and return success message
+  - Follow existing naming conventions: getX(), createX(), deleteX()
+  - Always run typecheck after creating new API clients
+---
+
+## 2026-03-17 - US-013
+- Implemented source and category dropdown filters on inbox list page with dynamic options
+- Files changed:
+  - apps/web/src/pages/inbox/inbox-page.tsx (added source dropdown, URL param support, dynamic options)
+  - apps/web/src/services/inbox.service.ts (added source filter support, loadSourcesAndCategories method)
+- **Learnings for future iterations:**
+  - URL param persistence: Use useSearchParams from react-router to sync filters with URL
+  - Initialize filters from URL on component mount to restore state on page load/refresh
+  - Create updateFilters helper to update both URL params and service state in sync
+  - Use URLSearchParams.set() to add params, .delete() to remove params when value is undefined
+  - Load dropdown options from API on mount using Promise.all for parallel requests
+  - Dynamic dropdowns: Map over service.sources/categories arrays loaded from API
+  - Disable dropdowns while options are loading with isLoadingOptions flag
+  - Replace hardcoded enum options with dynamic data from backend
+  - Filter updates should call custom updateFilters() instead of service.setFilters() directly when URL sync is needed
+  - Backend pre-existing issues (like __dirname in ESM) are not related to frontend feature implementation
+---
+
