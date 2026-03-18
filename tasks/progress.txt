@@ -1,135 +1,24 @@
 # Ralph Progress Log
-Started: 2026年 3月 17日 星期二 CST
+Started: Wed Mar 18 00:00:00 CST 2026
+---
 
 ## Codebase Patterns
-- Frontend services extend `Service` from `@rabjs/react` for reactive state management
-- Type-only imports must use `type` keyword when `verbatimModuleSyntax` is enabled
-- Build verification: use `pnpm build:web` from root directory
-- Anki .apkg format: ZIP containing collection.anki21/anki2 (SQLite), media (JSON), and numbered media files
+- Use `serializeToHtml()` from `prosemirror-serializer.ts` to convert TipTap JSON to HTML server-side
+- When adding optional JSON fields to DTOs, use `Record<string, unknown>` type and cast to `ProseMirrorJsonDoc` with `as unknown as ProseMirrorJsonDoc`
+- Frontend RichTextEditor component already exists and handles TipTap JSON format with onChange callback
+- Service layer should prioritize JSON over plain text when both are provided
 
+## 2026-03-18 08:58 - US-001
+- Implemented server-side support for plain text to rich text conversion
+- Files changed:
+  - `packages/dto/src/inbox.dto.ts`: Added optional `frontJson` and `backJson` fields to CreateInboxDto and UpdateInboxDto
+  - `apps/server/src/services/inbox.service.ts`: Added `convertPlainTextToTipTapJson()` method, updated create/update methods to handle JSON conversion using `serializeToHtml()`
+  - `apps/server/src/__tests__/inbox.service.test.ts`: Added comprehensive unit tests for JSON conversion logic (8 new tests)
+- **Learnings for future iterations:**
+  - The codebase already has a robust ProseMirror serialization system in `prosemirror-serializer.ts` with jsdom polyfill for Node.js
+  - TipTap JSON format: `{ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'content' }] }] }`
+  - JSON fields take precedence over plain text fields when both are provided
+  - Type casting requires double cast: `Record<string, unknown>` → `unknown` → `ProseMirrorJsonDoc` to satisfy TypeScript
+  - All 35 tests pass, including 8 new tests for JSON conversion
 ---
 
-## 2026-03-18 - US-001
-- Added JSZip and sql.js dependencies to apps/web
-- Files changed: apps/web/package.json, pnpm-lock.yaml
-- **Learnings for future iterations:**
-  - Dependencies are managed via pnpm workspaces at the monorepo root
-  - Typecheck is run via `pnpm typecheck` from the root directory
-  - Both packages installed successfully: jszip ^3.10.1, sql.js ^1.14.1
----
-## 2026-03-18 - US-002
-- Created apkg-parser.service.ts in apps/web/src/services/
-- Implemented full APKG parsing functionality with JSZip and sql.js
-- Parses Anki database tables: notes, cards, models (note types), decks, and revlog (review history)
-- Extracts media files and media mapping from .apkg ZIP
-- Supports both anki21 and anki2 collection formats
-- Files changed: apps/web/src/services/apkg-parser.service.ts, apps/web/package.json, pnpm-lock.yaml
-- **Learnings for future iterations:**
-  - sql.js requires WASM initialization with `initSqlJs()` before use
-  - Database type imports must use `type` keyword: `import { type Database }`
-  - Anki stores models and decks as JSON in the `col` table, not separate tables
-  - Anki note fields are stored as a single string separated by `\x1f` character
-  - Media files in .apkg are numbered (0, 1, 2...) with a JSON mapping to original filenames
-  - sql.js loads WASM from CDN: `https://sql.js.org/dist/`
-  - @types/sql.js package needed for TypeScript support
-  - Anki revlog timestamps are in milliseconds (id field)
-  - Build passes with `pnpm build:web` command
----
-## 2026-03-18 - US-003
-- Verified import notes API endpoint already fully implemented
-- POST /api/v1/import/apkg endpoint handles .apkg file uploads
-- EchoeImportService.importApkg() processes the entire import pipeline:
-  - Detects package type (standard Anki vs legacy Echoe)
-  - Imports notetypes with templates (qfmt, afmt) and CSS
-  - Imports decks with hierarchy preservation
-  - Imports notes with field normalization and media references
-  - Imports cards with FSRS state
-  - Imports review history (revlog)
-  - Handles media files with deduplication
-- Fixed missing storageKey field in EchoeMediaDto return object
-- Files changed: apps/server/src/services/echoe-media.service.ts
-- **Learnings for future iterations:**
-  - The import service uses better-sqlite3 on the server side (not sql.js)
-  - Import endpoint accepts .apkg buffer directly, not pre-parsed JSON
-  - EchoeImportService is comprehensive - handles both standard Anki and legacy Echoe formats
-  - Media files are deduplicated by SHA1 hash before upload
-  - FSRS state is backfilled from Anki revlog data when available
-  - The service uses reference maps to track old ID -> new ID mappings during import
-  - All DTO interfaces must match exactly - missing fields cause typecheck errors
----
-## 2026-03-18 - US-004
-- Verified import review history API endpoint is fully implemented
-- Review history import handled by importRevlogFromStandardAnki() and importRevlog() methods
-- Revlog entries converted to Echoe FSRS records with all required fields:
-  - stability, difficulty, lastReview (FSRS algorithm fields)
-  - ivl, lastIvl, factor (Anki ease factor and intervals preserved)
-  - Pre-review snapshot fields for undo functionality
-- Original timestamps preserved via resolveRevlogReviewTimestamp() helper
-- Difficulty conversion: Anki factor (permille) -> FSRS difficulty (factor/1000)
-- Timestamp handling supports multiple Anki revlog ID formats (microseconds, milliseconds, seconds)
-- Revlog import includes deduplication by sourceRevlogId to prevent duplicates
-- Files verified: apps/server/src/services/echoe-import.service.ts, apps/server/src/db/schema/echoe-revlog.ts
-- Tests passing: echoe-import.service.test.ts (8/8 tests pass)
-- Typecheck passes: both server and web builds successful
-- **Learnings for future iterations:**
-  - Revlog import is fully integrated into the main import pipeline - no separate endpoint needed
-  - The import service automatically imports revlog when processing .apkg files
-  - FSRS difficulty is calculated from Anki's ease factor (permille scale) divided by 1000
-  - Review timestamps are extracted from Anki's revlog ID field (timestamp-based IDs)
-  - Revlog records store both current state and pre-review snapshot for undo functionality
-  - The service uses FSRS_DIFFICULTY_FALLBACK (2.5) when factor is missing or zero
-  - Revlog import validates card existence before inserting (prevents orphaned records)
-  - All revlog imports are scoped by uid (user ID) for multi-tenant isolation
----
-## 2026-03-18 - US-005
-- Implemented media file import with URL replacement in note content
-- Refactored import flow to upload media files BEFORE importing notes
-- Built mapping from original filenames to stored filenames (timestamp-hash format)
-- Updated replaceMediaReferences() to handle both [sound:...] and <img src="..."> patterns
-- Media references in notes now use stored filenames instead of original filenames
-- Files changed: apps/server/src/services/echoe-import.service.ts
-- **Learnings for future iterations:**
-  - Media must be uploaded BEFORE notes are imported to get the filename mapping
-  - EchoeMediaService.uploadMedia() returns { filename: storedFilename, url }
-  - Stored filenames use format: timestamp-hash.extension (e.g., 1234567890-abc123de.mp3)
-  - Anki media references come in two formats: numeric (123) and original filenames
-  - The import flow: numeric filename → original filename (via manifest) → stored filename (via upload)
-  - replaceMediaReferences() must handle both [sound:...] and <img src="..."> patterns
-  - Both standard Anki and legacy Echoe formats share the same media import logic
-  - The filenameMap is passed through the import pipeline: importMedia → importNotes → importNotesRows → replaceMediaReferences
----
-## 2026-03-18 - US-006
-- Added drag-and-drop support to existing APKG import UI
-- Enhanced file upload area with drag events (dragEnter, dragLeave, dragOver, drop)
-- Added visual feedback when dragging files over the upload area
-- Improved user experience with "Drop APKG file here" message during drag
-- Files changed: apps/web/src/pages/cards/apkg-import.tsx
-- **Learnings for future iterations:**
-  - The APKG import page was already implemented at apps/web/src/pages/cards/apkg-import.tsx
-  - The page already had file validation, import progress, and statistics display
-  - Only drag-and-drop handlers were missing from the original implementation
-  - React drag events need preventDefault() and stopPropagation() to work correctly
-  - Drag state (isDragging) provides visual feedback during file drag operations
-  - The page is routed at /cards/import/apkg in App.tsx
-  - Build verification passes with `pnpm build:web` from root directory
----
-## 2026-03-18 - US-007
-- Added comprehensive error handling for APKG import process
-- Implemented .apkg file format validation (ZIP structure and collection database presence)
-- Added SQLite database integrity checks to detect corrupted databases
-- Enhanced media import with graceful handling of missing/corrupted files
-- Improved error messages with user-friendly suggestions and categories
-- Updated frontend to display detailed error breakdown with collapsible error list
-- Refactored to use shared ImportResultDto and ImportErrorDetailDto types from @echoe/dto
-- Fixed TypeScript type issues with better-sqlite3 Database type
-- Files changed: apps/server/src/services/echoe-import.service.ts, apps/web/src/pages/cards/apkg-import.tsx, tasks/prd.json
-- **Learnings for future iterations:**
-  - Import error handling uses graceful degradation (partial imports) rather than full rollback
-  - This design is intentional: users prefer seeing 99/100 notes imported vs 0/100 on single error
-  - SQLite integrity checks use `pragma('integrity_check')` to validate database health
-  - Media import errors are tracked separately and don't fail the entire import
-  - better-sqlite3 Database type must be imported as `type Database as DatabaseType` to avoid namespace conflicts
-  - Frontend error display uses collapsible details element for long error lists
-  - Error categorization (general, media, notetype, etc.) helps users understand what failed
-  - User-friendly error messages should suggest actionable fixes (e.g., "re-export from Anki")
----

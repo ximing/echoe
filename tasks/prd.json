@@ -1,16 +1,19 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/anki-apkg-import",
-  "description": "Anki .apkg 文件导入功能 - 支持直接导入 Anki 的 .apkg 文件，解析 ZIP 和 SQLite 数据库，保持模板样式和媒体文件",
+  "branchName": "ralph/inbox-rich-text",
+  "description": "Inbox 富文本升级：将 Inbox 正面/背面内容从纯文本升级为 TipTap 富文本存储，支持从剪贴板粘贴富文本。",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add JSZip and sql.js dependencies",
-      "description": "As a developer, I need to add JSZip and sql.js libraries to the web app for parsing .apkg files in the browser.",
+      "title": "服务端支持纯文本转富文本存储",
+      "description": "作为开发者，我需要在服务端接收纯文本输入并转换为 TipTap JSON 格式存储。",
       "acceptanceCriteria": [
-        "Add jszip package to apps/web",
-        "Add sql.js package to apps/web",
-        "Typecheck passes"
+        "在 DTO 中添加 frontJson 和 backJson 字段（可选字段，用于前端传递 TipTap JSON）",
+        "在 InboxService 中添加 convertPlainTextToTipTapJson() 转换方法",
+        "当收到纯文本时，自动转换为 TipTap JSON: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '原始内容' }] }] }",
+        "当收到 JSON 时，直接存储 JSON",
+        "Typecheck passes",
+        "单元测试覆盖转换逻辑"
       ],
       "priority": 1,
       "passes": true,
@@ -18,101 +21,65 @@
     },
     {
       "id": "US-002",
-      "title": "Create APKG parser service",
-      "description": "As a developer, I need to create a parser service that can extract and parse .apkg files in the browser.",
+      "title": "Inbox 创建对话框使用富文本编辑器",
+      "description": "作为用户，我想在创建 Inbox 项目时使用富文本编辑器来编辑正面和背面内容。",
       "acceptanceCriteria": [
-        "Create apkg-parser.service.ts in apps/web/src/services/",
-        "Use JSZip to unzip .apkg file",
-        "Detect and extract collection.anki21 or collection.anki2 SQLite database",
-        "Use sql.js to open and query SQLite database",
-        "Parse media JSON mapping file",
-        "Support both anki21 and anki2 formats",
-        "Typecheck passes"
+        "将 CreateInboxDialog 中的 textarea 替换为 RichTextEditor",
+        "RichTextEditor 接收 content prop 时支持 JSON 格式",
+        "onChange 回调同时返回 HTML 和 JSON",
+        "支持从剪贴板粘贴富文本（Word、网页内容）",
+        "提交时传递 JSON 格式内容到 API",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Add import notes API endpoint",
-      "description": "As a user, I want to import Anki notes and cards into Echoe via API.",
+      "title": "Inbox 编辑对话框使用富文本编辑器",
+      "description": "作为用户，我想在编辑 Inbox 项目时使用富文本编辑器来修改正面和背面内容。",
       "acceptanceCriteria": [
-        "Create POST /api/v1/import/anki endpoint",
-        "Accept parsed Anki data (notes, cards, models, decks) in request body",
-        "Convert Anki notes to Echoe notes format",
-        "Parse Anki templates (qfmt, afmt) and store HTML content",
-        "Parse CSS from models and apply to notes",
-        "Create notes in database as new records",
-        "Create corresponding deck/folder structure from Anki decks",
-        "Typecheck passes"
+        "将 EditInboxDialog 中的 textarea 替换为 RichTextEditor",
+        "加载现有内容时，正确解析纯文本和 JSON 两种格式",
+        "纯文本内容自动转换为 TipTap JSON 再传给编辑器",
+        "支持从剪贴板粘贴富文本（Word、网页内容）",
+        "提交时传递 JSON 格式内容到 API",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Add import review history API endpoint",
-      "description": "As a user, I want to import my Anki review history so I can continue learning with existing progress.",
+      "title": "Inbox 列表展示富文本内容",
+      "description": "作为用户，我想在 Inbox 列表中预览富文本内容的纯文本摘要。",
       "acceptanceCriteria": [
-        "Add revlog parsing to import endpoint",
-        "Convert revlog entries to Echoe FSRS review records",
-        "Import review history with original timestamps",
-        "Preserve interval and ease factor data",
+        "在 Inbox 列表渲染时，使用 RichTextRenderer 渲染内容",
+        "对于纯文本历史数据，RichTextRenderer 能正确处理（当作纯文本渲染）",
+        "列表中只显示摘要（前 100 字符），使用 RichTextRenderer 的内容截断",
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Add media file import support",
-      "description": "As a user, I want to import images and audio files from Anki cards.",
+      "title": "卡片转换保留富文本内容",
+      "description": "作为用户，我想将 Inbox 项目转换为卡片时保留富文本格式。",
       "acceptanceCriteria": [
-        "Extract media files from unzipped apkg",
-        "Parse media JSON mapping (数字文件名 -> 原始文件名)",
-        "Upload media files to Echoe storage via existing API",
-        "Update note content to use new media URLs",
-        "Support common media types: images (jpg, png, gif, svg), audio (mp3, wav, ogg), video (mp4, webm)",
-        "Typecheck passes"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-006",
-      "title": "Create Anki import UI",
-      "description": "As a user, I want a user interface to upload and import Anki .apkg files.",
-      "acceptanceCriteria": [
-        "Create ImportPage in apps/web/src/pages/",
-        "Add file upload component with drag-and-drop support",
-        "Add .apkg file type validation",
-        "Show import progress (parsing, uploading, completed)",
-        "Display import statistics (notes count, cards count, media count)",
+        "ConvertToCardDialog 中展示富文本预览",
+        "转换时正确传递 TipTap JSON 格式内容",
+        "创建的卡片内容为富文本格式",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 6,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-007",
-      "title": "Add import error handling",
-      "description": "As a user, I want to see clear error messages when import fails.",
-      "acceptanceCriteria": [
-        "Validate .apkg file format before processing",
-        "Handle corrupted SQLite database gracefully",
-        "Handle missing media files gracefully",
-        "Show specific error messages with suggested fixes",
-        "Rollback partial imports on failure",
-        "Typecheck passes"
-      ],
-      "priority": 7,
-      "passes": true,
+      "priority": 5,
+      "passes": false,
       "notes": ""
     }
   ]
