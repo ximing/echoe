@@ -14,8 +14,8 @@ import type { Inbox, NewInbox } from '../db/schema/inbox.js';
 import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
 
 export interface CreateInboxParams {
-  front: string;
-  back: string;
+  front?: string;
+  back?: string;
   frontJson?: Record<string, unknown>;
   backJson?: Record<string, unknown>;
   source?: string;
@@ -111,6 +111,11 @@ export class InboxService {
     try {
       const db = getDatabase();
 
+      // Validate: at least frontJson or front must be provided
+      if (!data.frontJson && !data.front) {
+        throw new Error('frontJson or front must be provided');
+      }
+
       const inboxId = generateInboxId();
 
       // Auto-create source if provided and doesn't exist
@@ -128,18 +133,20 @@ export class InboxService {
       // Process front content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
       // If only plain text provided, convert to TipTap JSON
-      let frontContent: ProseMirrorJsonDoc | string = data.front;
+      // Note: validation ensures either frontJson or front is provided
+      let frontContent: ProseMirrorJsonDoc | string;
       if (data.frontJson) {
         frontContent = data.frontJson as unknown as ProseMirrorJsonDoc;
-      } else if (data.front) {
-        // Convert plain text to TipTap JSON
-        frontContent = this.convertPlainTextToTipTapJson(data.front);
+      } else {
+        // front is guaranteed to exist due to earlier validation
+        frontContent = this.convertPlainTextToTipTapJson(data.front!);
       }
 
       // Process back content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
       // If only plain text provided, convert to TipTap JSON
-      let backContent: ProseMirrorJsonDoc | string | undefined = data.back;
+      // Note: back is optional, so we need to handle undefined case
+      let backContent: ProseMirrorJsonDoc | string | undefined;
       if (data.backJson) {
         backContent = data.backJson as unknown as ProseMirrorJsonDoc;
       } else if (data.back) {
