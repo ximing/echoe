@@ -4,8 +4,9 @@ import { ToastService } from '../../services/toast.service';
 import { EchoeCsvImportService } from '../../services/echoe-csv-import.service';
 import { EchoeNoteService } from '../../services/echoe-note.service';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
+import { ApkgParserService } from '../../services/apkg-parser.service';
 import * as echoeApi from '../../api/echoe';
-import type { ImportResultDto } from '@echoe/dto';
+import type { ImportResultDto, CreateEchoeNoteDto } from '@echoe/dto';
 import {
   Upload,
   FileText,
@@ -27,6 +28,7 @@ const CsvImportPageContent = view(() => {
   const csvImportService = useService(EchoeCsvImportService);
   const noteTypeService = useService(EchoeNoteService);
   const deckService = useService(EchoeDeckService);
+  const apkgParserService = useService(ApkgParserService);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -142,7 +144,7 @@ const CsvImportPageContent = view(() => {
     }
   };
 
-  // Handle APKG import
+  // Handle APKG import - use frontend parser (ApkgParserService)
   const handleApkgImport = async () => {
     if (!apkgFile) {
       toastService.error('请先选择一个文件');
@@ -151,19 +153,130 @@ const CsvImportPageContent = view(() => {
 
     setIsApkgImporting(true);
     try {
-      const response = await echoeApi.importApkg(apkgFile);
-      setApkgResult(response.data);
+      // Parse APKG file using frontend ApkgParserService
+      const parseSuccess = await apkgParserService.parseApkgFile(apkgFile);
+      if (!parseSuccess) {
+        const errorMessage = apkgParserService.error || '解析 APKG 文件失败';
+        toastService.error(errorMessage);
+        setApkgResult({
+          notesAdded: 0,
+          notesUpdated: 0,
+          notesSkipped: 0,
+          cardsAdded: 0,
+          cardsUpdated: 0,
+          decksAdded: 0,
+          notetypesAdded: 0,
+          revlogImported: 0,
+          mediaImported: 0,
+          errors: [errorMessage],
+          errorDetails: [{ category: 'general', message: errorMessage }],
+        });
+        setIsApkgImporting(false);
+        return;
+      }
 
-      if (response.data.errors.length === 0) {
-        toastService.success('导入成功');
-      } else if (response.data.notesAdded > 0 || response.data.cardsAdded > 0) {
-        toastService.warning(`导入完成但有 ${response.data.errors.length} 个警告`);
+      // Get parsed data
+      const { notes, models } = apkgParserService;
+
+      // Get note types and decks from service
+      const noteTypes = noteTypeService.noteTypes || [];
+      const echoeDecks = deckService.decks || [];
+
+      // Create or find a basic note type for import
+      let notetypeId: string;
+      if (noteTypes.length > 0) {
+        notetypeId = noteTypes[0].id;
       } else {
-        toastService.error('导入失败');
+        // Need at least one note type
+        toastService.error('请先创建一个笔记类型');
+        setIsApkgImporting(false);
+        return;
+      }
+
+      // Find or create deck
+      let deckId: string;
+      if (echoeDecks.length > 0) {
+        deckId = echoeDecks[0].id;
+      } else {
+        toastService.error('请先创建一个卡组');
+        setIsApkgImporting(false);
+        return;
+      }
+
+      // Import notes - create them one by one
+      let notesAdded = 0;
+      let notesSkipped = 0;
+      const errors: string[] = [];
+
+      for (const note of notes) {
+        try {
+          // Parse Anki fields (0x1f separator)
+          const fields = note.flds.split('\x1f');
+
+          // Get the model for this note to map fields
+          const model = models.find(m => m.id === note.mid);
+          if (!model) {
+            notesSkipped++;
+            continue;
+          }
+
+          // Build field map
+          const fieldMap: Record<string, string> = {};
+          model.flds.forEach((fld: any, index: number) => {
+            if (index < fields.length) {
+              fieldMap[fld.name] = fields[index];
+            }
+          });
+
+          // Parse tags
+          const tags = note.tags ? note.tags.split(' ').filter(t => t) : [];
+
+          // Create note
+          const noteDto: CreateEchoeNoteDto = {
+            notetypeId,
+            deckId,
+            fields: fieldMap,
+            tags,
+          };
+
+          await echoeApi.createNote(noteDto);
+          notesAdded++;
+        } catch (e) {
+          notesSkipped++;
+          const err = e as Error;
+          if (err.message) {
+            errors.push(`Note ${note.id}: ${err.message}`);
+          }
+        }
+      }
+
+      const result: ImportResultDto = {
+        notesAdded,
+        notesUpdated: 0,
+        notesSkipped,
+        cardsAdded: notesAdded, // Each note creates one card
+        cardsUpdated: 0,
+        decksAdded: 0,
+        notetypesAdded: 0,
+        revlogImported: 0,
+        mediaImported: 0,
+        errors,
+        errorDetails: errors.length > 0
+          ? [{ category: 'general', message: `${errors.length} notes failed to import` }]
+          : [],
+      };
+
+      setApkgResult(result);
+
+      if (notesAdded > 0) {
+        toastService.success(`成功导入 ${notesAdded} 张卡片`);
+      }
+      if (notesSkipped > 0) {
+        toastService.warning(`${notesSkipped} 张卡片导入失败`);
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      const errorMessage = err.response?.data?.message || err.message || '导入失败';
+      const err = error as { message?: string };
+      const errorMessage = err.message || '导入失败';
       toastService.error(errorMessage);
       setApkgResult({
         notesAdded: 0,

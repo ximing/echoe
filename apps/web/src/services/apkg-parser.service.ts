@@ -1,6 +1,8 @@
 import { Service } from '@rabjs/react';
 import JSZip from 'jszip';
 import initSqlJs, { type Database } from 'sql.js';
+import sqlWasmBrowserUrl from 'sql.js/dist/sql-wasm-browser.wasm?url';
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 
 /**
  * Anki APKG Parser Service
@@ -32,9 +34,21 @@ export class ApkgParserService extends Service {
     this.reset();
 
     try {
-      // Load sql.js WASM
+      // Resolve wasm from Vite bundled asset to avoid runtime CDN failures.
       const SQL = await initSqlJs({
-        locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+        locateFile: (file: string) => {
+          if (file === 'sql-wasm.wasm' || file === 'sql-wasm-debug.wasm') {
+            return sqlWasmUrl;
+          }
+          if (file === 'sql-wasm-browser.wasm' || file === 'sql-wasm-browser-debug.wasm') {
+            return sqlWasmBrowserUrl;
+          }
+          // Fallback for potential future sql.js wasm filenames.
+          if (file.endsWith('.wasm')) {
+            return sqlWasmBrowserUrl;
+          }
+          return file;
+        },
       });
 
       // Unzip the .apkg file

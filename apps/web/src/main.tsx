@@ -17,13 +17,14 @@ import { UserModelService } from './services/user-model.service';
 import { ApiTokenService } from './services/api-token.service';
 import { InboxService } from './services/inbox.service';
 import { InboxReportService } from './services/inbox-report.service';
-
+import { ApkgParserService } from './services/apkg-parser.service';
 /**
  * Register services globally
  * These are accessible throughout the entire application
  */
 const AppWithServices = bindServices(App, []);
 register(AuthService);
+register(ApkgParserService);
 register(ThemeService);
 register(ToastService);
 register(UserModelService);
