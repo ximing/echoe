@@ -6,6 +6,7 @@ import type { InboxListItemDto } from '@echoe/dto';
 import * as inboxSourceCategoryApi from '../../api/inbox-source-category.js';
 import { toast } from '../../services/toast.service.js';
 import { RichTextEditor } from '../../components/echoe/RichTextEditor.js';
+import { RichTextRenderer } from '../../components/echoe/RichTextRenderer.js';
 import {
   Plus,
   Edit,
@@ -1000,6 +1001,7 @@ const DeleteConfirmDialog = view(
 // Convert to Card Dialog Component
 const ConvertToCardDialog = view(
   ({
+    item,
     onClose,
     onSubmit,
   }: {
@@ -1028,7 +1030,7 @@ const ConvertToCardDialog = view(
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50">转换为卡片</h2>
             <button
@@ -1039,6 +1041,24 @@ const ConvertToCardDialog = view(
             </button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Content Preview */}
+            <div className="space-y-3">
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">正面</h3>
+                <RichTextRenderer
+                  content={item.front}
+                  className="text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">背面</h3>
+                <RichTextRenderer
+                  content={item.back}
+                  className="text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            </div>
+
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
