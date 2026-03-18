@@ -35,3 +35,15 @@ Started: Wed Mar 18 00:00:00 CST 2026
   - Build passes with no type errors
 ---
 
+## 2026-03-18 09:30 - US-003
+- Implemented rich text editor in EditInboxDialog
+- Files changed:
+  - `apps/web/src/pages/inbox/inbox-page.tsx`: Replaced textarea elements with RichTextEditor, added JSON state tracking
+- **Learnings for future iterations:**
+  - RichTextEditor handles both plain text and HTML content seamlessly via the `content` prop
+  - When loading existing content, pass it directly to RichTextEditor - it auto-detects format
+  - RichTextEditor internally converts plain text to TipTap JSON when needed
+  - Same pattern as CreateInboxDialog: track both HTML and JSON in state, send JSON to API
+  - UpdateInboxDto already supports optional frontJson/backJson fields (from US-001)
+---
+
