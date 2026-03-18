@@ -22,3 +22,16 @@ Started: Wed Mar 18 00:00:00 CST 2026
   - All 35 tests pass, including 8 new tests for JSON conversion
 ---
 
+## 2026-03-18 09:15 - US-002
+- Implemented rich text editor in CreateInboxDialog
+- Files changed:
+  - `apps/web/src/pages/inbox/inbox-page.tsx`: Replaced textarea elements with RichTextEditor component, added frontJson/backJson state tracking
+- **Learnings for future iterations:**
+  - RichTextEditor component already exists at `apps/web/src/components/echoe/RichTextEditor.tsx` with full TipTap integration
+  - onChange callback provides both HTML and JSON: `onChange={(html, json) => {...}}`
+  - RichTextEditor supports clipboard paste out of the box (no additional configuration needed)
+  - The existing CreateInboxDto interface already supports optional frontJson/backJson fields after US-001
+  - Frontend API layer automatically passes through all DTO fields, no changes needed
+  - Build passes with no type errors
+---
+
