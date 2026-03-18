@@ -8,7 +8,7 @@
  */
 
 import { JSDOM } from 'jsdom';
-import { generateHTML, generateText } from '@tiptap/core';
+import { generateHTML, generateText, generateJSON } from '@tiptap/core';
 import Bold from '@tiptap/extension-bold';
 import Blockquote from '@tiptap/extension-blockquote';
 import BulletList from '@tiptap/extension-bullet-list';
@@ -89,4 +89,15 @@ export function serializeToHtml(doc: ProseMirrorJsonDoc): string {
  */
 export function serializeToPlainText(doc: ProseMirrorJsonDoc): string {
   return generateText(doc, SERIALIZER_EXTENSIONS);
+}
+
+/**
+ * Converts an HTML string to a ProseMirror JSON document.
+ * Parses HTML markup into TipTap/ProseMirror node structure.
+ *
+ * @param html - An HTML string to parse
+ * @returns ProseMirror JSON document with type "doc"
+ */
+export function parseHtmlToJson(html: string): ProseMirrorJsonDoc {
+  return generateJSON(html, SERIALIZER_EXTENSIONS) as ProseMirrorJsonDoc;
 }

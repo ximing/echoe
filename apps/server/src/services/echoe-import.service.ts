@@ -17,9 +17,11 @@ import { echoeNotetypes, type NewEchoeNotetypes } from '../db/schema/echoe-notet
 import { EchoeMediaService } from './echoe-media.service.js';
 import { logger } from '../utils/logger.js';
 import { normalizeNoteFields } from '../lib/note-field-normalizer.js';
+import { parseHtmlToJson } from '../lib/prosemirror-serializer.js';
 import { generateTypeId } from '../utils/id.js';
 import { OBJECT_TYPE } from '../models/constant/type.js';
 import type { ImportResultDto, ImportErrorDetailDto } from '@echoe/dto';
+import type { RichTextFields } from '../types/note-fields.js';
 
 type PackageType = 'standard-anki' | 'echoe-legacy' | 'unknown';
 
@@ -1190,7 +1192,15 @@ export class EchoeImportService {
           fields[notetypeFields[i]] = value;
         }
 
-        const normalized = normalizeNoteFields({ notetypeFields, fields });
+        // Convert HTML fields to TipTap JSON format for richTextFields
+        const richTextFields: RichTextFields = {};
+        for (const [fieldName, fieldValue] of Object.entries(fields)) {
+          if (fieldValue) {
+            richTextFields[fieldName] = parseHtmlToJson(fieldValue);
+          }
+        }
+
+        const normalized = normalizeNoteFields({ notetypeFields, fields, richTextFields });
 
         // Check for existing note in user scope (uid, guid)
         const existing = await db
@@ -1214,6 +1224,7 @@ export class EchoeImportService {
               csum: normalized.csum,
               fldNames: normalized.fldNames,
               fieldsJson: normalized.fieldsJson,
+              richTextFields,
             })
             .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid)));
           updated++;
@@ -1236,6 +1247,7 @@ export class EchoeImportService {
             data: row.data || '{}',
             fldNames: normalized.fldNames,
             fieldsJson: normalized.fieldsJson,
+            richTextFields,
           };
           await db.insert(echoeNotes).values(newNote).ignore();
           added++;

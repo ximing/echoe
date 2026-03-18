@@ -127,12 +127,19 @@ export class EchoeCsvImportService {
               .filter(Boolean);
           }
 
+          // Convert plain text fields to TipTap JSON format
+          const richTextFields: Record<string, Record<string, any>> = {};
+          for (const [fieldName, fieldValue] of Object.entries(fields)) {
+            richTextFields[fieldName] = this.convertPlainTextToTipTapJson(fieldValue);
+          }
+
           // Create note via EchoeNoteService
           await this.noteService.createNote(uid, {
             notetypeId: dto.notetypeId,
             deckId: dto.deckId,
             fields,
             tags,
+            richTextFields,
           });
 
           result.added++;
@@ -173,5 +180,25 @@ export class EchoeCsvImportService {
     }
 
     return detected;
+  }
+
+  /**
+   * Convert plain text to TipTap JSON format
+   */
+  private convertPlainTextToTipTapJson(text: string): Record<string, any> {
+    return {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text,
+            },
+          ],
+        },
+      ],
+    };
   }
 }

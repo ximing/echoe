@@ -2,7 +2,7 @@ import { JsonController, Get, Post, Put, Delete, Body, Param, QueryParam, Curren
 import { Service } from 'typedi';
 
 import { ErrorCode } from '../../constants/error-codes.js';
-import { InboxService } from '../../services/inbox.service.js';
+import { InboxService, type CreateInboxParams } from '../../services/inbox.service.js';
 import { InboxQueueService, InboxJobType } from '../../services/inbox-queue.service.js';
 import { logger } from '../../utils/logger.js';
 import { ResponseUtil } from '../../utils/response.js';
@@ -95,7 +95,7 @@ export class InboxController {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR);
       }
 
-      const inboxItem = await this.inboxService.create(userDto.uid, dto);
+      const inboxItem = await this.inboxService.create(userDto.uid, dto as CreateInboxParams);
       return ResponseUtil.success(inboxItem);
     } catch (error) {
       logger.error('Create inbox item error:', error);
