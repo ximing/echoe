@@ -18,6 +18,17 @@ import {
   X,
 } from 'lucide-react';
 
+/**
+ * Truncate HTML content to a specified character limit
+ * Strips HTML tags and returns plain text preview
+ */
+function truncateContent(html: string, maxLength: number = 100): string {
+  // Strip HTML tags
+  const text = html.replace(/<[^>]*>/g, '');
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
 export const InboxPage = view(() => {
   const inboxService = useService(InboxService);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -280,18 +291,18 @@ export const InboxPage = view(() => {
                         <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                           正面:
                         </span>
-                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                          {item.front}
-                        </p>
+                        <div className="text-sm text-gray-900 dark:text-gray-100 mt-1 line-clamp-2">
+                          {truncateContent(item.front, 100)}
+                        </div>
                       </div>
                       {item.back && (
                         <div>
                           <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                             背面:
                           </span>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                            {item.back}
-                          </p>
+                          <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                            {truncateContent(item.back, 100)}
+                          </div>
                         </div>
                       )}
                     </div>
