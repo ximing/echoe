@@ -127,16 +127,24 @@ export class InboxService {
 
       // Process front content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
       let frontContent: ProseMirrorJsonDoc | string = data.front;
       if (data.frontJson) {
         frontContent = data.frontJson as unknown as ProseMirrorJsonDoc;
+      } else if (data.front) {
+        // Convert plain text to TipTap JSON
+        frontContent = this.convertPlainTextToTipTapJson(data.front);
       }
 
       // Process back content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
       let backContent: ProseMirrorJsonDoc | string | undefined = data.back;
       if (data.backJson) {
         backContent = data.backJson as unknown as ProseMirrorJsonDoc;
+      } else if (data.back) {
+        // Convert plain text to TipTap JSON
+        backContent = this.convertPlainTextToTipTapJson(data.back);
       }
 
       const newInboxItem: NewInbox = {
@@ -262,18 +270,22 @@ export class InboxService {
 
       // Process front content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
       if (data.frontJson !== undefined) {
         updateValues.front = data.frontJson as unknown as ProseMirrorJsonDoc;
       } else if (data.front !== undefined) {
-        updateValues.front = data.front;
+        // Convert plain text to TipTap JSON
+        updateValues.front = this.convertPlainTextToTipTapJson(data.front);
       }
 
       // Process back content: JSON takes precedence over plain text
       // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
       if (data.backJson !== undefined) {
         updateValues.back = data.backJson as unknown as ProseMirrorJsonDoc;
       } else if (data.back !== undefined) {
-        updateValues.back = data.back;
+        // Convert plain text to TipTap JSON
+        updateValues.back = this.convertPlainTextToTipTapJson(data.back);
       }
 
       if (data.source !== undefined) updateValues.source = data.source;

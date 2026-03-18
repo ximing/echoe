@@ -121,8 +121,35 @@ describe('InboxService', () => {
 
       // Verify data was inserted
       expect(insertedData.uid).toBe('test-uid');
-      expect(insertedData.front).toBe('Front content');
-      expect(insertedData.back).toBe('Back content');
+      // Plain text is now converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
       expect(insertedData.source).toBe('manual');
       expect(insertedData.category).toBe('backend');
       expect(insertedData.isRead).toBe(false);
@@ -331,7 +358,21 @@ describe('InboxService', () => {
       // Verify frontJson is stored directly as JSON (not converted to HTML)
       expect(serializeToHtml).not.toHaveBeenCalled();
       expect(insertedData.front).toEqual(frontJson);
-      expect(insertedData.back).toBe('Back content');
+      // back should be converted to JSON since only plain text provided
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
     });
 
     it('should store backJson directly as JSON when provided', async () => {
@@ -392,7 +433,21 @@ describe('InboxService', () => {
 
       // Verify backJson is stored directly as JSON (not converted to HTML)
       expect(serializeToHtml).not.toHaveBeenCalled();
-      expect(insertedData.front).toBe('Front content');
+      // front should be converted to JSON since only plain text provided
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
       expect(insertedData.back).toEqual(backJson);
     });
 
@@ -472,6 +527,149 @@ describe('InboxService', () => {
       expect(serializeToHtml).not.toHaveBeenCalled();
       expect(insertedData.front).toEqual(frontJson);
       expect(insertedData.back).toEqual(backJson);
+    });
+
+    it('should convert plain text front to TipTap JSON when frontJson not provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front text' }] }] },
+        back: 'Back content',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Plain front text',
+        back: 'Back content',
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify plain text is converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front text',
+              },
+            ],
+          },
+        ],
+      });
+      // Back should also be converted to JSON
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert plain text back to TipTap JSON when backJson not provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front content',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back text' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Front content',
+        back: 'Plain back text',
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify both front and back plain text are converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back text',
+              },
+            ],
+          },
+        ],
+      });
     });
   });
 
@@ -1196,6 +1394,213 @@ describe('InboxService', () => {
 
       // Should use JSON, not plain text
       expect(result.front).toBe('<p>From JSON</p>');
+    });
+
+    it('should convert plain text front to TipTap JSON when frontJson not provided', async () => {
+      // Mock the updated inbox item with the converted front text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        // This is what would be stored after converting plain text to TipTap JSON
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front text' }] }] },
+        back: 'Back',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        front: 'Plain front text',
+      });
+
+      // Verify plain text is converted to TipTap JSON
+      expect(result.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front text',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert plain text back to TipTap JSON when backJson not provided', async () => {
+      // Mock the updated inbox item with the converted back text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        // This is what would be stored after converting plain text to TipTap JSON
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back text' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        back: 'Plain back text',
+      });
+
+      // Verify plain text is converted to TipTap JSON
+      expect(result.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back text',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert both plain text front and back to TipTap JSON when updating', async () => {
+      // Mock the updated inbox item with the converted front and back text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        // These are what would be stored after converting plain text to TipTap JSON
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front' }] }] },
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        front: 'Plain front',
+        back: 'Plain back',
+      });
+
+      // Verify both plain texts are converted to TipTap JSON
+      expect(result.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front',
+              },
+            ],
+          },
+        ],
+      });
+      expect(result.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back',
+              },
+            ],
+          },
+        ],
+      });
     });
   });
 
