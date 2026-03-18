@@ -1,7 +1,8 @@
 import { view, useService } from '@rabjs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
+import { EchoeDeckService } from '../../services/echoe-deck.service';
 import * as echoeApi from '../../api/echoe';
 import type { ImportResultDto } from '@echoe/dto';
 import {
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   RotateCcw,
   FileArchive,
+  ChevronDown,
 } from 'lucide-react';
 
 export default function ApkgImportPage() {
@@ -19,13 +21,21 @@ export default function ApkgImportPage() {
 
 const ApkgImportPageContent = view(() => {
   const toastService = useService(ToastService);
+  const deckService = useService(EchoeDeckService);
   const navigate = useNavigate();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDeckId, setSelectedDeckId] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Load decks
+  useEffect(() => {
+    deckService.loadDecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Validate file extension
   const validateFile = (file: File): boolean => {
@@ -87,7 +97,7 @@ const ApkgImportPageContent = view(() => {
 
     setIsImporting(true);
     try {
-      const response = await echoeApi.importApkg(selectedFile);
+      const response = await echoeApi.importApkg(selectedFile, selectedDeckId || undefined);
       setImportResult(response.data);
 
       // Show appropriate message based on results
@@ -350,6 +360,39 @@ const ApkgImportPageContent = view(() => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Deck Selection */}
+        {selectedFile && !importResult && (
+          <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Import Options
+            </h2>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Target Deck (optional)
+              </label>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                Leave empty to import deck structure from .apkg, or select a deck to import all cards into it
+              </p>
+              <div className="relative">
+                <select
+                  value={selectedDeckId}
+                  onChange={(e) => setSelectedDeckId(e.target.value)}
+                  className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">Import deck structure from .apkg</option>
+                  {deckService.decks.map((deck) => (
+                    <option key={deck.id} value={deck.id}>
+                      {deck.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
         )}
 

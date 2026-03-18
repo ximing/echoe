@@ -218,8 +218,11 @@ export class EchoeImportService {
 
   /**
    * Import an .apkg file
+   * @param uid User ID
+   * @param buffer APKG file buffer
+   * @param targetDeckId Optional deck ID to import all cards into (instead of creating decks from .apkg)
    */
-  async importApkg(uid: string, buffer: Buffer): Promise<ImportResultDto> {
+  async importApkg(uid: string, buffer: Buffer, targetDeckId?: string): Promise<ImportResultDto> {
     const result: ImportResultDto = {
       notesAdded: 0,
       notesUpdated: 0,
@@ -254,9 +257,9 @@ export class EchoeImportService {
       logger.info(`Detected package type: ${packageType}`);
 
       if (packageType === 'standard-anki') {
-        return await this.importStandardAnki(uid, zip, result);
+        return await this.importStandardAnki(uid, zip, result, targetDeckId);
       } else {
-        return await this.importLegacyEchoe(uid, zip, result);
+        return await this.importLegacyEchoe(uid, zip, result, targetDeckId);
       }
     } catch (error) {
       logger.error('Import error:', error);
@@ -309,7 +312,7 @@ export class EchoeImportService {
    * Import Standard Anki APKG format
    * Supports both official format (collection.anki2/anki21) and legacy col.json.
    */
-  private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
+  private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string): Promise<ImportResultDto> {
     let db: DatabaseType | null = null;
 
     try {
@@ -383,10 +386,16 @@ export class EchoeImportService {
         result.notetypesAdded = notetypeResult.added;
         result.errors.push(...notetypeResult.errors);
 
-        // Import decks from col.decks
-        const deckResult = await this.importDecksFromColJson(uid, col, referenceMap);
-        result.decksAdded = deckResult.added;
-        result.errors.push(...deckResult.errors);
+        // Import decks from col.decks OR use targetDeckId
+        if (targetDeckId) {
+          // When targetDeckId is provided, map all source deck IDs to the target deck
+          await this.mapAllDecksToTarget(uid, col, targetDeckId, referenceMap);
+          result.decksAdded = 0; // No new decks created
+        } else {
+          const deckResult = await this.importDecksFromColJson(uid, col, referenceMap);
+          result.decksAdded = deckResult.added;
+          result.errors.push(...deckResult.errors);
+        }
 
         // Import media files FIRST to get filename mapping
         const mediaResult = await this.importMediaFromStandardAnki(uid, zip, mediaManifest);
@@ -439,7 +448,7 @@ export class EchoeImportService {
   /**
    * Import Echoe Legacy format
    */
-  private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto): Promise<ImportResultDto> {
+  private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string): Promise<ImportResultDto> {
     let db: DatabaseType | null = null;
 
     try {
@@ -482,10 +491,16 @@ export class EchoeImportService {
       result.notetypesAdded = notetypeResult.added;
       result.errors.push(...notetypeResult.errors);
 
-      // Import decks
-      const deckResult = await this.importDecks(uid, db, referenceMap);
-      result.decksAdded = deckResult.added;
-      result.errors.push(...deckResult.errors);
+      // Import decks OR use targetDeckId
+      if (targetDeckId) {
+        // When targetDeckId is provided, map all source deck IDs to the target deck
+        await this.mapAllDecksToTargetFromDb(uid, db, targetDeckId, referenceMap);
+        result.decksAdded = 0; // No new decks created
+      } else {
+        const deckResult = await this.importDecks(uid, db, referenceMap);
+        result.decksAdded = deckResult.added;
+        result.errors.push(...deckResult.errors);
+      }
 
       // Import notes
       const noteResult = await this.importNotes(uid, db, referenceMap);
@@ -718,6 +733,84 @@ export class EchoeImportService {
     }
 
     return { added, errors };
+  }
+
+  /**
+   * Map all source deck IDs to a target deck (from col.json format)
+   */
+  private async mapAllDecksToTarget(
+    uid: string,
+    col: Record<string, unknown>,
+    targetDeckId: string,
+    referenceMap: ImportReferenceMap
+  ): Promise<void> {
+    try {
+      const decks = col.decks as Record<string, { id: number }>;
+
+      if (!decks || typeof decks !== 'object') {
+        return;
+      }
+
+      // Verify target deck exists and belongs to user
+      const db = getDatabase();
+      const targetDeck = await db
+        .select({ deckId: echoeDecks.deckId })
+        .from(echoeDecks)
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, targetDeckId), eq(echoeDecks.deletedAt, 0)))
+        .limit(1);
+
+      if (targetDeck.length === 0) {
+        throw new Error(`Target deck ${targetDeckId} not found or does not belong to user`);
+      }
+
+      // Map all source deck IDs to the target deck
+      for (const [did, deck] of Object.entries(decks)) {
+        const sourceDid = this.getSourceIdKey(did);
+        const deckDid = Number.isFinite(deck?.id) ? this.getSourceIdKey(deck.id) : sourceDid;
+
+        referenceMap.didToDeckId.set(sourceDid, targetDeckId);
+        referenceMap.didToDeckId.set(deckDid, targetDeckId);
+      }
+    } catch (error) {
+      logger.error('Failed to map decks to target:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Map all source deck IDs to a target deck (from SQLite database)
+   */
+  private async mapAllDecksToTargetFromDb(
+    uid: string,
+    sourceDb: DatabaseType,
+    targetDeckId: string,
+    referenceMap: ImportReferenceMap
+  ): Promise<void> {
+    try {
+      // Verify target deck exists and belongs to user
+      const db = getDatabase();
+      const targetDeck = await db
+        .select({ deckId: echoeDecks.deckId })
+        .from(echoeDecks)
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.deckId, targetDeckId), eq(echoeDecks.deletedAt, 0)))
+        .limit(1);
+
+      if (targetDeck.length === 0) {
+        throw new Error(`Target deck ${targetDeckId} not found or does not belong to user`);
+      }
+
+      // Get all source deck IDs from the database
+      const rows = sourceDb.prepare('SELECT id FROM decks').all() as { id: string }[];
+
+      // Map all source deck IDs to the target deck
+      for (const row of rows) {
+        const sourceDid = this.getSourceIdKey(row.id);
+        referenceMap.didToDeckId.set(sourceDid, targetDeckId);
+      }
+    } catch (error) {
+      logger.error('Failed to map decks to target from db:', error);
+      throw error;
+    }
   }
 
   /**

@@ -4,7 +4,7 @@
  */
 
 import multer from 'multer';
-import { JsonController, Post, Req, CurrentUser } from 'routing-controllers';
+import { JsonController, Post, Req, CurrentUser, QueryParam } from 'routing-controllers';
 import { Service, Inject } from 'typedi';
 import type { Request, Response } from 'express';
 
@@ -62,9 +62,10 @@ export class EchoeImportController {
   /**
    * POST /api/v1/import/apkg
    * Import an .apkg file
+   * @query deckId - Optional deck ID to import all cards into
    */
   @Post('/apkg')
-  async importApkg(@Req() request: Request, @CurrentUser() userDto?: UserInfoDto) {
+  async importApkg(@Req() request: Request, @QueryParam('deckId') deckId?: string, @CurrentUser() userDto?: UserInfoDto) {
     if (!userDto?.uid) {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
@@ -88,7 +89,7 @@ export class EchoeImportController {
     }
 
     try {
-      const result: ImportResultDto = await this.importService.importApkg(userDto.uid, file.buffer);
+      const result: ImportResultDto = await this.importService.importApkg(userDto.uid, file.buffer, deckId);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Failed to import .apkg:', error);

@@ -280,7 +280,7 @@ export const InboxPage = view(() => {
                           正面:
                         </span>
                         <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                          {item.front}
+                          {typeof item.front === 'string' ? item.front : JSON.stringify(item.front)}
                         </p>
                       </div>
                       {item.back && (
@@ -289,7 +289,7 @@ export const InboxPage = view(() => {
                             背面:
                           </span>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                            {item.back}
+                            {typeof item.back === 'string' ? item.back : JSON.stringify(item.back)}
                           </p>
                         </div>
                       )}
@@ -401,7 +401,7 @@ export const InboxPage = view(() => {
       {/* Delete Dialog */}
       {showDeleteDialog && selectedItem && (
         <DeleteConfirmDialog
-          itemName={selectedItem.front}
+          itemName={typeof selectedItem.front === 'string' ? selectedItem.front : JSON.stringify(selectedItem.front)}
           onClose={() => {
             setShowDeleteDialog(false);
             setSelectedItem(null);
@@ -690,8 +690,8 @@ const EditInboxDialog = view(
     }) => Promise<void>;
   }) => {
     const inboxService = useService(InboxService);
-    const [front, setFront] = useState(item.front);
-    const [back, setBack] = useState(item.back ?? '');
+    const [front, setFront] = useState(typeof item.front === 'string' ? item.front : JSON.stringify(item.front));
+    const [back, setBack] = useState(typeof item.back === 'string' ? item.back : (item.back ? JSON.stringify(item.back) : ''));
     const [source, setSource] = useState<string>(item.source || '');
     const [category, setCategory] = useState<string>(item.category || '');
     const [newSourceInput, setNewSourceInput] = useState('');
