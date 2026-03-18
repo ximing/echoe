@@ -8,7 +8,6 @@ import { EchoeDeckController } from './v1/echoe-deck.controller.js';
 import { EchoeNoteController } from './v1/echoe-note.controller.js';
 import { EchoeStudyController } from './v1/echoe-study.controller.js';
 import { EchoeMediaController } from './v1/echoe-media.controller.js';
-import { EchoeImportController } from './v1/echoe-import.controller.js';
 import { EchoeExportController } from './v1/echoe-export.controller.js';
 import { EchoeStatsController } from './v1/echoe-stats.controller.js';
 import { EchoeConfigController } from './v1/echoe-config.controller.js';
@@ -31,7 +30,6 @@ export const controllers = [
   EchoeNoteController,
   EchoeStudyController,
   EchoeMediaController,
-  EchoeImportController,
   EchoeExportController,
   EchoeStatsController,
   EchoeConfigController,
