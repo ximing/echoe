@@ -1,6 +1,127 @@
 import 'reflect-metadata';
 import dayjs from 'dayjs';
 
+// Sample TipTap JSON format for testing
+const sampleFrontJson = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'What is TypeScript?',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleBackJson = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'TypeScript is a typed superset of JavaScript.',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleFrontJson2 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'What is React?',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleBackJson2 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'React is a JavaScript library for building UIs.',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleFrontJson3 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Question 1',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleBackJson3 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Answer 1',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleFrontJson4 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Question 2',
+        },
+      ],
+    },
+  ],
+};
+
+const sampleBackJson4 = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Answer 2',
+        },
+      ],
+    },
+  ],
+};
+
 // Inline mock for drizzle-orm
 jest.mock('drizzle-orm', () => {
   return {
@@ -71,13 +192,36 @@ function createMockSelect(returnValue: any[]) {
 describe('InboxAiService', () => {
   let service: InboxAiService;
   let mockMetricsService: any;
+  let mockInboxService: any;
 
   beforeEach(() => {
     mockMetricsService = {
       trackInboxOrganizeStart: jest.fn(),
       trackInboxOrganizeSuccess: jest.fn(),
     };
-    service = new InboxAiService(mockMetricsService);
+    mockInboxService = {
+      convertToPlainText: jest.fn((content: any) => {
+        // Handle both string and JSON format
+        if (!content) return '';
+        if (typeof content === 'string') return content;
+        // If it's JSON with proseMirror structure, extract text content
+        if (content.type === 'doc' && content.content) {
+          const extractText = (node: any): string => {
+            if (!node) return '';
+            if (typeof node === 'string') return node;
+            if (node.text) return node.text;
+            if (node.content && Array.isArray(node.content)) {
+              return node.content.map(extractText).join('');
+            }
+            return '';
+          };
+          return extractText(content);
+        }
+        // Fallback: return empty string for unknown format
+        return '';
+      }),
+    };
+    service = new InboxAiService(mockMetricsService, mockInboxService as any);
     mockedGetDatabase.mockReset();
   });
 
@@ -86,8 +230,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -120,8 +264,8 @@ describe('InboxAiService', () => {
       const mockCurrentItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -135,8 +279,8 @@ describe('InboxAiService', () => {
       const mockRelatedItem = {
         inboxId: 'i124',
         uid: 'test-uid',
-        front: 'What is React?',
-        back: 'React is a JavaScript library for building UIs.',
+        front: sampleFrontJson2,
+        back: sampleBackJson2,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -182,8 +326,8 @@ describe('InboxAiService', () => {
       const mockCurrentItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'Test question',
-        back: 'Test answer',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -258,8 +402,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -272,8 +416,8 @@ describe('InboxAiService', () => {
         {
           inboxId: 'i124',
           uid: 'test-uid',
-          front: 'What is React?',
-          back: 'React is a JavaScript library.',
+          front: sampleFrontJson2,
+          back: sampleBackJson2,
           source: 'manual',
           category: 'backend',
           isRead: false,
@@ -376,8 +520,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -444,8 +588,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -477,8 +621,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -512,8 +656,8 @@ describe('InboxAiService', () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: 'What is TypeScript?',
-        back: 'TypeScript is a typed superset of JavaScript.',
+        front: sampleFrontJson,
+        back: sampleBackJson,
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -565,8 +709,8 @@ describe('InboxAiService', () => {
         {
           inboxId: 'i1',
           uid: 'test-uid',
-          front: 'Question 1',
-          back: 'Answer 1',
+          front: sampleFrontJson3,
+          back: sampleBackJson3,
           category: 'backend',
           source: 'manual',
           isRead: false,
@@ -577,8 +721,8 @@ describe('InboxAiService', () => {
         {
           inboxId: 'i2',
           uid: 'test-uid',
-          front: 'Question 2',
-          back: 'Answer 2',
+          front: sampleFrontJson4,
+          back: sampleBackJson4,
           category: 'frontend',
           source: 'api',
           isRead: true,
@@ -667,8 +811,8 @@ describe('InboxAiService', () => {
         {
           inboxId: 'i1',
           uid: 'test-uid',
-          front: 'Question 1',
-          back: 'Answer 1',
+          front: sampleFrontJson3,
+          back: sampleBackJson3,
           category: 'backend',
           source: 'manual',
           isRead: false,

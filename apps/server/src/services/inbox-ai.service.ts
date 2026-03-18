@@ -11,6 +11,7 @@ import { inboxReport, type InboxReport } from '../db/schema/inbox-report.js';
 import { config } from '../config/config.js';
 import { logger } from '../utils/logger.js';
 import { InboxMetricsService } from './inbox-metrics.service.js';
+import { InboxService } from './inbox.service.js';
 import type { AiOrganizeResponseDto } from '@echoe/dto';
 
 /**
@@ -107,7 +108,18 @@ export interface BuildPromptParams {
 
 @Service()
 export class InboxAiService {
-  constructor(private metricsService: InboxMetricsService) {}
+  constructor(
+    private metricsService: InboxMetricsService,
+    private inboxService: InboxService
+  ) {}
+
+  /**
+   * Convert inbox content (front/back) to plain text
+   * Handles both plain string and TipTap JSON format
+   */
+  private convertContentToPlainText(content: unknown): string {
+    return this.inboxService.convertToPlainText(content as any);
+  }
   /**
    * Retrieve L0: Current inbox item
    */
@@ -168,14 +180,16 @@ export class InboxAiService {
         .limit(L1_RETRIEVAL_LIMIT * 2); // Get more to filter out current item
 
       // Calculate simple similarity based on content overlap (category + content length)
-      const currentContent = currentItem.length > 0 ? `${currentItem[0].front} ${currentItem[0].back}` : '';
+      const currentContent = currentItem.length > 0
+        ? `${this.convertContentToPlainText(currentItem[0].front)} ${this.convertContentToPlainText(currentItem[0].back)}`
+        : '';
       const currentCategory = currentItem.length > 0 ? currentItem[0].category : '';
 
       // Filter out the current inbox item
       const filteredResults = results.filter((item: Inbox) => item.inboxId !== currentInboxId);
 
       const itemsWithSimilarity = filteredResults.slice(0, L1_RETRIEVAL_LIMIT).map((item: Inbox) => {
-        const content = `${item.front} ${item.back}`;
+        const content = `${this.convertContentToPlainText(item.front)} ${this.convertContentToPlainText(item.back)}`;
         const similarity = this.calculateSimpleSimilarity(currentContent, content, currentCategory, item.category);
         return {
           level: 'L1' as ContextLevel,
@@ -315,8 +329,8 @@ export class InboxAiService {
       task,
       currentInput: {
         inboxId: currentItem[0].inboxId,
-        front: currentItem[0].front,
-        back: currentItem[0].back,
+        front: this.convertContentToPlainText(currentItem[0].front),
+        back: this.convertContentToPlainText(currentItem[0].back),
       },
       retrievedContext: {
         l0: context.l0,
@@ -454,7 +468,9 @@ export class InboxAiService {
   private formatInboxContent(item: Inbox): string {
     const category = item.category ? `[${item.category}]` : '';
     const source = item.source ? `(${item.source})` : '';
-    return `${category} ${source}\nQ: ${item.front}\nA: ${item.back}`.trim();
+    const front = this.convertContentToPlainText(item.front);
+    const back = this.convertContentToPlainText(item.back);
+    return `${category} ${source}\nQ: ${front}\nA: ${back}`.trim();
   }
 
   /**
@@ -576,7 +592,9 @@ export class InboxAiService {
       // Build AI prompt for report generation
       const dailyFacts = dailyInboxItems
         .map((item: Inbox, idx: number) => {
-          return `[${idx + 1}] ID:${item.inboxId} [${item.category}] (${item.source})\nQ: ${item.front}\nA: ${item.back}\nRead: ${item.isRead === true ? 'Yes' : 'No'}`;
+          const front = this.convertContentToPlainText(item.front);
+          const back = this.convertContentToPlainText(item.back);
+          return `[${idx + 1}] ID:${item.inboxId} [${item.category}] (${item.source})\nQ: ${front}\nA: ${back}\nRead: ${item.isRead === true ? 'Yes' : 'No'}`;
         })
         .join('\n\n');
 
@@ -833,8 +851,8 @@ ${sourceBreakdown.map((s) => `- ${s.source}: ${s.count}`).join('\n')}
         throw new Error('Inbox item not found');
       }
 
-      const originalFront = currentItem[0].front;
-      const originalBack = currentItem[0].back || '';
+      const originalFront = this.convertContentToPlainText(currentItem[0].front);
+      const originalBack = this.convertContentToPlainText(currentItem[0].back);
 
       // Build AI prompt with context
       const promptInput = await this.buildPrompt({
@@ -950,8 +968,8 @@ Your response must be valid JSON matching this schema:
         .where(and(eq(inbox.uid, uid), eq(inbox.inboxId, inboxId), eq(inbox.deletedAt, 0)))
         .limit(1);
 
-      const originalFront = currentItem[0]?.front || '';
-      const originalBack = currentItem[0]?.back || '';
+      const originalFront = this.convertContentToPlainText(currentItem[0]?.front) || '';
+      const originalBack = this.convertContentToPlainText(currentItem[0]?.back) || '';
 
       return {
         optimizedFront: originalFront,
