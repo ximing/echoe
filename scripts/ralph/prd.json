@@ -16,8 +16,8 @@
         "单元测试覆盖转换逻辑"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "已在之前会话完成：DTO 添加 frontJson/backJson 字段，InboxService 添加 convertPlainTextToTipTapJson() 方法，typecheck 和单元测试通过"
     },
     {
       "id": "US-002",

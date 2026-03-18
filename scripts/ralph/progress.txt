@@ -1,4 +1,25 @@
 # Ralph Progress Log
-Started: Wed Mar 18 00:00:00 CST 2026
+Started: Wed Mar 18 08:52:43 CST 2026
 ---
 
+## 2026-03-18 - US-001
+- **Status**: 已完成（之前会话实现）
+- **What was implemented**:
+  - DTO 中添加 frontJson 和 backJson 字段（可选字段，用于前端传递 TipTap JSON）
+  - InboxService 添加 convertPlainTextToTipTapJson() 转换方法
+  - 纯文本自动转换为 TipTap JSON 格式存储
+  - JSON 直接存储（不转换）
+  - 40 个单元测试覆盖转换逻辑
+- **Files changed**:
+  - `packages/dto/src/inbox.dto.ts` - 添加 frontJson/backJson 字段
+  - `apps/server/src/services/inbox.service.ts` - 添加转换方法
+  - `apps/server/src/__tests__/inbox.service.test.ts` - 转换逻辑测试
+- **Verification**:
+  - Typecheck: ✅ 通过
+  - Unit tests: ✅ 40/40 通过
+  - Lint: ⚠️ 7 errors (web 应用既有错误，与 inbox 无关)
+- **Learnings for future iterations:**
+  - 服务端富文本存储使用 TipTap JSON 格式，与 Note 模块保持一致
+  - JSON 列使用 `.$type<ProseMirrorJsonDoc | string>()` 支持向后兼容
+  - 转换逻辑在 create 和 update 方法中复用 convertPlainTextToTipTapJson()
+---
