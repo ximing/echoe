@@ -45,10 +45,10 @@ export interface InboxDto {
   inboxId: string;
   /** 用户 ID (所有者) */
   uid: string;
-  /** 正面/问题内容 */
-  front: string;
-  /** 背面/答案内容 */
-  back: string;
+  /** 正面/问题内容 (TipTap JSON 或纯文本) */
+  front: string | Record<string, unknown>;
+  /** 背面/答案内容 (TipTap JSON 或纯文本) */
+  back: string | Record<string, unknown> | null;
   /** 来源 (动态字符串值) */
   source: string | null;
   /** 类别/标签 (动态字符串值) */
@@ -69,10 +69,10 @@ export interface InboxDto {
 export interface InboxListItemDto {
   /** Inbox 唯一标识符 */
   inboxId: string;
-  /** 正面/问题内容 */
-  front: string;
-  /** 背面/答案内容 */
-  back: string;
+  /** 正面/问题内容 (TipTap JSON 或纯文本) */
+  front: string | Record<string, unknown>;
+  /** 背面/答案内容 (TipTap JSON 或纯文本) */
+  back: string | Record<string, unknown> | null;
   /** 来源 (动态字符串值) */
   source: string | null;
   /** 类别 (动态字符串值) */
@@ -89,10 +89,14 @@ export interface InboxListItemDto {
  * 创建 Inbox 请求 DTO
  */
 export interface CreateInboxDto {
-  /** 正面/问题内容 */
-  front: string;
-  /** 背面/答案内容 */
-  back: string;
+  /** 正面/问题内容 (可选, 当 frontJson 存在时) */
+  front?: string;
+  /** 背面/答案内容 (可选, 当 backJson 存在时) */
+  back?: string;
+  /** 正面内容的 TipTap JSON 格式 (优先于 front) */
+  frontJson?: Record<string, unknown>;
+  /** 背面内容的 TipTap JSON 格式 (优先于 back) */
+  backJson?: Record<string, unknown>;
   /** 来源 (可选, 动态字符串值) */
   source?: string;
   /** 类别 (可选, 动态字符串值) */
@@ -103,10 +107,14 @@ export interface CreateInboxDto {
  * 更新 Inbox 请求 DTO
  */
 export interface UpdateInboxDto {
-  /** 正面/问题内容 */
+  /** 正面/问题内容 (可选) */
   front?: string;
-  /** 背面/答案内容 */
+  /** 背面/答案内容 (可选) */
   back?: string;
+  /** 正面内容的 TipTap JSON 格式 (优先于 front) */
+  frontJson?: Record<string, unknown>;
+  /** 背面内容的 TipTap JSON 格式 (优先于 back) */
+  backJson?: Record<string, unknown>;
   /** 来源 (动态字符串值) */
   source?: string | null;
   /** 类别 (动态字符串值) */

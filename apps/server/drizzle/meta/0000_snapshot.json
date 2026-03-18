@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "b2a5c144-d027-49ea-a496-e71d85540b8e",
+  "id": "4c3f21fe-2f29-4fba-bdf4-a1209c17aae1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -1994,6 +1994,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "int",
@@ -2230,14 +2237,14 @@
         },
         "front": {
           "name": "front",
-          "type": "text",
+          "type": "json",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "back": {
           "name": "back",
-          "type": "text",
+          "type": "json",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

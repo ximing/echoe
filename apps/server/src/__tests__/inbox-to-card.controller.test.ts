@@ -158,6 +158,13 @@ describe('InboxToCardController', () => {
     // Create mock services
     mockInboxService = {
       findByIdAndUid: jest.fn(),
+      convertToPlainText: jest.fn((content) => {
+        // Simple mock: if it's a string, return as-is; if it's an object, return a placeholder
+        if (typeof content === 'string') {
+          return content;
+        }
+        return 'Converted content';
+      }),
     } as unknown as jest.Mocked<InboxService>;
 
     mockEchoeNoteService = {

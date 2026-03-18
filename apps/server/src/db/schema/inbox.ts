@@ -1,7 +1,7 @@
 import {
   mysqlTable,
   varchar,
-  text,
+  json,
   boolean,
   bigint,
   timestamp,
@@ -9,6 +9,7 @@ import {
   unique,
   int,
 } from 'drizzle-orm/mysql-core';
+import type { ProseMirrorJsonDoc } from '../../types/note-fields.js';
 
 /**
  * Inbox table - stores captured content with read state and source metadata
@@ -20,8 +21,8 @@ export const inbox = mysqlTable(
     id: int('id').primaryKey().autoincrement(), // Auto-increment primary key
     inboxId: varchar('inbox_id', { length: 191 }).notNull(), // Business ID (nanoid with 'i' prefix)
     uid: varchar('uid', { length: 191 }).notNull(), // User ID (owner of this inbox item)
-    front: text('front').notNull().$type<string>(), // Front side/question content
-    back: text('back'), // Back side/answer content
+    front: json('front').notNull().$type<ProseMirrorJsonDoc | string>(), // Front side/question content (TipTap JSON or plain text)
+    back: json('back').$type<ProseMirrorJsonDoc | string>(), // Back side/answer content (TipTap JSON or plain text)
     source: varchar('source', { length: 191 }), // Source of the item - dynamic user-defined value
     category: varchar('category', { length: 191 }), // Category/tag for organizing - dynamic user-defined value
     isRead: boolean('is_read').default(false).notNull(), // Read state (false = unread, true = read)

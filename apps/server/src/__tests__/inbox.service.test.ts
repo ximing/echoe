@@ -17,9 +17,37 @@ jest.mock('../db/connection.js', () => ({
   getDatabase: jest.fn(),
 }));
 
+// Mock prosemirror-serializer
+jest.mock('../lib/prosemirror-serializer.js', () => ({
+  serializeToHtml: jest.fn((doc) => {
+    // Simple mock: convert JSON to a basic HTML representation
+    if (doc.type === 'doc' && doc.content) {
+      return doc.content.map((node: any) => {
+        if (node.type === 'paragraph' && node.content) {
+          return `<p>${node.content.map((n: any) => n.text || '').join('')}</p>`;
+        }
+        return '';
+      }).join('');
+    }
+    return '';
+  }),
+  serializeToPlainText: jest.fn((doc) => {
+    if (doc.type === 'doc' && doc.content) {
+      return doc.content.map((node: any) => {
+        if (node.type === 'paragraph' && node.content) {
+          return node.content.map((n: any) => n.text || '').join('');
+        }
+        return '';
+      }).join('');
+    }
+    return '';
+  }),
+}));
+
 // Import after mocks
 import { getDatabase } from '../db/connection.js';
 import { InboxService, CreateInboxParams, ListInboxParams } from '../services/inbox.service.js';
+import { serializeToHtml } from '../lib/prosemirror-serializer.js';
 
 const mockedGetDatabase = getDatabase as jest.MockedFunction<typeof getDatabase>;
 
@@ -93,8 +121,35 @@ describe('InboxService', () => {
 
       // Verify data was inserted
       expect(insertedData.uid).toBe('test-uid');
-      expect(insertedData.front).toBe('Front content');
-      expect(insertedData.back).toBe('Back content');
+      // Plain text is now converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
       expect(insertedData.source).toBe('manual');
       expect(insertedData.category).toBe('backend');
       expect(insertedData.isRead).toBe(false);
@@ -242,6 +297,421 @@ describe('InboxService', () => {
 
       expect(mockSourceService.create).toHaveBeenCalledWith('test-uid', 'new-source');
       expect(mockCategoryService.create).toHaveBeenCalledWith('test-uid', 'new-category');
+    });
+
+    it('should store frontJson directly as JSON when provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Test content' }] }] },
+        back: 'Back content',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const frontJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Test content',
+              },
+            ],
+          },
+        ],
+      };
+
+      const params: CreateInboxParams = {
+        front: 'This should be ignored',
+        back: 'Back content',
+        frontJson,
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify frontJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(insertedData.front).toEqual(frontJson);
+      // back should be converted to JSON since only plain text provided
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should store backJson directly as JSON when provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front content',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Back content' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const backJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      };
+
+      const params: CreateInboxParams = {
+        front: 'Front content',
+        back: 'This should be ignored',
+        backJson,
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify backJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      // front should be converted to JSON since only plain text provided
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
+      expect(insertedData.back).toEqual(backJson);
+    });
+
+    it('should store both frontJson and backJson directly as JSON when provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Front content' }] }] },
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Back content' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const frontJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      };
+
+      const backJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      };
+
+      const params: CreateInboxParams = {
+        front: 'Should be ignored',
+        back: 'Should be ignored',
+        frontJson,
+        backJson,
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify both are stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(insertedData.front).toEqual(frontJson);
+      expect(insertedData.back).toEqual(backJson);
+    });
+
+    it('should convert plain text front to TipTap JSON when frontJson not provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front text' }] }] },
+        back: 'Back content',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Plain front text',
+        back: 'Back content',
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify plain text is converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front text',
+              },
+            ],
+          },
+        ],
+      });
+      // Back should also be converted to JSON
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Back content',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert plain text back to TipTap JSON when backJson not provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front content',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back text' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      let insertedData: any;
+
+      const whereFn = jest.fn().mockResolvedValue([mockInboxItem]);
+      const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+      const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+      const mockDb = {
+        select: selectFn,
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((data: any) => {
+            insertedData = data;
+            return Promise.resolve();
+          }),
+        }),
+        update: jest.fn(),
+      };
+
+      mockedGetDatabase.mockReturnValue(mockDb);
+
+      const params: CreateInboxParams = {
+        front: 'Front content',
+        back: 'Plain back text',
+      };
+
+      await service.create('test-uid', params);
+
+      // Verify both front and back plain text are converted to TipTap JSON
+      expect(insertedData.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Front content',
+              },
+            ],
+          },
+        ],
+      });
+      expect(insertedData.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back text',
+              },
+            ],
+          },
+        ],
+      });
+    });
+  });
+
+  describe('convertPlainTextToTipTapJson', () => {
+    it('should convert plain text to TipTap JSON format', () => {
+      const text = 'Hello World';
+      const result = service.convertPlainTextToTipTapJson(text);
+
+      expect(result).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Hello World',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should handle empty string', () => {
+      const text = '';
+      const result = service.convertPlainTextToTipTapJson(text);
+
+      expect(result).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: '',
+              },
+            ],
+          },
+        ],
+      });
     });
   });
 
@@ -729,6 +1199,408 @@ describe('InboxService', () => {
 
       expect(result.category).toBeNull();
       expect(mockCategoryService.create).not.toHaveBeenCalled();
+    });
+
+    it('should store frontJson directly as JSON when updating', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated front' }] }] },
+        back: 'Back',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const frontJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Updated front',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.update('test-uid', 'i123', {
+        frontJson,
+      });
+
+      // Verify frontJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(result.front).toEqual(frontJson);
+    });
+
+    it('should store backJson directly as JSON when updating', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated back' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const backJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Updated back',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.update('test-uid', 'i123', {
+        backJson,
+      });
+
+      // Verify backJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(result.back).toEqual(backJson);
+    });
+
+    it('should prioritize frontJson over front when both provided', async () => {
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: '<p>From JSON</p>',
+        back: 'Back',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const frontJson = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'From JSON',
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.update('test-uid', 'i123', {
+        front: 'Plain text should be ignored',
+        frontJson,
+      });
+
+      // Should use JSON, not plain text
+      expect(result.front).toBe('<p>From JSON</p>');
+    });
+
+    it('should convert plain text front to TipTap JSON when frontJson not provided', async () => {
+      // Mock the updated inbox item with the converted front text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        // This is what would be stored after converting plain text to TipTap JSON
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front text' }] }] },
+        back: 'Back',
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        front: 'Plain front text',
+      });
+
+      // Verify plain text is converted to TipTap JSON
+      expect(result.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front text',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert plain text back to TipTap JSON when backJson not provided', async () => {
+      // Mock the updated inbox item with the converted back text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        front: 'Front',
+        // This is what would be stored after converting plain text to TipTap JSON
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back text' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        back: 'Plain back text',
+      });
+
+      // Verify plain text is converted to TipTap JSON
+      expect(result.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back text',
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should convert both plain text front and back to TipTap JSON when updating', async () => {
+      // Mock the updated inbox item with the converted front and back text
+      const mockInboxItem = {
+        inboxId: 'i123',
+        uid: 'test-uid',
+        // These are what would be stored after converting plain text to TipTap JSON
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain front' }] }] },
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Plain back' }] }] },
+        source: 'manual',
+        category: 'backend',
+        isRead: false,
+        deletedAt: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const selectMock = jest.fn();
+      const fromMock = jest.fn();
+      const whereMock = jest.fn();
+      const limitMock = jest.fn();
+
+      const mockWhereResult1 = Object.assign(Promise.resolve([{ inboxId: 'i123', uid: 'test-uid' }]), {
+        limit: limitMock.mockResolvedValueOnce([{ inboxId: 'i123', uid: 'test-uid' }]),
+      });
+      const mockWhereResult2 = Promise.resolve([mockInboxItem]);
+
+      whereMock
+        .mockReturnValueOnce(mockWhereResult1)
+        .mockReturnValueOnce(mockWhereResult2);
+
+      fromMock.mockReturnValue({ where: whereMock });
+      selectMock.mockReturnValue({ from: fromMock });
+
+      mockedGetDatabase.mockReturnValue({
+        select: selectMock,
+        insert: jest.fn(),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      } as any);
+
+      const result = await service.update('test-uid', 'i123', {
+        front: 'Plain front',
+        back: 'Plain back',
+      });
+
+      // Verify both plain texts are converted to TipTap JSON
+      expect(result.front).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain front',
+              },
+            ],
+          },
+        ],
+      });
+      expect(result.back).toEqual({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain back',
+              },
+            ],
+          },
+        ],
+      });
     });
   });
 

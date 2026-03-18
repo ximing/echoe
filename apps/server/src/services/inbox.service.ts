@@ -8,12 +8,16 @@ import { logger } from '../utils/logger.js';
 import { InboxMetricsService } from './inbox-metrics.service.js';
 import { InboxSourceService } from './inbox-source.service.js';
 import { InboxCategoryService } from './inbox-category.service.js';
+import { serializeToPlainText } from '../lib/prosemirror-serializer.js';
 
 import type { Inbox, NewInbox } from '../db/schema/inbox.js';
+import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
 
 export interface CreateInboxParams {
-  front: string;
-  back: string;
+  front?: string;
+  back?: string;
+  frontJson?: Record<string, unknown>;
+  backJson?: Record<string, unknown>;
   source?: string;
   category?: string;
   isRead?: boolean;
@@ -22,6 +26,8 @@ export interface CreateInboxParams {
 export interface UpdateInboxParams {
   front?: string;
   back?: string;
+  frontJson?: Record<string, unknown>;
+  backJson?: Record<string, unknown>;
   source?: string | null;
   category?: string | null;
   isRead?: boolean;
@@ -52,11 +58,63 @@ export class InboxService {
   ) {}
 
   /**
+   * Convert plain text to TipTap JSON format
+   * @param text - Plain text string
+   * @returns TipTap JSON document
+   */
+  convertPlainTextToTipTapJson(text: string): ProseMirrorJsonDoc {
+    return {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: text,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /**
+   * Convert stored inbox content (JSON or plain text) to plain text
+   * Used when converting inbox to card
+   * @param content - Stored content (JSON or plain text)
+   * @returns Plain text string
+   */
+  convertToPlainText(content: ProseMirrorJsonDoc | string | null | undefined): string {
+    if (!content) {
+      return '';
+    }
+
+    // If it's already a string, return as-is
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    // If it's JSON, convert to plain text
+    try {
+      return serializeToPlainText(content as ProseMirrorJsonDoc);
+    } catch (error) {
+      logger.error('Error converting JSON to plain text:', error);
+      return '';
+    }
+  }
+
+  /**
    * Create a new inbox item
    */
   async create(uid: string, data: CreateInboxParams): Promise<Inbox> {
     try {
       const db = getDatabase();
+
+      // Validate: at least frontJson or front must be provided
+      if (!data.frontJson && !data.front) {
+        throw new Error('frontJson or front must be provided');
+      }
 
       const inboxId = generateInboxId();
 
@@ -72,11 +130,35 @@ export class InboxService {
         await this.categoryService.create(uid, data.category);
       }
 
+      // Process front content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
+      // Note: validation ensures either frontJson or front is provided
+      let frontContent: ProseMirrorJsonDoc | string;
+      if (data.frontJson) {
+        frontContent = data.frontJson as unknown as ProseMirrorJsonDoc;
+      } else {
+        // front is guaranteed to exist due to earlier validation
+        frontContent = this.convertPlainTextToTipTapJson(data.front!);
+      }
+
+      // Process back content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
+      // Note: back is optional, so we need to handle undefined case
+      let backContent: ProseMirrorJsonDoc | string | undefined;
+      if (data.backJson) {
+        backContent = data.backJson as unknown as ProseMirrorJsonDoc;
+      } else if (data.back) {
+        // Convert plain text to TipTap JSON
+        backContent = this.convertPlainTextToTipTapJson(data.back);
+      }
+
       const newInboxItem: NewInbox = {
         inboxId,
         uid,
-        front: data.front,
-        back: data.back,
+        front: frontContent,
+        back: backContent,
         source: sourceValue,
         category: categoryValue,
         isRead: data.isRead ?? false,
@@ -192,8 +274,27 @@ export class InboxService {
 
       // Build update values
       const updateValues: Partial<NewInbox> = {};
-      if (data.front !== undefined) updateValues.front = data.front;
-      if (data.back !== undefined) updateValues.back = data.back;
+
+      // Process front content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
+      if (data.frontJson !== undefined) {
+        updateValues.front = data.frontJson as unknown as ProseMirrorJsonDoc;
+      } else if (data.front !== undefined) {
+        // Convert plain text to TipTap JSON
+        updateValues.front = this.convertPlainTextToTipTapJson(data.front);
+      }
+
+      // Process back content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
+      // If only plain text provided, convert to TipTap JSON
+      if (data.backJson !== undefined) {
+        updateValues.back = data.backJson as unknown as ProseMirrorJsonDoc;
+      } else if (data.back !== undefined) {
+        // Convert plain text to TipTap JSON
+        updateValues.back = this.convertPlainTextToTipTapJson(data.back);
+      }
+
       if (data.source !== undefined) updateValues.source = data.source;
       if (data.category !== undefined) updateValues.category = data.category;
       if (data.isRead !== undefined) updateValues.isRead = data.isRead;

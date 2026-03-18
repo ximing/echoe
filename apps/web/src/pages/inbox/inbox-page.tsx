@@ -5,6 +5,8 @@ import { InboxService } from '../../services/inbox.service.js';
 import type { InboxListItemDto } from '@echoe/dto';
 import * as inboxSourceCategoryApi from '../../api/inbox-source-category.js';
 import { toast } from '../../services/toast.service.js';
+import { RichTextEditor } from '../../components/echoe/RichTextEditor.js';
+import { RichTextRenderer } from '../../components/echoe/RichTextRenderer.js';
 import {
   Plus,
   Edit,
@@ -16,6 +18,37 @@ import {
   Filter,
   X,
 } from 'lucide-react';
+
+/**
+ * Convert content (string or JSON) to string for display
+ * Handles both plain text and TipTap JSON format
+ */
+function contentToString(content: string | Record<string, unknown> | null | undefined): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  // For JSON content, extract text from the JSON structure
+  // TipTap JSON typically has content array with text nodes
+  if (typeof content === 'object' && content !== null) {
+    const json = content as { content?: Array<{ text?: string }> };
+    if (json.content && Array.isArray(json.content)) {
+      return json.content.map((node) => node.text || '').join('');
+    }
+  }
+  return '';
+}
+
+/**
+ * Truncate content (string or JSON) to a specified character limit
+ * Strips HTML tags and returns plain text preview
+ */
+function truncateContent(
+  content: string | Record<string, unknown> | null | undefined,
+  maxLength: number = 100
+): string {
+  const text = contentToString(content);
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
 
 export const InboxPage = view(() => {
   const inboxService = useService(InboxService);
@@ -279,18 +312,18 @@ export const InboxPage = view(() => {
                         <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                           正面:
                         </span>
-                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                          {typeof item.front === 'string' ? item.front : JSON.stringify(item.front)}
-                        </p>
+                        <div className="text-sm text-gray-900 dark:text-gray-100 mt-1 line-clamp-2">
+                          {truncateContent(item.front, 100)}
+                        </div>
                       </div>
                       {item.back && (
                         <div>
                           <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                             背面:
                           </span>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                            {typeof item.back === 'string' ? item.back : JSON.stringify(item.back)}
-                          </p>
+                          <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                            {truncateContent(item.back, 100)}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -401,7 +434,7 @@ export const InboxPage = view(() => {
       {/* Delete Dialog */}
       {showDeleteDialog && selectedItem && (
         <DeleteConfirmDialog
-          itemName={typeof selectedItem.front === 'string' ? selectedItem.front : JSON.stringify(selectedItem.front)}
+          itemName={truncateContent(selectedItem.front, 50)}
           onClose={() => {
             setShowDeleteDialog(false);
             setSelectedItem(null);
@@ -441,15 +474,15 @@ const CreateInboxDialog = view(
   }: {
     onClose: () => void;
     onSubmit: (data: {
-      front: string;
-      back: string;
+      frontJson?: Record<string, unknown>;
+      backJson?: Record<string, unknown>;
       source?: string;
       category?: string;
     }) => Promise<void>;
   }) => {
     const inboxService = useService(InboxService);
-    const [front, setFront] = useState('');
-    const [back, setBack] = useState('');
+    const [frontJson, setFrontJson] = useState<Record<string, unknown> | undefined>(undefined);
+    const [backJson, setBackJson] = useState<Record<string, unknown> | undefined>(undefined);
     const [source, setSource] = useState<string>('');
     const [category, setCategory] = useState<string>('');
     const [newSourceInput, setNewSourceInput] = useState('');
@@ -457,6 +490,9 @@ const CreateInboxDialog = view(
     const [isCreatingSource, setIsCreatingSource] = useState(false);
     const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Check if front content exists
+    const hasFrontContent = frontJson && Object.keys(frontJson).length > 0;
 
     const handleCreateSource = async () => {
       if (!newSourceInput.trim()) return;
@@ -498,13 +534,13 @@ const CreateInboxDialog = view(
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!front.trim()) return;
+      if (!hasFrontContent) return;
 
       setIsSubmitting(true);
       try {
         await onSubmit({
-          front: front.trim(),
-          back: back.trim(),
+          frontJson,
+          backJson,
           source: source || undefined,
           category: category || undefined,
         });
@@ -530,25 +566,26 @@ const CreateInboxDialog = view(
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 正面内容 *
               </label>
-              <textarea
-                value={front}
-                onChange={(e) => setFront(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
-                required
+              <RichTextEditor
+                content=""
+                onChange={(_html, json) => {
+                  setFrontJson(json);
+                }}
                 placeholder="输入正面内容..."
+                minHeight="120px"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 背面内容
               </label>
-              <textarea
-                value={back}
-                onChange={(e) => setBack(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
+              <RichTextEditor
+                content=""
+                onChange={(_html, json) => {
+                  setBackJson(json);
+                }}
                 placeholder="输入背面内容..."
+                minHeight="120px"
               />
             </div>
             <div>
@@ -657,7 +694,7 @@ const CreateInboxDialog = view(
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !front.trim()}
+                disabled={isSubmitting || !hasFrontContent}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSubmitting && (
@@ -683,15 +720,20 @@ const EditInboxDialog = view(
     item: InboxListItemDto;
     onClose: () => void;
     onSubmit: (data: {
-      front?: string;
-      back?: string;
+      frontJson?: Record<string, unknown>;
+      backJson?: Record<string, unknown>;
       source?: string | null;
       category?: string | null;
     }) => Promise<void>;
   }) => {
     const inboxService = useService(InboxService);
-    const [front, setFront] = useState(typeof item.front === 'string' ? item.front : JSON.stringify(item.front));
-    const [back, setBack] = useState(typeof item.back === 'string' ? item.back : (item.back ? JSON.stringify(item.back) : ''));
+    // Initialize frontJson from item.front if it's already in JSON format
+    const [frontJson, setFrontJson] = useState<Record<string, unknown> | undefined>(
+      typeof item.front === 'object' ? (item.front as Record<string, unknown>) : undefined
+    );
+    const [backJson, setBackJson] = useState<Record<string, unknown> | undefined>(
+      item.back && typeof item.back === 'object' ? (item.back as Record<string, unknown>) : undefined
+    );
     const [source, setSource] = useState<string>(item.source || '');
     const [category, setCategory] = useState<string>(item.category || '');
     const [newSourceInput, setNewSourceInput] = useState('');
@@ -699,6 +741,11 @@ const EditInboxDialog = view(
     const [isCreatingSource, setIsCreatingSource] = useState(false);
     const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Check if front content exists (either in JSON state or initial item)
+    const hasFrontContent =
+      (frontJson && Object.keys(frontJson).length > 0) ||
+      (typeof item.front === 'string' && item.front.trim().length > 0);
 
     const handleCreateSource = async () => {
       if (!newSourceInput.trim()) return;
@@ -740,13 +787,13 @@ const EditInboxDialog = view(
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!front.trim()) return;
+      if (!hasFrontContent) return;
 
       setIsSubmitting(true);
       try {
         await onSubmit({
-          front: front.trim(),
-          back: back.trim(),
+          frontJson,
+          backJson,
           source: source || undefined,
           category: category || undefined,
         });
@@ -772,23 +819,24 @@ const EditInboxDialog = view(
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 正面内容 *
               </label>
-              <textarea
-                value={front}
-                onChange={(e) => setFront(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
-                required
+              <RichTextEditor
+                content={item.front}
+                onChange={(_html, json) => {
+                  setFrontJson(json);
+                }}
+                minHeight="120px"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 背面内容
               </label>
-              <textarea
-                value={back}
-                onChange={(e) => setBack(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
+              <RichTextEditor
+                content={item.back ?? ''}
+                onChange={(_html, json) => {
+                  setBackJson(json);
+                }}
+                minHeight="120px"
               />
             </div>
             <div>
@@ -897,7 +945,7 @@ const EditInboxDialog = view(
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !front.trim()}
+                disabled={isSubmitting || !hasFrontContent}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSubmitting && (
@@ -970,6 +1018,7 @@ const DeleteConfirmDialog = view(
 // Convert to Card Dialog Component
 const ConvertToCardDialog = view(
   ({
+    item,
     onClose,
     onSubmit,
   }: {
@@ -998,7 +1047,7 @@ const ConvertToCardDialog = view(
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="bg-white dark:bg-dark-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50">转换为卡片</h2>
             <button
@@ -1009,6 +1058,24 @@ const ConvertToCardDialog = view(
             </button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Content Preview */}
+            <div className="space-y-3">
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">正面</h3>
+                <RichTextRenderer
+                  content={item.front}
+                  className="text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">背面</h3>
+                <RichTextRenderer
+                  content={item.back ?? undefined}
+                  className="text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            </div>
+
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />

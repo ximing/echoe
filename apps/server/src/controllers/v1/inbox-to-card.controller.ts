@@ -135,10 +135,11 @@ export class InboxToCardController {
       }
 
       // 6. Build fields object for note creation
+      // Convert stored JSON content to plain text for Note fields
       const fields: Record<string, string> = {};
-      fields[frontFieldName] = inboxItem.front;
+      fields[frontFieldName] = this.inboxService.convertToPlainText(inboxItem.front);
       if (backFieldName !== undefined) {
-        fields[backFieldName] = inboxItem.back || '';
+        fields[backFieldName] = this.inboxService.convertToPlainText(inboxItem.back) || '';
       }
 
       // 7. Create note and cards
@@ -213,7 +214,9 @@ export class InboxToCardController {
     // Select notetype based on content complexity
     // If back is empty or very short, prefer cloze-style (type=1)
     // Otherwise, prefer standard Q&A (type=0)
-    const backLength = (inboxItem.back || '').length;
+    // Convert JSON to plain text for length calculation
+    const backText = this.inboxService.convertToPlainText(inboxItem.back);
+    const backLength = backText.length;
     let selectedNotetype = notetypes.find((n) => (backLength < 20 ? n.type === 1 : n.type === 0));
     if (!selectedNotetype) {
       // Fallback: Use the first notetype
