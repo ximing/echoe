@@ -1,6 +1,6 @@
 ---
 name: maintain-adr
-description: 维护 Echoe 的 ADR 知识库。每次运行都要增量更新 `.claude/skills/arch.adr/references/*.md`，并同步更新 `.claude/skills/arch.adr/SKILL.md` 索引。用户提到“沉淀规则/更新 ADR/维护 Guardrails/维护 Source of Truth/防止架构漂移”时必须启用。
+description: 维护 Echoe 的 ADR 知识库。每次运行先给出简明变更说明并与用户确认，再增量更新 `.claude/skills/arch.adr/references/*.md`，并同步更新 `.claude/skills/arch.adr/SKILL.md` 索引。用户提到“沉淀规则/更新 ADR/维护 Guardrails/维护 Source of Truth/防止架构漂移”时必须启用。
 ---
 
 # Echoe ADR 维护技能（Write）
@@ -80,6 +80,16 @@ description: 维护 Echoe 的 ADR 知识库。每次运行都要增量更新 `.c
 - 替代（Supersede）
 - 废弃（Deprecate）
 
+### Step 2.5：写入前确认（强制）
+在真正写入文件前，先向用户给出简明说明并确认：
+- 用 3~7 条短 bullet 概述拟变更（ADR-ID、变更类型、核心决策、证据来源、影响面）
+- 明确标注“待写入文件清单”（references 与索引）
+- 显式询问用户“以上是否正确，是否开始写入？”
+
+约束：
+- 未获得用户确认前，不得写入任何 ADR 文件或索引文件
+- 若用户提出修正，先更新草案说明，再次确认后再写入
+
 ### Step 3：落盘 ADR
 每个 ADR 文件至少包含：
 - Status
@@ -104,7 +114,7 @@ description: 维护 Echoe 的 ADR 知识库。每次运行都要增量更新 `.c
 2. 变更文件列表
 3. 对技术方案设计的新增约束
 4. 对 PRD 设计的新增事实
-5. 待确认项（仅证据不足时）
+5. 确认状态与待确认项（如有）
 
 ## 质量门槛
 - 每条 ADR 必须有证据路径

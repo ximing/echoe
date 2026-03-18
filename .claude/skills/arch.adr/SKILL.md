@@ -72,9 +72,12 @@ ADR 的权威来源是：
 | ENG-0003  | ENG  | 认证与安全约束                                   | Accepted | `references/ENG-0003-auth-security-constraints.md`         |
 | ENG-0004  | ENG  | 前端架构约束                                     | Accepted | `references/ENG-0004-frontend-architecture-constraints.md` |
 | ENG-0005  | ENG  | 后端架构约束                                     | Accepted | `references/ENG-0005-backend-architecture-constraints.md`  |
+| ENG-0006  | ENG  | APKG 导入架构：浏览器解析 + 服务端导入           | Accepted | `references/ENG-0006-apkg-import-architecture.md`          |
+| ENG-0007  | ENG  | 导入错误处理策略：优雅降级                       | Accepted | `references/ENG-0007-import-error-handling.md`             |
 | BIZ-0001  | BIZ  | 媒体存储：private bucket + storageKey + 动态访问 | Accepted | `references/BIZ-0001-media-storage-private-access.md`      |
 | BIZ-0002  | BIZ  | 卡片字段模型：richTextFields 与 Anki 兼容链路    | Accepted | `references/BIZ-0002-card-richtext-anki-compat.md`         |
 | BIZ-0003  | BIZ  | AI 模型调用链：LLMService 与用户模型配置         | Accepted | `references/BIZ-0003-llm-user-model-call-chain.md`         |
+| BIZ-0004  | BIZ  | 媒体文件导入处理策略                             | Accepted | `references/BIZ-0004-media-import-strategy.md`             |
 
 ## 示例触发语句
 
