@@ -148,3 +148,59 @@ Started: 2026年 3月 17日 星期二 CST
   - Plain text can be converted to TipTap JSON using a simple structure: {type: 'doc', content: [{type: 'paragraph', content: [{type: 'text', text: '...'}]}]}
   - The normalizeNoteFields function already handles richTextFields if provided
 ---
+## 2026-03-18 16:35 - US-002
+- Implemented Deck selection for APKG import (CSV already had it)
+- Files changed:
+  - apps/server/src/services/echoe-import.service.ts: Added targetDeckId parameter to importApkg, importStandardAnki, importLegacyEchoe
+  - apps/server/src/services/echoe-import.service.ts: Added mapAllDecksToTarget and mapAllDecksToTargetFromDb helpers
+  - apps/server/src/controllers/v1/echoe-import.controller.ts: Added deckId query parameter
+  - apps/web/src/api/echoe.ts: Updated importApkg to accept optional deckId parameter
+  - apps/web/src/pages/cards/apkg-import.tsx: Added deck selection dropdown with EchoeDeckService
+  - apps/web/src/pages/inbox/inbox-page.tsx: Fixed TypeScript errors for rich text field display
+
+**Learnings for future iterations:**
+  - CSV import already had deck selection via csvImportService.selectedDeckId
+  - APKG import needed both backend and frontend changes to support deck selection
+  - When targetDeckId is provided, all source deck IDs are mapped to the target deck (no new decks created)
+  - The mapping happens in referenceMap.didToDeckId which is used when importing cards
+  - Both standard Anki (col.json) and legacy Echoe (SQLite) formats needed separate mapping helpers
+  - Target deck validation ensures the deck exists and belongs to the user before mapping
+  - Frontend deck selection is optional - empty value means "import deck structure from .apkg"
+  - Fixed pre-existing TypeScript errors in inbox-page.tsx where rich text fields needed string conversion
+---
+## 2026-03-18 17:00 - US-003
+- Implemented batch processing structure for CSV import
+- Files changed:
+  - apps/server/src/services/echoe-csv-import.service.ts: Added BATCH_SIZE=50 and batch processing loop
+
+**Learnings for future iterations:**
+  - CSV and APKG imports both happen entirely server-side after file upload
+  - "批量调用 API" (batch API calls) doesn't apply here - the file is uploaded once and processed server-side
+  - Added batch structure (process 50 rows at a time) for better code organization and progress logging
+  - Each batch completion is logged for monitoring: "CSV import progress: X/Y rows processed"
+  - APKG import already uses efficient batch database inserts, no changes needed
+  - True performance optimization would require refactoring createNote to accept arrays and use bulk inserts
+  - Current implementation maintains correctness while adding structure for future progress reporting (US-004)
+---
+## 2026-03-18 17:15 - US-004 (Incomplete)
+- Analyzed requirements for real-time progress bar
+- Current state:
+  - Both CSV and APKG import pages already show loading spinner during import
+  - Both pages show detailed statistics after completion
+  - Missing: Real-time progress updates showing "笔记: xx/xx" format during import
+
+**Learnings for future iterations:**
+  - Real-time progress requires Server-Sent Events (SSE) or WebSocket infrastructure
+  - Current architecture: File uploads -> backend processes entirely -> returns final result
+  - To implement real-time progress:
+    1. Add SSE endpoint (e.g., GET /api/v1/import/progress/:jobId)
+    2. Backend emits progress events during import processing
+    3. Frontend listens to SSE stream and updates progress bar
+    4. Use job ID to track individual import operations
+  - Alternative simpler approach: Polling endpoint that returns current progress
+  - Both imports already have batch structure (US-003) which makes progress tracking feasible
+  - APKG import shows: notes, cards, decks, notetypes, media, revlog counts
+  - CSV import shows: added, updated, skipped counts
+  - Consider using a library like `express-sse` or native Response streaming
+  - Progress updates should include: current count, total count, percentage, estimated time remaining
+---
