@@ -1,118 +1,69 @@
 {
   "project": "Echoe",
-  "branchName": "ralph/anki-apkg-import",
-  "description": "Anki .apkg 文件导入功能 - 支持直接导入 Anki 的 .apkg 文件，解析 ZIP 和 SQLite 数据库，保持模板样式和媒体文件",
+  "branchName": "ralph/import-optimization",
+  "description": "导入功能优化：修复富文本解析、添加Deck选择、批量导入、进度条显示",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add JSZip and sql.js dependencies",
-      "description": "As a developer, I need to add JSZip and sql.js libraries to the web app for parsing .apkg files in the browser.",
+      "title": "修复导入时富文本字段解析",
+      "description": "作为开发者，我需要在导入时正确解析富文本内容，确保 rich_text_fields 字段被正确填充。",
       "acceptanceCriteria": [
-        "Add jszip package to apps/web",
-        "Add sql.js package to apps/web",
+        "导入笔记时同时填充 content (纯文本) 和 rich_text_fields (TipTap JSON)",
+        "纯文本从富文本 HTML 中提取",
+        "csv-import.tsx 中的导入逻辑正确解析 rich_text_fields",
+        "apkg-import.tsx 中的导入逻辑正确解析 rich_text_fields",
         "Typecheck passes"
       ],
       "priority": 1,
       "passes": true,
-      "notes": ""
+      "notes": "Implemented richTextFields parsing in both CSV and APKG import services"
     },
     {
       "id": "US-002",
-      "title": "Create APKG parser service",
-      "description": "As a developer, I need to create a parser service that can extract and parse .apkg files in the browser.",
+      "title": "添加 Deck 选择功能到导入页面",
+      "description": "作为用户，我想在导入时选择要将笔记导入到哪个 Deck，而不是全部导入到 Default。",
       "acceptanceCriteria": [
-        "Create apkg-parser.service.ts in apps/web/src/services/",
-        "Use JSZip to unzip .apkg file",
-        "Detect and extract collection.anki21 or collection.anki2 SQLite database",
-        "Use sql.js to open and query SQLite database",
-        "Parse media JSON mapping file",
-        "Support both anki21 and anki2 formats",
-        "Typecheck passes"
+        "csv-import.tsx 页面显示 Deck 下拉选择框",
+        "apkg-import.tsx 页面显示 Deck 下拉选择框",
+        "下拉框显示当前用户的所有 Deck",
+        "选择 Deck 后，导入的笔记属于该 Deck",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Add import notes API endpoint",
-      "description": "As a user, I want to import Anki notes and cards into Echoe via API.",
+      "title": "实现批量导入机制",
+      "description": "作为用户，我希望导入过程更快，不用一个个等待。每50条提交一次。",
       "acceptanceCriteria": [
-        "Create POST /api/v1/import/anki endpoint",
-        "Accept parsed Anki data (notes, cards, models, decks) in request body",
-        "Convert Anki notes to Echoe notes format",
-        "Parse Anki templates (qfmt, afmt) and store HTML content",
-        "Parse CSS from models and apply to notes",
-        "Create notes in database as new records",
-        "Create corresponding deck/folder structure from Anki decks",
+        "csv-import.tsx 实现每50条批量调用 createNote API",
+        "apkg-import.tsx 实现每50条批量调用 createNote API",
+        "媒体文件保持逐个上传",
+        "批量提交失败时记录失败条目",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Add import review history API endpoint",
-      "description": "As a user, I want to import my Anki review history so I can continue learning with existing progress.",
+      "title": "添加可视化进度条",
+      "description": "作为用户，我想清楚看到导入进度，知道还需要多久完成。",
       "acceptanceCriteria": [
-        "Add revlog parsing to import endpoint",
-        "Convert revlog entries to Echoe FSRS review records",
-        "Import review history with original timestamps",
-        "Preserve interval and ease factor data",
-        "Typecheck passes"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-005",
-      "title": "Add media file import support",
-      "description": "As a user, I want to import images and audio files from Anki cards.",
-      "acceptanceCriteria": [
-        "Extract media files from unzipped apkg",
-        "Parse media JSON mapping (数字文件名 -> 原始文件名)",
-        "Upload media files to Echoe storage via existing API",
-        "Update note content to use new media URLs",
-        "Support common media types: images (jpg, png, gif, svg), audio (mp3, wav, ogg), video (mp4, webm)",
-        "Typecheck passes"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-006",
-      "title": "Create Anki import UI",
-      "description": "As a user, I want a user interface to upload and import Anki .apkg files.",
-      "acceptanceCriteria": [
-        "Create ImportPage in apps/web/src/pages/",
-        "Add file upload component with drag-and-drop support",
-        "Add .apkg file type validation",
-        "Show import progress (parsing, uploading, completed)",
-        "Display import statistics (notes count, cards count, media count)",
+        "导入页面显示进度条组件",
+        "显示 '笔记: xx/xx' 格式的进度",
+        "显示 '媒体: xx/xx' 格式的进度",
+        "进度实时更新",
+        "导入完成后显示完成状态",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 6,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-007",
-      "title": "Add import error handling",
-      "description": "As a user, I want to see clear error messages when import fails.",
-      "acceptanceCriteria": [
-        "Validate .apkg file format before processing",
-        "Handle corrupted SQLite database gracefully",
-        "Handle missing media files gracefully",
-        "Show specific error messages with suggested fixes",
-        "Rollback partial imports on failure",
-        "Typecheck passes"
-      ],
-      "priority": 7,
-      "passes": true,
+      "priority": 4,
+      "passes": false,
       "notes": ""
     }
   ]

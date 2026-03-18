@@ -133,3 +133,18 @@ Started: 2026年 3月 17日 星期二 CST
   - Error categorization (general, media, notetype, etc.) helps users understand what failed
   - User-friendly error messages should suggest actionable fixes (e.g., "re-export from Anki")
 ---
+## 2026-03-18 16:30 - US-001
+- Implemented richTextFields parsing for import功能
+- Files changed:
+  - apps/server/src/services/echoe-csv-import.service.ts: Added convertPlainTextToTipTapJson helper and richTextFields population
+  - apps/server/src/services/echoe-import.service.ts: Added parseHtmlToJson import and richTextFields parsing for APKG import
+  - apps/server/src/lib/prosemirror-serializer.ts: Added parseHtmlToJson function to convert HTML to TipTap JSON
+  - apps/server/src/controllers/v1/inbox.controller.ts: Fixed TypeScript type error
+
+**Learnings for future iterations:**
+  - The CSV import service creates notes via EchoeNoteService.createNote(), which accepts richTextFields parameter
+  - The APKG import service directly inserts into database, so richTextFields must be added to both update and insert operations
+  - TipTap's generateJSON function can parse HTML into ProseMirror JSON format
+  - Plain text can be converted to TipTap JSON using a simple structure: {type: 'doc', content: [{type: 'paragraph', content: [{type: 'text', text: '...'}]}]}
+  - The normalizeNoteFields function already handles richTextFields if provided
+---
