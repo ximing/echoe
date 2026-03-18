@@ -695,6 +695,8 @@ const EditInboxDialog = view(
     onSubmit: (data: {
       front?: string;
       back?: string;
+      frontJson?: Record<string, unknown>;
+      backJson?: Record<string, unknown>;
       source?: string | null;
       category?: string | null;
     }) => Promise<void>;
@@ -702,6 +704,8 @@ const EditInboxDialog = view(
     const inboxService = useService(InboxService);
     const [front, setFront] = useState(item.front);
     const [back, setBack] = useState(item.back ?? '');
+    const [frontJson, setFrontJson] = useState<Record<string, unknown> | undefined>(undefined);
+    const [backJson, setBackJson] = useState<Record<string, unknown> | undefined>(undefined);
     const [source, setSource] = useState<string>(item.source || '');
     const [category, setCategory] = useState<string>(item.category || '');
     const [newSourceInput, setNewSourceInput] = useState('');
@@ -757,6 +761,8 @@ const EditInboxDialog = view(
         await onSubmit({
           front: front.trim(),
           back: back.trim(),
+          frontJson,
+          backJson,
           source: source || undefined,
           category: category || undefined,
         });
@@ -782,23 +788,26 @@ const EditInboxDialog = view(
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 正面内容 *
               </label>
-              <textarea
-                value={front}
-                onChange={(e) => setFront(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
-                required
+              <RichTextEditor
+                content={item.front}
+                onChange={(html, json) => {
+                  setFront(html);
+                  setFrontJson(json);
+                }}
+                minHeight="120px"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 背面内容
               </label>
-              <textarea
-                value={back}
-                onChange={(e) => setBack(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
+              <RichTextEditor
+                content={item.back ?? ''}
+                onChange={(html, json) => {
+                  setBack(html);
+                  setBackJson(json);
+                }}
+                minHeight="120px"
               />
             </div>
             <div>
