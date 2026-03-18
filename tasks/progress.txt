@@ -47,3 +47,15 @@ Started: Wed Mar 18 00:00:00 CST 2026
   - UpdateInboxDto already supports optional frontJson/backJson fields (from US-001)
 ---
 
+## 2026-03-18 09:45 - US-004
+- Implemented rich text content preview in Inbox list
+- Files changed:
+  - `apps/web/src/pages/inbox/inbox-page.tsx`: Added truncateContent helper, updated list rendering
+- **Learnings for future iterations:**
+  - For list previews, plain text truncation is simpler than rendering full RichTextRenderer
+  - truncateContent strips HTML tags and returns plain text: `html.replace(/<[^>]*>/g, '')`
+  - Truncate to 100 characters with ellipsis: `text.substring(0, 100) + '...'`
+  - Works seamlessly for both plain text and HTML content (legacy data)
+  - TailwindCSS `line-clamp-2` provides additional visual truncation
+---
+
