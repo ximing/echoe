@@ -8,7 +8,6 @@ Started: Wed Mar 18 08:52:43 CST 2026
   - DTO 中添加 frontJson 和 backJson 字段（可选字段，用于前端传递 TipTap JSON）
   - InboxService 添加 convertPlainTextToTipTapJson() 转换方法
   - 纯文本自动转换为 TipTap JSON 格式存储
-  - JSON 直接存储（不转换）
   - 40 个单元测试覆盖转换逻辑
 - **Files changed**:
   - `packages/dto/src/inbox.dto.ts` - 添加 frontJson/backJson 字段
@@ -22,4 +21,23 @@ Started: Wed Mar 18 08:52:43 CST 2026
   - 服务端富文本存储使用 TipTap JSON 格式，与 Note 模块保持一致
   - JSON 列使用 `.$type<ProseMirrorJsonDoc | string>()` 支持向后兼容
   - 转换逻辑在 create 和 update 方法中复用 convertPlainTextToTipTapJson()
+
+## 2026-03-18 - US-002, US-003, US-004, US-005
+- **Status**: 已完成（之前会话实现）
+- **What was implemented**:
+  - US-002: CreateInboxDialog 使用 RichTextEditor，onChange 返回 JSON，提交时传递 frontJson/backJson
+  - US-003: EditInboxDialog 使用 RichTextEditor，正确解析纯文本和 JSON 两种格式
+  - US-004: 列表使用 truncateContent/contentToString 处理 JSON 格式内容，显示前 100 字符摘要
+  - US-005: ConvertToCardDialog 使用 RichTextRenderer 展示预览，转换时传递 TipTap JSON 格式
+- **Files changed**:
+  - `apps/web/src/pages/inbox/inbox-page.tsx` - 对话框使用 RichTextEditor，列表使用 truncateContent
+  - `apps/web/src/components/echoe/RichTextEditor.tsx` - 富文本编辑器组件
+  - `apps/web/src/components/echoe/RichTextRenderer.tsx` - 富文本渲染器组件
+- **Verification**:
+  - Typecheck: ✅ 通过
+- **Learnings for future iterations:**
+  - RichTextEditor 的 onChange 回调同时返回 HTML 和 JSON 格式
+  - 使用 `contentToString` 函数从 TipTap JSON 提取纯文本用于列表展示
+  - 编辑时初始化 frontJson: `typeof item.front === 'object' ? item.front : undefined`
+
 ---
