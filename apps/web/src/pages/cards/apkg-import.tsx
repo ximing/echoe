@@ -1,9 +1,12 @@
 import { view, useService } from '@rabjs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
+import { ApkgParserService } from '../../services/apkg-parser.service';
+import { EchoeNoteService } from '../../services/echoe-note.service';
+import { EchoeDeckService } from '../../services/echoe-deck.service';
 import * as echoeApi from '../../api/echoe';
-import type { ImportResultDto } from '@echoe/dto';
+import type { ImportResultDto, CreateEchoeNoteDto } from '@echoe/dto';
 import {
   ArrowLeft,
   Upload,
@@ -19,7 +22,16 @@ export default function ApkgImportPage() {
 
 const ApkgImportPageContent = view(() => {
   const toastService = useService(ToastService);
+  const apkgParserService = useService(ApkgParserService);
+  const noteTypeService = useService(EchoeNoteService);
+  const deckService = useService(EchoeDeckService);
   const navigate = useNavigate();
+
+  // Load note types and decks on mount
+  useEffect(() => {
+    noteTypeService.loadNoteTypes();
+    deckService.loadDecks();
+  }, [noteTypeService, deckService]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -78,7 +90,7 @@ const ApkgImportPageContent = view(() => {
     }
   };
 
-  // Handle import
+  // Handle import - use frontend ApkgParserService
   const handleImport = async () => {
     if (!selectedFile) {
       toastService.error('Please select a file first');
@@ -87,20 +99,133 @@ const ApkgImportPageContent = view(() => {
 
     setIsImporting(true);
     try {
-      const response = await echoeApi.importApkg(selectedFile);
-      setImportResult(response.data);
+      // Parse APKG file using frontend ApkgParserService
+      const parseSuccess = await apkgParserService.parseApkgFile(selectedFile);
+      if (!parseSuccess) {
+        const errorMessage = apkgParserService.error || 'Failed to parse APKG file';
+        toastService.error(errorMessage);
+        setImportResult({
+          notesAdded: 0,
+          notesUpdated: 0,
+          notesSkipped: 0,
+          cardsAdded: 0,
+          cardsUpdated: 0,
+          decksAdded: 0,
+          notetypesAdded: 0,
+          revlogImported: 0,
+          mediaImported: 0,
+          errors: [errorMessage],
+          errorDetails: [{ category: 'general', message: errorMessage }],
+        });
+        setIsImporting(false);
+        return;
+      }
+
+      // Get parsed data
+      const { notes, models } = apkgParserService;
+
+      // Get note types and decks from service
+      const noteTypes = noteTypeService.noteTypes || [];
+      const echoeDecks = deckService.decks || [];
+
+      // Create or find a basic note type for import
+      let notetypeId: string;
+      if (noteTypes.length > 0) {
+        notetypeId = noteTypes[0].id;
+      } else {
+        // Need at least one note type
+        toastService.error('Please create a note type first');
+        setIsImporting(false);
+        return;
+      }
+
+      // Find or create deck
+      let deckId: string;
+      if (echoeDecks.length > 0) {
+        deckId = echoeDecks[0].id;
+      } else {
+        toastService.error('Please create a deck first');
+        setIsImporting(false);
+        return;
+      }
+
+      // Import notes - create them one by one
+      let notesAdded = 0;
+      let notesSkipped = 0;
+      const errors: string[] = [];
+
+      for (const note of notes) {
+        try {
+          // Parse Anki fields (0x1f separator)
+          const fields = note.flds.split('\x1f');
+
+          // Get the model for this note to map fields
+          const model = models.find((m) => m.id === note.mid);
+          if (!model) {
+            notesSkipped++;
+            continue;
+          }
+
+          // Build field map
+          const fieldMap: Record<string, string> = {};
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          model.flds.forEach((fld: any, index: number) => {
+            if (index < fields.length) {
+              fieldMap[fld.name] = fields[index];
+            }
+          });
+
+          // Parse tags
+          const tags = note.tags ? note.tags.split(' ').filter((t) => t) : [];
+
+          // Create note
+          const noteDto: CreateEchoeNoteDto = {
+            notetypeId,
+            deckId,
+            fields: fieldMap,
+            tags,
+          };
+
+          await echoeApi.createNote(noteDto);
+          notesAdded++;
+        } catch (e) {
+          notesSkipped++;
+          const err = e as Error;
+          if (err.message) {
+            errors.push(`Note ${note.id}: ${err.message}`);
+          }
+        }
+      }
+
+      const result: ImportResultDto = {
+        notesAdded,
+        notesUpdated: 0,
+        notesSkipped,
+        cardsAdded: notesAdded, // Each note creates one card
+        cardsUpdated: 0,
+        decksAdded: 0,
+        notetypesAdded: 0,
+        revlogImported: 0,
+        mediaImported: 0,
+        errors,
+        errorDetails: errors.length > 0
+          ? [{ category: 'general', message: `${errors.length} notes failed to import` }]
+          : [],
+      };
+
+      setImportResult(result);
 
       // Show appropriate message based on results
-      if (response.data.errors.length === 0) {
+      if (result.errors.length === 0 && notesAdded > 0) {
         toastService.success('Import completed successfully');
-      } else if (response.data.notesAdded > 0 || response.data.cardsAdded > 0) {
-        toastService.warning(`Import completed with ${response.data.errors.length} warnings. Check details below.`);
+      } else if (notesAdded > 0) {
+        toastService.warning(`Import completed with ${result.errors.length} warnings. Check details below.`);
       } else {
         toastService.error('Import failed. Please check the error details below.');
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      const errorMessage = err.response?.data?.message || err.message || 'Import failed. Please try again.';
+      const err = error as { message?: string };
+      const errorMessage = err.message || 'Import failed. Please try again.';
       toastService.error(errorMessage);
 
       // Set empty result to show error state
