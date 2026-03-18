@@ -91,64 +91,77 @@ export class EchoeCsvImportService {
         if (fieldName === 'Tags') tagsColumn = idx;
       }
 
-      // Process each row
-      for (let rowIdx = startRow; rowIdx < rows.length; rowIdx++) {
-        const row = rows[rowIdx];
+      // Process rows in batches of 50
+      const BATCH_SIZE = 50;
+      const totalRows = rows.length - startRow;
 
-        try {
-          // Build fields object based on mapping
-          const fields: Record<string, string> = {};
+      for (let batchStart = startRow; batchStart < rows.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, rows.length);
+        const batchRows = rows.slice(batchStart, batchEnd);
 
-          for (const [colIdxRaw, fieldName] of Object.entries(fieldMap)) {
-            const colIdx = Number(colIdxRaw);
-            const cellValue = row[colIdx];
-            if (fieldName && fieldName !== 'Ignore' && cellValue) {
-              fields[fieldName] = cellValue;
+        // Process each row in the batch
+        for (let i = 0; i < batchRows.length; i++) {
+          const rowIdx = batchStart + i;
+          const row = batchRows[i];
+
+          try {
+            // Build fields object based on mapping
+            const fields: Record<string, string> = {};
+
+            for (const [colIdxRaw, fieldName] of Object.entries(fieldMap)) {
+              const colIdx = Number(colIdxRaw);
+              const cellValue = row[colIdx];
+              if (fieldName && fieldName !== 'Ignore' && cellValue) {
+                fields[fieldName] = cellValue;
+              }
             }
+
+            // Default to using all columns if mapping is incomplete
+            if (Object.keys(fields).length === 0 && row.length >= 2) {
+              fields['Front'] = row[0];
+              fields['Back'] = row.slice(1).join(' ');
+            }
+
+            if (!fields['Front'] || !fields['Back']) {
+              result.skipped++;
+              continue;
+            }
+
+            // Parse tags if present
+            let tags: string[] = [];
+            if (tagsColumn >= 0 && row[tagsColumn]) {
+              tags = row[tagsColumn]
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean);
+            }
+
+            // Convert plain text fields to TipTap JSON format
+            const richTextFields: Record<string, Record<string, any>> = {};
+            for (const [fieldName, fieldValue] of Object.entries(fields)) {
+              richTextFields[fieldName] = this.convertPlainTextToTipTapJson(fieldValue);
+            }
+
+            // Create note via EchoeNoteService
+            await this.noteService.createNote(uid, {
+              notetypeId: dto.notetypeId,
+              deckId: dto.deckId,
+              fields,
+              tags,
+              richTextFields,
+            });
+
+            result.added++;
+          } catch (error) {
+            result.errors.push({
+              row: rowIdx + 1,
+              reason: error instanceof Error ? error.message : 'Unknown error',
+            });
           }
-
-          // Default to using all columns if mapping is incomplete
-          if (Object.keys(fields).length === 0 && row.length >= 2) {
-            fields['Front'] = row[0];
-            fields['Back'] = row.slice(1).join(' ');
-          }
-
-          if (!fields['Front'] || !fields['Back']) {
-            result.skipped++;
-            continue;
-          }
-
-          // Parse tags if present
-          let tags: string[] = [];
-          if (tagsColumn >= 0 && row[tagsColumn]) {
-            tags = row[tagsColumn]
-              .split(',')
-              .map((t) => t.trim())
-              .filter(Boolean);
-          }
-
-          // Convert plain text fields to TipTap JSON format
-          const richTextFields: Record<string, Record<string, any>> = {};
-          for (const [fieldName, fieldValue] of Object.entries(fields)) {
-            richTextFields[fieldName] = this.convertPlainTextToTipTapJson(fieldValue);
-          }
-
-          // Create note via EchoeNoteService
-          await this.noteService.createNote(uid, {
-            notetypeId: dto.notetypeId,
-            deckId: dto.deckId,
-            fields,
-            tags,
-            richTextFields,
-          });
-
-          result.added++;
-        } catch (error) {
-          result.errors.push({
-            row: rowIdx + 1,
-            reason: error instanceof Error ? error.message : 'Unknown error',
-          });
         }
+
+        // Log progress after each batch
+        logger.info(`CSV import progress: ${Math.min(batchEnd, rows.length)}/${totalRows + startRow} rows processed`);
       }
     } catch (error) {
       logger.error('CSV import error:', error);
