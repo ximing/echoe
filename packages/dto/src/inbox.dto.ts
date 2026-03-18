@@ -93,6 +93,10 @@ export interface CreateInboxDto {
   front: string;
   /** 背面/答案内容 */
   back: string;
+  /** 正面内容的 TipTap JSON 格式 (可选, 优先于 front) */
+  frontJson?: Record<string, unknown>;
+  /** 背面内容的 TipTap JSON 格式 (可选, 优先于 back) */
+  backJson?: Record<string, unknown>;
   /** 来源 (可选, 动态字符串值) */
   source?: string;
   /** 类别 (可选, 动态字符串值) */
@@ -107,6 +111,10 @@ export interface UpdateInboxDto {
   front?: string;
   /** 背面/答案内容 */
   back?: string;
+  /** 正面内容的 TipTap JSON 格式 (可选, 优先于 front) */
+  frontJson?: Record<string, unknown>;
+  /** 背面内容的 TipTap JSON 格式 (可选, 优先于 back) */
+  backJson?: Record<string, unknown>;
   /** 来源 (动态字符串值) */
   source?: string | null;
   /** 类别 (动态字符串值) */

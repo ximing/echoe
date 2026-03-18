@@ -8,12 +8,16 @@ import { logger } from '../utils/logger.js';
 import { InboxMetricsService } from './inbox-metrics.service.js';
 import { InboxSourceService } from './inbox-source.service.js';
 import { InboxCategoryService } from './inbox-category.service.js';
+import { serializeToHtml } from '../lib/prosemirror-serializer.js';
 
 import type { Inbox, NewInbox } from '../db/schema/inbox.js';
+import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
 
 export interface CreateInboxParams {
   front: string;
   back: string;
+  frontJson?: Record<string, unknown>;
+  backJson?: Record<string, unknown>;
   source?: string;
   category?: string;
   isRead?: boolean;
@@ -22,6 +26,8 @@ export interface CreateInboxParams {
 export interface UpdateInboxParams {
   front?: string;
   back?: string;
+  frontJson?: Record<string, unknown>;
+  backJson?: Record<string, unknown>;
   source?: string | null;
   category?: string | null;
   isRead?: boolean;
@@ -52,6 +58,28 @@ export class InboxService {
   ) {}
 
   /**
+   * Convert plain text to TipTap JSON format
+   * @param text - Plain text string
+   * @returns TipTap JSON document
+   */
+  convertPlainTextToTipTapJson(text: string): ProseMirrorJsonDoc {
+    return {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: text,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /**
    * Create a new inbox item
    */
   async create(uid: string, data: CreateInboxParams): Promise<Inbox> {
@@ -72,11 +100,25 @@ export class InboxService {
         await this.categoryService.create(uid, data.category);
       }
 
+      // Process front content: JSON takes precedence over plain text
+      let frontContent = data.front;
+      if (data.frontJson) {
+        // If JSON is provided, serialize it to HTML
+        frontContent = serializeToHtml(data.frontJson as unknown as ProseMirrorJsonDoc);
+      }
+
+      // Process back content: JSON takes precedence over plain text
+      let backContent = data.back;
+      if (data.backJson) {
+        // If JSON is provided, serialize it to HTML
+        backContent = serializeToHtml(data.backJson as unknown as ProseMirrorJsonDoc);
+      }
+
       const newInboxItem: NewInbox = {
         inboxId,
         uid,
-        front: data.front,
-        back: data.back,
+        front: frontContent,
+        back: backContent,
         source: sourceValue,
         category: categoryValue,
         isRead: data.isRead ?? false,
@@ -192,8 +234,21 @@ export class InboxService {
 
       // Build update values
       const updateValues: Partial<NewInbox> = {};
-      if (data.front !== undefined) updateValues.front = data.front;
-      if (data.back !== undefined) updateValues.back = data.back;
+
+      // Process front content: JSON takes precedence over plain text
+      if (data.frontJson !== undefined) {
+        updateValues.front = serializeToHtml(data.frontJson as unknown as ProseMirrorJsonDoc);
+      } else if (data.front !== undefined) {
+        updateValues.front = data.front;
+      }
+
+      // Process back content: JSON takes precedence over plain text
+      if (data.backJson !== undefined) {
+        updateValues.back = serializeToHtml(data.backJson as unknown as ProseMirrorJsonDoc);
+      } else if (data.back !== undefined) {
+        updateValues.back = data.back;
+      }
+
       if (data.source !== undefined) updateValues.source = data.source;
       if (data.category !== undefined) updateValues.category = data.category;
       if (data.isRead !== undefined) updateValues.isRead = data.isRead;
