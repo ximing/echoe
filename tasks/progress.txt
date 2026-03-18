@@ -59,3 +59,15 @@ Started: Wed Mar 18 00:00:00 CST 2026
   - TailwindCSS `line-clamp-2` provides additional visual truncation
 ---
 
+## 2026-03-18 10:00 - US-005
+- Implemented rich text preview in ConvertToCardDialog
+- Files changed:
+  - `apps/web/src/pages/inbox/inbox-page.tsx`: Added RichTextRenderer import, updated ConvertToCardDialog to display front/back content preview
+- **Learnings for future iterations:**
+  - RichTextRenderer can render both HTML strings and TipTap JSON objects
+  - Backend already preserves rich text during card conversion (uses HTML format from inbox.front/back)
+  - Dialog expanded to max-w-2xl with scrolling to accommodate rich content preview
+  - No backend changes needed - the InboxToCardController already passes HTML content to note fields
+  - Content preview helps users verify what will be converted before confirming
+---
+
