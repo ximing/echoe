@@ -272,11 +272,11 @@ describe('InboxService', () => {
       expect(mockCategoryService.create).toHaveBeenCalledWith('test-uid', 'new-category');
     });
 
-    it('should convert frontJson to HTML when provided', async () => {
+    it('should store frontJson directly as JSON when provided', async () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: '<p>Test content</p>',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Test content' }] }] },
         back: 'Back content',
         source: 'manual',
         category: 'backend',
@@ -328,18 +328,18 @@ describe('InboxService', () => {
 
       await service.create('test-uid', params);
 
-      // Verify frontJson was converted to HTML
-      expect(serializeToHtml).toHaveBeenCalledWith(frontJson);
-      expect(insertedData.front).toBe('<p>Test content</p>');
+      // Verify frontJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(insertedData.front).toEqual(frontJson);
       expect(insertedData.back).toBe('Back content');
     });
 
-    it('should convert backJson to HTML when provided', async () => {
+    it('should store backJson directly as JSON when provided', async () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
         front: 'Front content',
-        back: '<p>Back content</p>',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Back content' }] }] },
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -390,18 +390,18 @@ describe('InboxService', () => {
 
       await service.create('test-uid', params);
 
-      // Verify backJson was converted to HTML
-      expect(serializeToHtml).toHaveBeenCalledWith(backJson);
+      // Verify backJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
       expect(insertedData.front).toBe('Front content');
-      expect(insertedData.back).toBe('<p>Back content</p>');
+      expect(insertedData.back).toEqual(backJson);
     });
 
-    it('should convert both frontJson and backJson when provided', async () => {
+    it('should store both frontJson and backJson directly as JSON when provided', async () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: '<p>Front content</p>',
-        back: '<p>Back content</p>',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Front content' }] }] },
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Back content' }] }] },
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -468,9 +468,10 @@ describe('InboxService', () => {
 
       await service.create('test-uid', params);
 
-      // Verify both were converted
-      expect(insertedData.front).toBe('<p>Front content</p>');
-      expect(insertedData.back).toBe('<p>Back content</p>');
+      // Verify both are stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(insertedData.front).toEqual(frontJson);
+      expect(insertedData.back).toEqual(backJson);
     });
   });
 
@@ -1002,11 +1003,11 @@ describe('InboxService', () => {
       expect(mockCategoryService.create).not.toHaveBeenCalled();
     });
 
-    it('should convert frontJson to HTML when updating', async () => {
+    it('should store frontJson directly as JSON when updating', async () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
-        front: '<p>Updated front</p>',
+        front: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated front' }] }] },
         back: 'Back',
         source: 'manual',
         category: 'backend',
@@ -1062,16 +1063,17 @@ describe('InboxService', () => {
         frontJson,
       });
 
-      expect(serializeToHtml).toHaveBeenCalledWith(frontJson);
-      expect(result.front).toBe('<p>Updated front</p>');
+      // Verify frontJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(result.front).toEqual(frontJson);
     });
 
-    it('should convert backJson to HTML when updating', async () => {
+    it('should store backJson directly as JSON when updating', async () => {
       const mockInboxItem = {
         inboxId: 'i123',
         uid: 'test-uid',
         front: 'Front',
-        back: '<p>Updated back</p>',
+        back: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated back' }] }] },
         source: 'manual',
         category: 'backend',
         isRead: false,
@@ -1126,8 +1128,9 @@ describe('InboxService', () => {
         backJson,
       });
 
-      expect(serializeToHtml).toHaveBeenCalledWith(backJson);
-      expect(result.back).toBe('<p>Updated back</p>');
+      // Verify backJson is stored directly as JSON (not converted to HTML)
+      expect(serializeToHtml).not.toHaveBeenCalled();
+      expect(result.back).toEqual(backJson);
     });
 
     it('should prioritize frontJson over front when both provided', async () => {

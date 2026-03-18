@@ -8,7 +8,7 @@ import { logger } from '../utils/logger.js';
 import { InboxMetricsService } from './inbox-metrics.service.js';
 import { InboxSourceService } from './inbox-source.service.js';
 import { InboxCategoryService } from './inbox-category.service.js';
-import { serializeToHtml } from '../lib/prosemirror-serializer.js';
+import { serializeToPlainText } from '../lib/prosemirror-serializer.js';
 
 import type { Inbox, NewInbox } from '../db/schema/inbox.js';
 import type { ProseMirrorJsonDoc } from '../types/note-fields.js';
@@ -80,6 +80,31 @@ export class InboxService {
   }
 
   /**
+   * Convert stored inbox content (JSON or plain text) to plain text
+   * Used when converting inbox to card
+   * @param content - Stored content (JSON or plain text)
+   * @returns Plain text string
+   */
+  convertToPlainText(content: ProseMirrorJsonDoc | string | null | undefined): string {
+    if (!content) {
+      return '';
+    }
+
+    // If it's already a string, return as-is
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    // If it's JSON, convert to plain text
+    try {
+      return serializeToPlainText(content as ProseMirrorJsonDoc);
+    } catch (error) {
+      logger.error('Error converting JSON to plain text:', error);
+      return '';
+    }
+  }
+
+  /**
    * Create a new inbox item
    */
   async create(uid: string, data: CreateInboxParams): Promise<Inbox> {
@@ -101,17 +126,17 @@ export class InboxService {
       }
 
       // Process front content: JSON takes precedence over plain text
-      let frontContent = data.front;
+      // Store JSON directly instead of converting to HTML
+      let frontContent: ProseMirrorJsonDoc | string = data.front;
       if (data.frontJson) {
-        // If JSON is provided, serialize it to HTML
-        frontContent = serializeToHtml(data.frontJson as unknown as ProseMirrorJsonDoc);
+        frontContent = data.frontJson as unknown as ProseMirrorJsonDoc;
       }
 
       // Process back content: JSON takes precedence over plain text
-      let backContent = data.back;
+      // Store JSON directly instead of converting to HTML
+      let backContent: ProseMirrorJsonDoc | string | undefined = data.back;
       if (data.backJson) {
-        // If JSON is provided, serialize it to HTML
-        backContent = serializeToHtml(data.backJson as unknown as ProseMirrorJsonDoc);
+        backContent = data.backJson as unknown as ProseMirrorJsonDoc;
       }
 
       const newInboxItem: NewInbox = {
@@ -236,15 +261,17 @@ export class InboxService {
       const updateValues: Partial<NewInbox> = {};
 
       // Process front content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
       if (data.frontJson !== undefined) {
-        updateValues.front = serializeToHtml(data.frontJson as unknown as ProseMirrorJsonDoc);
+        updateValues.front = data.frontJson as unknown as ProseMirrorJsonDoc;
       } else if (data.front !== undefined) {
         updateValues.front = data.front;
       }
 
       // Process back content: JSON takes precedence over plain text
+      // Store JSON directly instead of converting to HTML
       if (data.backJson !== undefined) {
-        updateValues.back = serializeToHtml(data.backJson as unknown as ProseMirrorJsonDoc);
+        updateValues.back = data.backJson as unknown as ProseMirrorJsonDoc;
       } else if (data.back !== undefined) {
         updateValues.back = data.back;
       }

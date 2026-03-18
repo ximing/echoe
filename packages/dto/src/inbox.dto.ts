@@ -45,10 +45,10 @@ export interface InboxDto {
   inboxId: string;
   /** 用户 ID (所有者) */
   uid: string;
-  /** 正面/问题内容 */
-  front: string;
-  /** 背面/答案内容 */
-  back: string;
+  /** 正面/问题内容 (TipTap JSON 或纯文本) */
+  front: string | Record<string, unknown>;
+  /** 背面/答案内容 (TipTap JSON 或纯文本) */
+  back: string | Record<string, unknown> | null;
   /** 来源 (动态字符串值) */
   source: string | null;
   /** 类别/标签 (动态字符串值) */
@@ -69,10 +69,10 @@ export interface InboxDto {
 export interface InboxListItemDto {
   /** Inbox 唯一标识符 */
   inboxId: string;
-  /** 正面/问题内容 */
-  front: string;
-  /** 背面/答案内容 */
-  back: string;
+  /** 正面/问题内容 (TipTap JSON 或纯文本) */
+  front: string | Record<string, unknown>;
+  /** 背面/答案内容 (TipTap JSON 或纯文本) */
+  back: string | Record<string, unknown> | null;
   /** 来源 (动态字符串值) */
   source: string | null;
   /** 类别 (动态字符串值) */

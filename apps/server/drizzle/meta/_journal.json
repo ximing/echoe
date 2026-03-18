@@ -15,6 +15,13 @@
       "when": 1773753313182,
       "tag": "0001_tired_forge",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773799828208,
+      "tag": "0002_vengeful_betty_ross",
+      "breakpoints": true
     }
   ]
 }
