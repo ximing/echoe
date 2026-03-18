@@ -22,6 +22,7 @@ import type { EchoeDecks, NewEchoeDecks } from '../db/schema/echoe-decks.js';
 import type { EchoeDeckConfig, NewEchoeDeckConfig } from '../db/schema/echoe-deck-config.js';
 import type { EchoeCards } from '../db/schema/echoe-cards.js';
 import type { EchoeNotes } from '../db/schema/echoe-notes.js';
+import type { RichTextFields } from '../types/note-fields.js';
 
 import type {
   EchoeDeckWithCountsDto,
@@ -1249,6 +1250,7 @@ export class EchoeDeckService {
           addedAt: card.mod * 1000,
           mod: card.mod,
           notetypeType: noteType[0]?.type || 0,
+          richTextFields: noteData?.richTextFields as RichTextFields | undefined,
         };
       })
     );

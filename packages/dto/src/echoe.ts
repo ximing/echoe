@@ -510,6 +510,8 @@ export interface EchoeCardListItemDto {
   mod: number;
   /** Note type (0=standard, 1=cloze) */
   notetypeType: number;
+  /** Rich text JSON for fields (keyed by field name → ProseMirror doc) */
+  richTextFields?: Record<string, Record<string, any>>;
 }
 
 /** Query params for card list */

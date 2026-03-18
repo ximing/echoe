@@ -13,8 +13,42 @@ import {
   X,
   Edit,
 } from 'lucide-react';
+import { generateHTML } from '@tiptap/html';
+import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
 import type { EchoeCardListItemDto, EchoeDeckWithCountsDto } from '@echoe/dto';
 import { getDecks, bulkCardOperation, getCards } from '../../api/echoe';
+
+// TipTap extensions for rich text rendering
+const rendererExtensions = [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3],
+    },
+  }),
+  Image.configure({
+    inline: true,
+    allowBase64: true, // Allow base64 for browser display
+  }),
+  Link.configure({
+    openOnClick: false,
+  }),
+  Underline,
+];
+
+/**
+ * Convert Tiptap JSON to HTML string
+ */
+function jsonToHtml(json: Record<string, unknown>): string {
+  try {
+    return generateHTML(json, rendererExtensions);
+  } catch (error) {
+    console.error('Failed to convert JSON to HTML:', error);
+    return '';
+  }
+}
 
 type FilterStatus = 'all' | 'new' | 'learn' | 'review' | 'suspended' | 'buried' | 'leech';
 type SortField = 'added' | 'due' | 'mod';
@@ -619,16 +653,20 @@ const CardBrowserPageContent = view(() => {
             <div>
               <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Front</h3>
               <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
-                {selectedCard.card.fields['Front'] || '(empty)'}
+                {selectedCard.card.richTextFields?.['Front']
+                  ? <div dangerouslySetInnerHTML={{ __html: jsonToHtml(selectedCard.card.richTextFields['Front'] as Record<string, unknown>) }} />
+                  : selectedCard.card.fields['Front'] || '(empty)'}
               </div>
             </div>
 
             {/* Back field preview */}
-            {selectedCard.card.fields['Back'] && (
+            {(selectedCard.card.fields['Back'] || selectedCard.card.richTextFields?.['Back']) && (
               <div>
                 <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Back</h3>
                 <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
-                  {selectedCard.card.fields['Back']}
+                  {selectedCard.card.richTextFields?.['Back']
+                    ? <div dangerouslySetInnerHTML={{ __html: jsonToHtml(selectedCard.card.richTextFields['Back'] as Record<string, unknown>) }} />
+                    : selectedCard.card.fields['Back']}
                 </div>
               </div>
             )}
