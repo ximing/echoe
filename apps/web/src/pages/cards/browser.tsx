@@ -14,6 +14,7 @@ import {
   Edit,
 } from 'lucide-react';
 import { generateHTML } from '@tiptap/html';
+import { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -48,6 +49,67 @@ function jsonToHtml(json: Record<string, unknown>): string {
     console.error('Failed to convert JSON to HTML:', error);
     return '';
   }
+}
+
+/**
+ * Check if a string contains HTML tags
+ */
+function containsHtmlTags(str: string): boolean {
+  return /<[^>]+>/.test(str);
+}
+
+/**
+ * Convert HTML to Tiptap JSON using a temporary editor instance
+ */
+function htmlToJson(html: string): Record<string, unknown> | null {
+  try {
+    // Create a temporary editor to parse HTML to JSON
+    const editor = new Editor({
+      extensions: rendererExtensions,
+      content: html,
+      editable: false,
+    });
+    const json = editor.getJSON();
+    editor.destroy();
+    return json;
+  } catch (error) {
+    console.error('Failed to convert HTML to JSON:', error);
+    return null;
+  }
+}
+
+/**
+ * Render field content safely:
+ * 1. If richTextFields exists, render from JSON (safest - already parsed)
+ * 2. If fields contain HTML, convert HTML to JSON via TipTap then render (filters XSS)
+ * 3. Otherwise, render plain text
+ */
+function renderFieldContent(
+  fields: Record<string, string>,
+  richTextFields: Record<string, Record<string, unknown>> | undefined,
+  fieldName: string
+): React.ReactNode {
+  const fieldValue = fields[fieldName] || '';
+
+  // Priority 1: Use richTextFields JSON if available (safest)
+  if (richTextFields?.[fieldName]) {
+    const html = jsonToHtml(richTextFields[fieldName] as Record<string, unknown>);
+    return <span dangerouslySetInnerHTML={{ __html: html }} />;
+  }
+
+  // Priority 2: Convert HTML to JSON via TipTap (filters XSS)
+  if (containsHtmlTags(fieldValue)) {
+    const json = htmlToJson(fieldValue);
+    if (json) {
+      const html = jsonToHtml(json);
+      return <span dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+    // Fallback: strip HTML tags for safety
+    return fieldValue.replace(/<[^>]*>/g, '').trim();
+  }
+
+  // Priority 3: Plain text
+  return fieldValue || '(empty)';
 }
 
 type FilterStatus = 'all' | 'new' | 'learn' | 'review' | 'suspended' | 'buried' | 'leech';
@@ -516,8 +578,11 @@ const CardBrowserPageContent = view(() => {
                       />
                     </td>
                     <td className="px-4 py-2 max-w-xs">
-                      <div className="truncate text-gray-900 dark:text-white" title={card.front}>
-                        {card.front || '(empty)'}
+                      <div
+                        className="truncate text-gray-900 dark:text-white"
+                        title={card.front}
+                      >
+                        {renderFieldContent(card.fields, card.richTextFields, 'Front')}
                       </div>
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{card.deckName}</td>
@@ -574,7 +639,7 @@ const CardBrowserPageContent = view(() => {
 
       {/* Detail Panel */}
       {showDetailPanel && selectedCard && (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-dark-800 shadow-lg flex flex-col">
+        <div className="fixed inset-y-0 right-0 w-[480px] bg-white dark:bg-dark-800 shadow-lg flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-dark-700">
             <h2 className="font-semibold text-gray-900 dark:text-white">Card Details</h2>
             <button
@@ -653,9 +718,7 @@ const CardBrowserPageContent = view(() => {
             <div>
               <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Front</h3>
               <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
-                {selectedCard.card.richTextFields?.['Front']
-                  ? <div dangerouslySetInnerHTML={{ __html: jsonToHtml(selectedCard.card.richTextFields['Front'] as Record<string, unknown>) }} />
-                  : selectedCard.card.fields['Front'] || '(empty)'}
+                {renderFieldContent(selectedCard.card.fields, selectedCard.card.richTextFields, 'Front')}
               </div>
             </div>
 
@@ -664,9 +727,7 @@ const CardBrowserPageContent = view(() => {
               <div>
                 <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-medium mb-2">Back</h3>
                 <div className="p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm text-gray-900 dark:text-white">
-                  {selectedCard.card.richTextFields?.['Back']
-                    ? <div dangerouslySetInnerHTML={{ __html: jsonToHtml(selectedCard.card.richTextFields['Back'] as Record<string, unknown>) }} />
-                    : selectedCard.card.fields['Back']}
+                  {renderFieldContent(selectedCard.card.fields, selectedCard.card.richTextFields, 'Back')}
                 </div>
               </div>
             )}

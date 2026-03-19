@@ -11,6 +11,7 @@ import type {
   EchoeNoteTypeDto,
   EchoeNoteDto,
   CreateEchoeNoteDto,
+  CreateEchoeNotesBatchDto,
   UpdateEchoeNoteDto,
   EchoeNoteQueryParams,
   EchoeCardWithNoteDto,
@@ -308,6 +309,16 @@ export const getNote = (id: string) => {
 export const createNote = (data: CreateEchoeNoteDto) => {
   return request.post<unknown, { code: number; data: EchoeNoteDto }>(
     '/api/v1/notes',
+    data
+  );
+};
+
+/**
+ * Batch create notes
+ */
+export const createNotesBatch = (data: CreateEchoeNotesBatchDto) => {
+  return request.post<unknown, { code: number; data: EchoeNoteDto[] }>(
+    '/api/v1/notes/batch',
     data
   );
 };

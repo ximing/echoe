@@ -8,6 +8,7 @@ import { ResponseUtil } from '../../utils/response.js';
 
 import type {
   CreateEchoeNoteDto,
+  CreateEchoeNotesBatchDto,
   UpdateEchoeNoteDto,
   EchoeNoteDto,
   EchoeNoteWithCardsDto,
@@ -107,6 +108,29 @@ export class EchoeNoteController {
       if (error instanceof Error && error.message.includes('not found')) {
         return ResponseUtil.error(ErrorCode.PARAMS_ERROR, error.message);
       }
+      return ResponseUtil.error(ErrorCode.DB_ERROR);
+    }
+  }
+
+  /**
+   * POST /api/v1/notes/batch
+   * Batch create notes
+   */
+  @Post('/notes/batch')
+  async createNotesBatch(@Body() dto: CreateEchoeNotesBatchDto, @CurrentUser() userDto?: UserInfoDto) {
+    try {
+      if (!userDto?.uid) {
+        return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
+      }
+
+      if (!dto.notes || dto.notes.length === 0) {
+        return ResponseUtil.error(ErrorCode.PARAMS_ERROR, 'No notes provided');
+      }
+
+      const notes = await this.echoeNoteService.createNotesBatch(userDto.uid, dto);
+      return ResponseUtil.success(notes);
+    } catch (error) {
+      logger.error('Batch create notes error:', error);
       return ResponseUtil.error(ErrorCode.DB_ERROR);
     }
   }

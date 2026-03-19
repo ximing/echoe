@@ -147,9 +147,9 @@ const ApkgImportPageContent = view(() => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <button
@@ -168,7 +168,7 @@ const ApkgImportPageContent = view(() => {
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Import Result */}
         {importResult && (
-          <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="mb-6 bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-700 p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                 <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -196,7 +196,7 @@ const ApkgImportPageContent = view(() => {
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Notes Updated</div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+              <div className="bg-gray-50 dark:bg-dark-700/50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                   {importResult.notesSkipped}
                 </div>
@@ -217,7 +217,7 @@ const ApkgImportPageContent = view(() => {
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Cards Updated</div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-center">
+              <div className="bg-gray-50 dark:bg-dark-700/50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                   {importResult.decksAdded}
                 </div>
@@ -259,7 +259,7 @@ const ApkgImportPageContent = view(() => {
                 {importResult.errorDetails && importResult.errorDetails.length > 0 && (
                   <div className="mb-3 space-y-2">
                     {importResult.errorDetails.map((detail, i) => (
-                      <div key={i} className="p-2 bg-white dark:bg-gray-800 rounded border border-yellow-200 dark:border-yellow-700">
+                      <div key={i} className="p-2 bg-white dark:bg-dark-800 rounded border border-yellow-200 dark:border-yellow-700">
                         <div className="flex items-start gap-2">
                           <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300 uppercase px-2 py-1 bg-yellow-100 dark:bg-yellow-900/40 rounded">
                             {detail.category}
@@ -288,7 +288,7 @@ const ApkgImportPageContent = view(() => {
             <div className="flex gap-3">
               <button
                 onClick={handleReset}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 transition-colors"
               >
                 <RotateCcw className="w-4 h-4" />
                 Import More
@@ -305,7 +305,7 @@ const ApkgImportPageContent = view(() => {
 
         {/* File Upload */}
         {!importResult && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-700 p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Select APKG File
             </h2>
@@ -365,7 +365,7 @@ const ApkgImportPageContent = view(() => {
 
         {/* Deck Selection */}
         {selectedFile && !importResult && (
-          <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="mt-6 bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-700 p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Import Options
             </h2>
@@ -381,7 +381,7 @@ const ApkgImportPageContent = view(() => {
                 <select
                   value={selectedDeckId}
                   onChange={(e) => setSelectedDeckId(e.target.value)}
-                  className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">Import deck structure from .apkg</option>
                   {deckService.decks.map((deck) => (

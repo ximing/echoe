@@ -287,18 +287,6 @@ export const Layout = view(({ children }: LayoutProps) => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
-
-      {/* Floating Action Button - Create New Card */}
-      {showFab && (
-        <button
-          onClick={() => navigate('/cards/cards/new')}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40"
-          title="Create new card"
-          aria-label="Create new card"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
-      )}
     </div>
   );
 });

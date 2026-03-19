@@ -162,13 +162,13 @@ const DuplicatesPageContent = view(() => {
   const selectedNoteType = noteTypes.find((nt) => nt.id === selectedNoteTypeId);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/cards')}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
@@ -178,7 +178,7 @@ const DuplicatesPageContent = view(() => {
 
       {/* Search Form */}
       <div className="p-4">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Note Type Select */}
             <div>
@@ -189,7 +189,7 @@ const DuplicatesPageContent = view(() => {
                 value={selectedNoteTypeId || ''}
                 onChange={(e) => setSelectedNoteTypeId(e.target.value || null)}
                 disabled={loadingNoteTypes}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
               >
                 {loadingNoteTypes ? (
                   <option>Loading...</option>
@@ -212,7 +212,7 @@ const DuplicatesPageContent = view(() => {
                 value={selectedFieldName}
                 onChange={(e) => setSelectedFieldName(e.target.value)}
                 disabled={!selectedNoteType}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
               >
                 {selectedNoteType?.flds.map((field) => (
                   <option key={field.name} value={field.name}>
@@ -234,7 +234,7 @@ const DuplicatesPageContent = view(() => {
                 step="0.05"
                 value={threshold}
                 onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                className="w-full h-2 bg-gray-200 dark:bg-dark-700 rounded-lg appearance-none cursor-pointer"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>50%</span>
@@ -261,7 +261,7 @@ const DuplicatesPageContent = view(() => {
       {/* Results */}
       <div className="px-4 pb-4">
         {duplicateGroups.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
+          <div className="bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg p-8 text-center">
             <Copy className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
             <p className="text-gray-500 dark:text-gray-400">
               Select a note type and field, then click "Find Duplicates" to search for duplicate notes.
@@ -277,7 +277,7 @@ const DuplicatesPageContent = view(() => {
             {duplicateGroups.map((group, groupIndex) => (
               <div
                 key={groupIndex}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                className="bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg p-4"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -307,7 +307,7 @@ const DuplicatesPageContent = view(() => {
                       className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
                         selectedToKeep[groupIndex] === note.id
                           ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          : 'border-gray-200 dark:border-dark-700 hover:border-gray-300 dark:hover:border-dark-600'
                       }`}
                     >
                       <input
@@ -337,7 +337,7 @@ const DuplicatesPageContent = view(() => {
                         {note.fields && typeof note.fields === 'object' && (
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             {selectedFieldName}:{' '}
-                            <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                            <span className="font-mono bg-gray-100 dark:bg-dark-700 px-1 rounded">
                               {note.fields[selectedFieldName] || '(empty)'}
                             </span>
                           </div>
@@ -348,7 +348,7 @@ const DuplicatesPageContent = view(() => {
                             {note.tags.map((tag) => (
                               <span
                                 key={tag}
-                                className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded"
+                                className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 rounded"
                               >
                                 {tag}
                               </span>

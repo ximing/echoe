@@ -27,6 +27,7 @@ import type {
   EchoeNoteDto,
   EchoeNoteWithCardsDto,
   CreateEchoeNoteDto,
+  CreateEchoeNotesBatchDto,
   UpdateEchoeNoteDto,
   EchoeCardDto,
   EchoeCardWithNoteDto,
@@ -381,6 +382,26 @@ export class EchoeNoteService {
   }
 
   /**
+   * Batch create notes
+   * Returns array of created notes with their cards
+   */
+  async createNotesBatch(uid: string, dto: CreateEchoeNotesBatchDto): Promise<EchoeNoteWithCardsDto[]> {
+    const results: EchoeNoteWithCardsDto[] = [];
+
+    for (const noteDto of dto.notes) {
+      try {
+        const note = await this.createNote(uid, noteDto);
+        results.push(note);
+      } catch (error) {
+        logger.error('Batch create note error:', error);
+        // Continue with other notes, skip failed ones
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Delete a note
    */
   async deleteNote(uid: string, id: string): Promise<boolean> {
@@ -616,6 +637,8 @@ export class EchoeNoteService {
           notetypeType: notetype?.type || 0,
           addedAt: card.mod * 1000,
           mod: note?.mod || card.mod,
+          // Include richTextFields for safe rendering in frontend
+          richTextFields: note?.richTextFields ?? undefined,
         };
       })
       .filter((item: EchoeCardListItemDto | null): item is EchoeCardListItemDto => item !== null);

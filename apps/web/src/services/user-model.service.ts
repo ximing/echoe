@@ -21,7 +21,12 @@ export class UserModelService extends Service {
 
     try {
       const result = await userModelApi.getModels();
-      this.models = result.models;
+      // 添加空值检查
+      if (!result) {
+        this.error = 'Failed to load models';
+        return;
+      }
+      this.models = result.models || [];
     } catch (err) {
       this.error = 'Failed to load models';
       console.error('Load models error:', err);

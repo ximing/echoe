@@ -18,9 +18,10 @@ suitable for implementation.
 ## The Job
 
 1. Receive a feature description from the user
-2. Ask 3-5 essential clarifying questions (with lettered options)
-3. Generate a structured PRD based on answers
-4. Save to `tasks/prd-[feature-name].md`
+2. Ask essential clarifying questions (with lettered options) in iterative rounds
+3. Continue questioning until no critical ambiguity remains (or unresolved items are explicitly recorded)
+4. Generate a structured PRD based on answers
+5. Save to `tasks/prd-[feature-name].md`
 
 **Important:** Do NOT start implementing. Just create the PRD.
 
@@ -28,7 +29,11 @@ suitable for implementation.
 
 ## Step 1: Clarifying Questions
 
-Ask only critical questions where the initial prompt is ambiguous. Focus on:
+Ask only critical questions where the prompt is ambiguous. There is no fixed number of questions.
+Work in short rounds: ask the highest-impact questions, wait for answers, then reassess and ask follow-ups until no critical ambiguity remains.
+If the user cannot decide something yet, capture it explicitly in `Open Questions` and continue.
+
+Focus on:
 
 - **Problem/Goal:** What problem does this solve?
 - **Core Functionality:** What are the key actions?
@@ -57,8 +62,9 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
    D. Just the UI
 ```
 
-This lets users respond with "1A, 2C, 3B" for quick iteration. Remember to
-indent the options.
+This lets users respond with "1A, 2C, 4D" for quick iteration. Remember to
+indent the options. After each round, ask another numbered batch if critical
+ambiguities still exist.
 
 ---
 
@@ -274,7 +280,8 @@ high-priority items when I'm focused.
 
 Before saving the PRD:
 
-- [ ] Asked clarifying questions with lettered options
+- [ ] Asked clarifying questions with lettered options in iterative rounds
+- [ ] Continued until no critical ambiguity remained (or documented unresolved items)
 - [ ] Incorporated user's answers
 - [ ] User stories are small and specific
 - [ ] Functional requirements are numbered and unambiguous

@@ -328,48 +328,68 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
           </div>
         </div>
 
-        {/* Badges Row */}
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          {deck.newCount > 0 && (
-            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md">
-              {deck.newCount} new
-            </span>
-          )}
-          {deck.learnCount > 0 && (
-            <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded-md">
-              {deck.learnCount} learn
-            </span>
-          )}
-          {deck.reviewCount > 0 && (
-            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-md">
-              {deck.reviewCount} review
-            </span>
-          )}
-          {deck.difficultCount > 0 && (
-            <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-md">
-              {deck.difficultCount} difficult
-            </span>
-          )}
-          {dueCount === 0 && deck.totalCount > 0 && (
-            <span className="px-2 py-1 bg-gray-100 dark:bg-dark-700 text-gray-500 dark:text-gray-400 text-xs font-medium rounded-md">
-              Done for now
-            </span>
-          )}
-        </div>
-
-        {/* Footer: Due count & Last studied */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-dark-700">
-          {dueCount > 0 ? (
-            <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
-              {dueCount} due
-            </span>
-          ) : (
-            <span></span>
-          )}
+        {/* Badges Row + Due count & Last studied - merged */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {deck.newCount > 0 && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-md">
+                {deck.newCount} new
+              </span>
+            )}
+            {deck.learnCount > 0 && (
+              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded-md">
+                {deck.learnCount} learn
+              </span>
+            )}
+            {deck.reviewCount > 0 && (
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-md">
+                {deck.reviewCount} review
+              </span>
+            )}
+            {deck.difficultCount > 0 && (
+              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-md">
+                {deck.difficultCount} diff
+              </span>
+            )}
+            {dueCount > 0 ? (
+              <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs font-medium rounded-md">
+                {dueCount} due
+              </span>
+            ) : dueCount === 0 && deck.totalCount > 0 ? (
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-dark-700 text-gray-500 dark:text-gray-400 text-xs font-medium rounded-md">
+                Done
+              </span>
+            ) : null}
+          </div>
           <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
             <Clock className="w-3 h-3" />
             <span>{formatLastStudied(deck.lastStudiedAt)}</span>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-dark-700">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/cards/browser?deckId=${deck.deckId}`);
+            }}
+            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            新增卡片
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/cards/study/${deck.deckId}`);
+            }}
+            disabled={dueCount === 0 && deck.totalCount === 0}
+            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <BookOpen className="w-3 h-3" />
+            去学习
+          </button>
         </div>
       </div>
 
@@ -386,73 +406,76 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-dark-700">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
-            </p>
+      <div className="px-6 py-3 border-b border-gray-200 dark:border-dark-700">
+        <div className="flex flex-col gap-3">
+          {/* Top Row: Title + Actions */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleImport}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors text-sm font-medium"
+              >
+                <Upload className="w-4 h-4" />
+                导入
+              </button>
+              <button
+                onClick={handleOpenCreateDeckDialog}
+                className="inline-flex items-center justify-center w-8 h-8 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                title="新建卡组"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleImport}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors text-sm font-medium"
-            >
-              <Upload className="w-4 h-4" />
-              导入
-            </button>
-            <button
-              onClick={handleOpenCreateDeckDialog}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              新建
-            </button>
-          </div>
+
+          {/* Search and Sort Row */}
+          {deckService.decks.length > 0 && (
+            <div className="flex items-center gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search decks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="flex items-center gap-1.5">
+                <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'due' | 'name' | 'lastStudied')}
+                  className="text-sm border-none bg-transparent text-gray-600 dark:text-gray-400 focus:ring-0 cursor-pointer"
+                >
+                  <option value="due">Due</option>
+                  <option value="name">Name</option>
+                  <option value="lastStudied">Recent</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Search and Sort Bar */}
-      {deckService.decks.length > 0 && (
-        <div className="px-6 py-3 border-b border-gray-200 dark:border-dark-700 bg-gray-50 dark:bg-dark-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          {/* Search Input */}
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search decks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Sort Dropdown */}
-          <div className="flex items-center gap-2">
-            <ArrowUpDown className="w-4 h-4 text-gray-500" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'due' | 'name' | 'lastStudied')}
-              className="text-sm border border-gray-300 dark:border-dark-600 rounded-lg px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="due">Due count</option>
-              <option value="name">Name A-Z</option>
-              <option value="lastStudied">Last studied</option>
-            </select>
-          </div>
-        </div>
-      )}
 
       {/* Deck List */}
       <div className="flex-1 overflow-y-auto">
@@ -472,9 +495,16 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               No decks yet
             </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-1">
-              使用顶部的「导入」或「新建」开始吧
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              使用顶部的「导入」开始，或点击下方按钮创建卡组
             </p>
+            <button
+              onClick={handleOpenCreateDeckDialog}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              新建卡组
+            </button>
           </div>
         ) : (
           <div className="p-6">

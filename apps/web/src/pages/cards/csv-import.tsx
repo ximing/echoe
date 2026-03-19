@@ -19,6 +19,26 @@ import {
   FileArchive,
 } from 'lucide-react';
 
+/**
+ * Convert plain text to TipTap JSON format
+ */
+function convertPlainTextToTipTapJson(text: string): Record<string, unknown> {
+  return {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export default function CsvImportPage() {
   return <CsvImportPageContent />;
 }
@@ -41,6 +61,10 @@ const CsvImportPageContent = view(() => {
   const [apkgResult, setApkgResult] = useState<ImportResultDto | null>(null);
   const [isApkgImporting, setIsApkgImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [apkgDeckId, setApkgDeckId] = useState<string>('');
+
+  // Progress state for APKG import
+  const [apkgProgress, setApkgProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Load note types and decks
   useEffect(() => {
@@ -193,9 +217,11 @@ const CsvImportPageContent = view(() => {
         return;
       }
 
-      // Find or create deck
+      // Find or create deck - use user selected deck or first available
       let deckId: string;
-      if (echoeDecks.length > 0) {
+      if (apkgDeckId) {
+        deckId = apkgDeckId;
+      } else if (echoeDecks.length > 0) {
         deckId = echoeDecks[0].id;
       } else {
         toastService.error('请先创建一个卡组');
@@ -203,51 +229,79 @@ const CsvImportPageContent = view(() => {
         return;
       }
 
-      // Import notes - create them one by one
+      // Import notes - batch import every 50 notes with progress tracking
       let notesAdded = 0;
       let notesSkipped = 0;
       const errors: string[] = [];
+      const BATCH_SIZE = 50;
 
-      for (const note of notes) {
-        try {
-          // Parse Anki fields (0x1f separator)
-          const fields = note.flds.split('\x1f');
+      // Set initial progress
+      setApkgProgress({ current: 0, total: notes.length });
 
-          // Get the model for this note to map fields
-          const model = models.find(m => m.id === note.mid);
-          if (!model) {
-            notesSkipped++;
-            continue;
-          }
+      for (let i = 0; i < notes.length; i += BATCH_SIZE) {
+        const batch = notes.slice(i, i + BATCH_SIZE);
+        const batchNotes: CreateEchoeNoteDto[] = [];
 
-          // Build field map
-          const fieldMap: Record<string, string> = {};
-          model.flds.forEach((fld: any, index: number) => {
-            if (index < fields.length) {
-              fieldMap[fld.name] = fields[index];
+        // Process batch
+        for (const note of batch) {
+          try {
+            // Parse Anki fields (0x1f separator)
+            const fields = note.flds.split('\x1f');
+
+            // Get the model for this note to map fields
+            const model = models.find(m => m.id === note.mid);
+            if (!model) {
+              notesSkipped++;
+              continue;
             }
-          });
 
-          // Parse tags
-          const tags = note.tags ? note.tags.split(' ').filter(t => t) : [];
+            // Build field map
+            const fieldMap: Record<string, string> = {};
+            const richTextFields: Record<string, Record<string, unknown>> = {};
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            model.flds.forEach((fld: any, index: number) => {
+              if (index < fields.length) {
+                const value = fields[index];
+                fieldMap[fld.name] = value;
+                // Convert plain text to TipTap JSON format for rich text fields
+                richTextFields[fld.name] = convertPlainTextToTipTapJson(value);
+              }
+            });
 
-          // Create note
-          const noteDto: CreateEchoeNoteDto = {
-            notetypeId,
-            deckId,
-            fields: fieldMap,
-            tags,
-          };
+            // Parse tags
+            const tags = note.tags ? note.tags.split(' ').filter(t => t) : [];
 
-          await echoeApi.createNote(noteDto);
-          notesAdded++;
-        } catch (e) {
-          notesSkipped++;
-          const err = e as Error;
-          if (err.message) {
-            errors.push(`Note ${note.id}: ${err.message}`);
+            // Create note DTO with rich text fields
+            batchNotes.push({
+              notetypeId,
+              deckId,
+              fields: fieldMap,
+              tags,
+              richTextFields,
+            });
+          } catch (e) {
+            notesSkipped++;
+            const err = e as Error;
+            if (err.message) {
+              errors.push(`Note ${note.id}: ${err.message}`);
+            }
           }
         }
+
+        // Batch create notes
+        if (batchNotes.length > 0) {
+          try {
+            // Use batch API for better performance
+            const response = await echoeApi.createNotesBatch({ notes: batchNotes });
+            notesAdded += response.data.length;
+          } catch (e) {
+            const err = e as Error;
+            errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err.message || 'Batch import failed'}`);
+          }
+        }
+
+        // Update progress
+        setApkgProgress({ current: Math.min(i + BATCH_SIZE, notes.length), total: notes.length });
       }
 
       const result: ImportResultDto = {
@@ -300,6 +354,8 @@ const CsvImportPageContent = view(() => {
   const handleApkgReset = () => {
     setApkgFile(null);
     setApkgResult(null);
+    setApkgDeckId('');
+    setApkgProgress(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -840,29 +896,86 @@ const CsvImportPageContent = view(() => {
                   </div>
                 </div>
               )}
+
+              {/* APKG Import Options - Deck Selection */}
+              {apkgFile && !apkgResult && (
+                <div className="bg-white dark:bg-dark-800 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">
+                    导入选项
+                  </h2>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      目标卡组（可选）
+                    </label>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                      留空则从 .apkg 导入卡组结构，或选择卡组将所有卡片导入到该卡组
+                    </p>
+                    <div className="relative">
+                      <select
+                        value={apkgDeckId || ''}
+                        onChange={(e) => setApkgDeckId(e.target.value)}
+                        className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg text-sm text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">从 .apkg 导入卡组结构</option>
+                        {deckService.decks.map((deck) => (
+                          <option key={deck.id} value={deck.id}>
+                            {deck.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* APKG Import Button */}
           {!apkgResult && (
-            <div className="flex justify-end">
-              <button
-                onClick={handleApkgImport}
-                disabled={!apkgFile || isApkgImporting}
-                className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-dark-600 disabled:cursor-not-allowed transition-colors"
-              >
-                {isApkgImporting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    导入中...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    导入卡组
-                  </>
-                )}
-              </button>
+            <div className="space-y-4">
+              {/* Progress Bar */}
+              {isApkgImporting && apkgProgress && (
+                <div className="bg-white dark:bg-dark-800 rounded-lg p-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-700 dark:text-gray-300">
+                      正在导入笔记...
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {apkgProgress.current} / {apkgProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                    <div
+                      className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${apkgProgress.total > 0 ? (apkgProgress.current / apkgProgress.total) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleApkgImport}
+                  disabled={!apkgFile || isApkgImporting}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-dark-600 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isApkgImporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      导入中...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      导入卡组
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

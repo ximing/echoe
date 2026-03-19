@@ -377,6 +377,11 @@ export interface CreateEchoeNoteDto {
   richTextFields?: Record<string, Record<string, any>>;
 }
 
+export interface CreateEchoeNotesBatchDto {
+  /** Notes to create */
+  notes: CreateEchoeNoteDto[];
+}
+
 export interface UpdateEchoeNoteDto {
   /** Note type ID (mid) - mutable per FR-2 */
   mid?: string;
