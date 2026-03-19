@@ -22,6 +22,7 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowUpDown,
+  X,
 } from 'lucide-react';
 import type { EchoeDeckWithCountsDto } from '@echoe/dto';
 
@@ -410,75 +411,78 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Header - Single Row Layout */}
       <div className="px-6 py-3 border-b border-gray-200 dark:border-dark-700">
-        <div className="flex flex-col gap-3">
-          {/* Top Row: Title + Actions */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Flashcards</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {totalDue > 0 ? `${totalDue} cards due today` : 'No cards due'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleImport}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors text-sm font-medium"
-              >
-                <Upload className="w-4 h-4" />
-                导入
-              </button>
-              <button
-                onClick={handleOpenCreateDeckDialog}
-                className="inline-flex items-center justify-center w-8 h-8 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                title="新建卡组"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
+        <div className="flex items-center gap-4">
+          {/* Title + Due count */}
+          <div className="flex-shrink-0">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">我的卡组</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {totalDue > 0 ? `${totalDue} 待复习` : '无待复习'}
+            </p>
           </div>
 
-          {/* Search and Sort Row */}
-          {deckService.decks.length > 0 && (
-            <div className="flex items-center gap-2">
-              {/* Search Input */}
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search decks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-200 dark:bg-dark-700" />
 
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5">
-                <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'due' | 'name' | 'lastStudied')}
-                  className="text-sm border-none bg-transparent text-gray-600 dark:text-gray-400 focus:ring-0 cursor-pointer"
+          {/* Search Input */}
+          {deckService.decks.length > 0 && (
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="搜索卡组..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
-                  <option value="due">Due</option>
-                  <option value="name">Name</option>
-                  <option value="lastStudied">Recent</option>
-                </select>
-              </div>
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           )}
+
+          {/* Sort Dropdown */}
+          {deckService.decks.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-1.5 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700">
+              <ArrowUpDown className="w-4 h-4 text-gray-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'due' | 'name' | 'lastStudied')}
+                className="text-sm border-none bg-transparent text-gray-600 dark:text-gray-400 focus:ring-0 cursor-pointer"
+              >
+                <option value="due">按待复习</option>
+                <option value="name">按名称</option>
+                <option value="lastStudied">按最近学习</option>
+              </select>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleImport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors text-sm font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              导入
+            </button>
+            <button
+              onClick={handleOpenCreateDeckDialog}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              新建卡组
+            </button>
+          </div>
         </div>
       </div>
 

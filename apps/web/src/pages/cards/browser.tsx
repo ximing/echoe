@@ -13,6 +13,9 @@ import {
   RotateCcw,
   X,
   Edit,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { generateHTML } from '@tiptap/html';
 import { Editor } from '@tiptap/react';
@@ -374,58 +377,64 @@ const CardBrowserPageContent = view(() => {
 
   // Filter chips
   const filterChips: { value: FilterStatus; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'new', label: 'New' },
-    { value: 'learn', label: 'Learning' },
-    { value: 'review', label: 'Review' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'buried', label: 'Buried' },
-    { value: 'leech', label: 'Leech' },
+    { value: 'all', label: '全部' },
+    { value: 'new', label: '新卡片' },
+    { value: 'learn', label: '学习中' },
+    { value: 'review', label: '待复习' },
+    { value: 'suspended', label: '暂停' },
+    { value: 'buried', label: '隐藏' },
+    { value: 'leech', label: '难题' },
   ];
 
   // Sort options
   const sortOptions: { value: SortField; label: string }[] = [
-    { value: 'added', label: 'Added' },
-    { value: 'due', label: 'Due' },
-    { value: 'mod', label: 'Modified' },
+    { value: 'added', label: '添加时间' },
+    { value: 'due', label: '待复习时间' },
+    { value: 'mod', label: '修改时间' },
   ];
 
   const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Card Browser</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                // Use deck filter as prefill if set
-                cardEditorState.openCreate(deckFilter);
-              }}
-              className="px-3 py-1.5 bg-primary-600 dark:bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
-            >
-              Add Cards
-            </button>
+      {/* Header - Single Row Layout */}
+      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-2">
+        <div className="flex items-center gap-3">
+          {/* Title */}
+          <div className="flex-shrink-0">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">浏览卡片</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {total > 0 ? `共 ${total} 张卡片` : '无卡片'}
+            </p>
           </div>
-        </div>
 
-        {/* Search and filters */}
-        <div className="flex flex-wrap items-center gap-3">
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-200 dark:bg-dark-700" />
+
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
+          <div className="relative w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search cards..."
+              placeholder="搜索卡片..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-4 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full pl-9 pr-8 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white placeholder-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setPage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Deck filter */}
@@ -435,9 +444,9 @@ const CardBrowserPageContent = view(() => {
               setDeckFilter(e.target.value || undefined);
               setPage(1);
             }}
-            className="px-3 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-2 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            <option value="">All Decks</option>
+            <option value="">全部卡组</option>
             {decks.map((deck) => (
               <option key={deck.deckId} value={deck.deckId}>
                 {deck.name}
@@ -446,14 +455,15 @@ const CardBrowserPageContent = view(() => {
           </select>
 
           {/* Sort */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 px-2 py-1.5 border border-gray-300 dark:border-dark-600 rounded-md bg-white dark:bg-dark-700">
+            <ArrowUpDown className="w-4 h-4 text-gray-500" />
             <select
               value={sortField}
               onChange={(e) => {
                 setSortField(e.target.value as SortField);
                 setPage(1);
               }}
-              className="px-2 py-1.5 text-sm bg-white dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="text-sm border-none bg-transparent text-gray-700 dark:text-gray-300 focus:ring-0 cursor-pointer"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -463,32 +473,55 @@ const CardBrowserPageContent = view(() => {
             </select>
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="p-1.5 border border-gray-300 dark:border-dark-600 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-dark-700"
-              title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              className="flex items-center gap-0.5 px-1 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
+              title={sortOrder === 'asc' ? '升序' : '降序'}
             >
-              {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {sortOrder === 'asc' ? (
+                <>
+                  <ArrowUp className="w-3 h-3" />
+                  <span>升序</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="w-3 h-3" />
+                  <span>降序</span>
+                </>
+              )}
             </button>
           </div>
-        </div>
 
-        {/* Filter chips */}
-        <div className="flex flex-wrap items-center gap-2 mt-3">
-          {filterChips.map((chip) => (
-            <button
-              key={chip.value}
-              onClick={() => {
-                setStatusFilter(chip.value);
-                setPage(1);
-              }}
-              className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                statusFilter === chip.value
-                  ? 'bg-primary-600 dark:bg-primary-500 text-white'
-                  : 'bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-dark-600'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
+          {/* Filter chips */}
+          <div className="flex items-center gap-1">
+            {filterChips.map((chip) => (
+              <button
+                key={chip.value}
+                onClick={() => {
+                  setStatusFilter(chip.value);
+                  setPage(1);
+                }}
+                className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                  statusFilter === chip.value
+                    ? 'bg-primary-600 dark:bg-primary-500 text-white'
+                    : 'bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-600'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Add Cards Button */}
+          <button
+            onClick={() => {
+              cardEditorState.openCreate(deckFilter);
+            }}
+            className="px-3 py-1.5 bg-primary-600 dark:bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
+          >
+            新增卡片
+          </button>
         </div>
       </div>
 

@@ -10,6 +10,11 @@ import {
   Video,
   FileText,
   Loader2,
+  FolderArchive,
+  CheckCircle,
+  AlertCircle,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function MediaPage() {
@@ -134,62 +139,80 @@ const MediaPageContent = view(() => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-dark-900">
-      {/* Header */}
+      {/* Header - Single Row */}
       <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Media Manager</h1>
-          <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
-            {mediaFiles.length} files ({totalSizeFormatted})
-          </span>
-        </div>
-      </div>
+        <div className="flex items-center gap-4">
+          {/* Title Section */}
+          <div className="flex items-center gap-2">
+            <FolderArchive className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">媒体文件</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {mediaFiles.length} 个文件 ({totalSizeFormatted})
+              </p>
+            </div>
+          </div>
 
-      {/* Stats bar */}
-      <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 px-4 py-2 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Used:</span>
-          <span className="text-sm font-medium text-green-600 dark:text-green-400">{usedCount}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Unused:</span>
-          <span className="text-sm font-medium text-orange-600 dark:text-orange-400">{unusedCount}</span>
-        </div>
-        <div className="flex-1" />
-        <button
-          onClick={handleCheckUnused}
-          disabled={checkingUnused}
-          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-600 disabled:opacity-50"
-        >
-          {checkingUnused ? (
-            <>
-              <Loader2 className="w-4 h-4 inline-block mr-1 animate-spin" />
-              Checking...
-            </>
-          ) : (
-            'Check Unused'
-          )}
-        </button>
-        {(unusedFiles.length > 0 || mediaFiles.filter((f) => !f.usedInCards).length > 0) && (
+          {/* Divider */}
+          <div className="h-8 w-px bg-gray-200 dark:bg-dark-700" />
+
+          {/* Stats */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">已使用</span>
+              <span className="text-sm font-semibold text-green-600 dark:text-green-400">{usedCount}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-orange-500" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">未使用</span>
+              <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">{unusedCount}</span>
+            </div>
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Search */}
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="搜索媒体文件..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 text-sm bg-gray-100 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          {/* Actions */}
           <button
-            onClick={handleDeleteUnused}
-            className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50"
+            onClick={handleCheckUnused}
+            disabled={checkingUnused}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600 disabled:opacity-50"
           >
-            Delete Unused ({unusedFiles.length > 0 ? unusedFiles.length : mediaFiles.filter((f) => !f.usedInCards).length})
+            {checkingUnused ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>检查中...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                <span>检查未使用</span>
+              </>
+            )}
           </button>
-        )}
-      </div>
 
-      {/* Search */}
-      <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search media files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
+          {(unusedFiles.length > 0 || mediaFiles.filter((f) => !f.usedInCards).length > 0) && (
+            <button
+              onClick={handleDeleteUnused}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>删除未使用 ({unusedFiles.length > 0 ? unusedFiles.length : mediaFiles.filter((f) => !f.usedInCards).length})</span>
+            </button>
+          )}
         </div>
       </div>
 
