@@ -221,8 +221,9 @@ export class EchoeImportService {
    * @param uid User ID
    * @param buffer APKG file buffer
    * @param targetDeckId Optional deck ID to import all cards into (instead of creating decks from .apkg)
+   * @param deckName Optional deck name to use when creating new decks (instead of using APKG deck names)
    */
-  async importApkg(uid: string, buffer: Buffer, targetDeckId?: string): Promise<ImportResultDto> {
+  async importApkg(uid: string, buffer: Buffer, targetDeckId?: string, deckName?: string): Promise<ImportResultDto> {
     const result: ImportResultDto = {
       notesAdded: 0,
       notesUpdated: 0,
@@ -257,9 +258,9 @@ export class EchoeImportService {
       logger.info(`Detected package type: ${packageType}`);
 
       if (packageType === 'standard-anki') {
-        return await this.importStandardAnki(uid, zip, result, targetDeckId);
+        return await this.importStandardAnki(uid, zip, result, targetDeckId, deckName);
       } else {
-        return await this.importLegacyEchoe(uid, zip, result, targetDeckId);
+        return await this.importLegacyEchoe(uid, zip, result, targetDeckId, deckName);
       }
     } catch (error) {
       logger.error('Import error:', error);
@@ -312,7 +313,7 @@ export class EchoeImportService {
    * Import Standard Anki APKG format
    * Supports both official format (collection.anki2/anki21) and legacy col.json.
    */
-  private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string): Promise<ImportResultDto> {
+  private async importStandardAnki(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string, deckName?: string): Promise<ImportResultDto> {
     let db: DatabaseType | null = null;
 
     try {
@@ -386,11 +387,16 @@ export class EchoeImportService {
         result.notetypesAdded = notetypeResult.added;
         result.errors.push(...notetypeResult.errors);
 
-        // Import decks from col.decks OR use targetDeckId
+        // Import decks from col.decks OR use targetDeckId OR use deckName
         if (targetDeckId) {
           // When targetDeckId is provided, map all source deck IDs to the target deck
           await this.mapAllDecksToTarget(uid, col, targetDeckId, referenceMap);
           result.decksAdded = 0; // No new decks created
+        } else if (deckName) {
+          // When deckName is provided, create a single deck with that name
+          const deckResult = await this.importSingleDeck(uid, col, deckName, referenceMap);
+          result.decksAdded = deckResult.added;
+          result.errors.push(...deckResult.errors);
         } else {
           const deckResult = await this.importDecksFromColJson(uid, col, referenceMap);
           result.decksAdded = deckResult.added;
@@ -448,7 +454,7 @@ export class EchoeImportService {
   /**
    * Import Echoe Legacy format
    */
-  private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string): Promise<ImportResultDto> {
+  private async importLegacyEchoe(uid: string, zip: JSZip, result: ImportResultDto, targetDeckId?: string, deckName?: string): Promise<ImportResultDto> {
     let db: DatabaseType | null = null;
 
     try {
@@ -491,11 +497,16 @@ export class EchoeImportService {
       result.notetypesAdded = notetypeResult.added;
       result.errors.push(...notetypeResult.errors);
 
-      // Import decks OR use targetDeckId
+      // Import decks OR use targetDeckId OR use deckName
       if (targetDeckId) {
         // When targetDeckId is provided, map all source deck IDs to the target deck
         await this.mapAllDecksToTargetFromDb(uid, db, targetDeckId, referenceMap);
         result.decksAdded = 0; // No new decks created
+      } else if (deckName) {
+        // When deckName is provided, create a single deck with that name
+        const deckResult = await this.importSingleDeckFromDb(uid, db, deckName, referenceMap);
+        result.decksAdded = deckResult.added;
+        result.errors.push(...deckResult.errors);
       } else {
         const deckResult = await this.importDecks(uid, db, referenceMap);
         result.decksAdded = deckResult.added;
@@ -730,6 +741,70 @@ export class EchoeImportService {
       }
     } catch (error) {
       errors.push(`Failed to read decks from col.json: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return { added, errors };
+  }
+
+  /**
+   * Import a single deck with a custom name (for deckName option)
+   */
+  private async importSingleDeck(
+    uid: string,
+    col: Record<string, unknown>,
+    deckName: string,
+    referenceMap: ImportReferenceMap
+  ): Promise<{ added: number; errors: string[] }> {
+    const errors: string[] = [];
+    let added = 0;
+
+    try {
+      const db = getDatabase();
+
+      // Check if deck already exists in user scope by name
+      const existing = await db
+        .select({ deckId: echoeDecks.deckId })
+        .from(echoeDecks)
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deckName), eq(echoeDecks.deletedAt, 0)))
+        .limit(1);
+
+      let deckId = existing[0]?.deckId;
+
+      if (!deckId) {
+        // Generate new business ID for imported deck
+        deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+
+        // Insert new deck with generated business ID
+        await db.insert(echoeDecks).values({
+          deckId,
+          uid,
+          name: deckName,
+          conf: '',
+          extendNew: 20,
+          extendRev: 200,
+          usn: 0,
+          lim: 0,
+          collapsed: 0,
+          dyn: 0,
+          mod: Math.floor(Date.now() / 1000),
+          desc: '',
+          mid: null,
+        });
+        added++;
+      }
+
+      // Get all deck IDs from the APKG and map them to our new deck
+      const decks = col.decks as Record<string, { id: number }>;
+      if (decks && typeof decks === 'object') {
+        for (const [did, deck] of Object.entries(decks)) {
+          const sourceDid = this.getSourceIdKey(did);
+          const deckDid = Number.isFinite(deck?.id) ? this.getSourceIdKey(deck.id) : sourceDid;
+          referenceMap.didToDeckId.set(sourceDid, deckId);
+          referenceMap.didToDeckId.set(deckDid, deckId);
+        }
+      }
+    } catch (error) {
+      errors.push(`Failed to import deck ${deckName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     return { added, errors };
@@ -1094,6 +1169,65 @@ export class EchoeImportService {
       }
     } catch (error) {
       errors.push(`Failed to read decks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return { added, errors };
+  }
+
+  /**
+   * Import a single deck with a custom name (for deckName option) from legacy format
+   */
+  private async importSingleDeckFromDb(
+    uid: string,
+    sourceDb: DatabaseType,
+    deckName: string,
+    referenceMap: ImportReferenceMap
+  ): Promise<{ added: number; errors: string[] }> {
+    const errors: string[] = [];
+    let added = 0;
+
+    try {
+      const db = getDatabase();
+
+      // Check if deck already exists in user scope by name
+      const existing = await db
+        .select({ deckId: echoeDecks.deckId })
+        .from(echoeDecks)
+        .where(and(eq(echoeDecks.uid, uid), eq(echoeDecks.name, deckName), eq(echoeDecks.deletedAt, 0)))
+        .limit(1);
+
+      let deckId = existing[0]?.deckId;
+
+      if (!deckId) {
+        // Generate new business ID for imported deck
+        deckId = generateTypeId(OBJECT_TYPE.ECHOE_DECK);
+
+        await db.insert(echoeDecks).values({
+          deckId,
+          uid,
+          name: deckName,
+          conf: '',
+          extendNew: 20,
+          extendRev: 200,
+          usn: 0,
+          lim: 0,
+          collapsed: 0,
+          dyn: 0,
+          mod: Math.floor(Date.now() / 1000),
+          desc: '',
+          mid: null,
+        });
+        added++;
+      }
+
+      // Get all deck IDs from the source database and map them to our new deck
+      const rows = sourceDb.prepare('SELECT id FROM decks').all() as { id: number }[];
+      for (const row of rows) {
+        const sourceDid = this.getSourceIdKey(row.id);
+        referenceMap.didToDeckId.set(sourceDid, deckId);
+      }
+    } catch (error) {
+      errors.push(`Failed to import deck ${deckName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     return { added, errors };

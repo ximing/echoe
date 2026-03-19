@@ -63,9 +63,15 @@ export class EchoeImportController {
    * POST /api/v1/import/apkg
    * Import an .apkg file
    * @query deckId - Optional deck ID to import all cards into
+   * @query deckName - Optional deck name to use when creating new decks (instead of using APKG deck names)
    */
   @Post('/apkg')
-  async importApkg(@Req() request: Request, @QueryParam('deckId') deckId?: string, @CurrentUser() userDto?: UserInfoDto) {
+  async importApkg(
+    @Req() request: Request,
+    @QueryParam('deckId') deckId?: string,
+    @QueryParam('deckName') deckName?: string,
+    @CurrentUser() userDto?: UserInfoDto
+  ) {
     if (!userDto?.uid) {
       return ResponseUtil.error(ErrorCode.UNAUTHORIZED);
     }
@@ -89,7 +95,7 @@ export class EchoeImportController {
     }
 
     try {
-      const result: ImportResultDto = await this.importService.importApkg(userDto.uid, file.buffer, deckId);
+      const result: ImportResultDto = await this.importService.importApkg(userDto.uid, file.buffer, deckId, deckName);
       return ResponseUtil.success(result);
     } catch (error) {
       logger.error('Failed to import .apkg:', error);

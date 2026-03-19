@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
+import { ApkgParserService, type AnkiDeck } from '../../services/apkg-parser.service';
 import * as echoeApi from '../../api/echoe';
 import type { ImportResultDto } from '@echoe/dto';
 import {
@@ -13,6 +14,8 @@ import {
   RotateCcw,
   FileArchive,
   ChevronDown,
+  Eye,
+  Layers,
 } from 'lucide-react';
 
 export default function ApkgImportPage() {
@@ -22,6 +25,7 @@ export default function ApkgImportPage() {
 const ApkgImportPageContent = view(() => {
   const toastService = useService(ToastService);
   const deckService = useService(EchoeDeckService);
+  const apkgParserService = useService(ApkgParserService);
   const navigate = useNavigate();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,6 +34,12 @@ const ApkgImportPageContent = view(() => {
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // APKG parsed data
+  const [parsedDecks, setParsedDecks] = useState<AnkiDeck[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
+  const [showDeckPreview, setShowDeckPreview] = useState(false);
+  const [customDeckName, setCustomDeckName] = useState<string>('');
 
   // Load decks
   useEffect(() => {
@@ -56,6 +66,27 @@ const ApkgImportPageContent = view(() => {
 
     if (validateFile(file)) {
       setSelectedFile(file);
+      setSelectedDeckId('');
+      setCustomDeckName('');
+      setParsedDecks([]);
+      setImportResult(null);
+
+      // Parse APKG file to get deck names
+      setIsParsing(true);
+      try {
+        const success = await apkgParserService.parseApkgFile(file);
+        if (success && apkgParserService.decks.length > 0) {
+          setParsedDecks(apkgParserService.decks);
+          // Set default custom deck name to the first deck's name
+          setCustomDeckName(apkgParserService.decks[0].name);
+        } else if (!success && apkgParserService.error) {
+          toastService.error('Failed to parse APKG: ' + apkgParserService.error);
+        }
+      } catch (error) {
+        console.error('Error parsing APKG:', error);
+      } finally {
+        setIsParsing(false);
+      }
     }
   };
 
@@ -77,7 +108,7 @@ const ApkgImportPageContent = view(() => {
     e.stopPropagation();
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -85,6 +116,27 @@ const ApkgImportPageContent = view(() => {
     const file = e.dataTransfer.files?.[0];
     if (file && validateFile(file)) {
       setSelectedFile(file);
+      setSelectedDeckId('');
+      setCustomDeckName('');
+      setParsedDecks([]);
+      setImportResult(null);
+
+      // Parse APKG file to get deck names
+      setIsParsing(true);
+      try {
+        const success = await apkgParserService.parseApkgFile(file);
+        if (success && apkgParserService.decks.length > 0) {
+          setParsedDecks(apkgParserService.decks);
+          // Set default custom deck name to the first deck's name
+          setCustomDeckName(apkgParserService.decks[0].name);
+        } else if (!success && apkgParserService.error) {
+          toastService.error('Failed to parse APKG: ' + apkgParserService.error);
+        }
+      } catch (error) {
+        console.error('Error parsing APKG:', error);
+      } finally {
+        setIsParsing(false);
+      }
     }
   };
 
@@ -97,7 +149,9 @@ const ApkgImportPageContent = view(() => {
 
     setIsImporting(true);
     try {
-      const response = await echoeApi.importApkg(selectedFile, selectedDeckId || undefined);
+      // When no target deck is selected and user provided a custom deck name, use it
+      const deckName = !selectedDeckId && customDeckName ? customDeckName : undefined;
+      const response = await echoeApi.importApkg(selectedFile, selectedDeckId || undefined, deckName);
       setImportResult(response.data);
 
       // Show appropriate message based on results
@@ -135,6 +189,10 @@ const ApkgImportPageContent = view(() => {
   // Handle reset
   const handleReset = () => {
     setSelectedFile(null);
+    setSelectedDeckId('');
+    setCustomDeckName('');
+    setParsedDecks([]);
+    setShowDeckPreview(false);
     setImportResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -375,7 +433,7 @@ const ApkgImportPageContent = view(() => {
                 Target Deck (optional)
               </label>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                Leave empty to import deck structure from .apkg, or select a deck to import all cards into it
+                Leave empty to use deck name from .apkg, or select a deck to import all cards into it
               </p>
               <div className="relative">
                 <select
@@ -383,7 +441,13 @@ const ApkgImportPageContent = view(() => {
                   onChange={(e) => setSelectedDeckId(e.target.value)}
                   className="appearance-none w-full px-3 py-2 pr-8 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <option value="">Import deck structure from .apkg</option>
+                  {parsedDecks.length > 0 ? (
+                    <option value="">
+                      {customDeckName || parsedDecks[0].name} ({parsedDecks.length} deck{parsedDecks.length > 1 ? 's' : ''})
+                    </option>
+                  ) : (
+                    <option value="">Import deck structure from .apkg</option>
+                  )}
                   {deckService.decks.map((deck) => (
                     <option key={deck.id} value={deck.id}>
                       {deck.name}
@@ -392,6 +456,61 @@ const ApkgImportPageContent = view(() => {
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
+
+              {/* Preview decks button */}
+              {parsedDecks.length > 0 && (
+                <button
+                  onClick={() => setShowDeckPreview(!showDeckPreview)}
+                  className="mt-3 flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                >
+                  <Eye className="w-4 h-4" />
+                  {showDeckPreview ? 'Hide' : 'Preview'} decks in this .apkg
+                </button>
+              )}
+
+              {/* Deck preview list */}
+              {showDeckPreview && parsedDecks.length > 0 && (
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-dark-700 rounded-lg border border-gray-200 dark:border-dark-600">
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <Layers className="w-4 h-4" />
+                    Decks in this .apkg:
+                  </div>
+                  <ul className="space-y-1">
+                    {parsedDecks.map((deck) => (
+                      <li key={deck.id} className="text-sm text-gray-600 dark:text-gray-400">
+                        {deck.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Rename deck input */}
+              {!selectedDeckId && parsedDecks.length > 0 && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Rename deck (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customDeckName}
+                    onChange={(e) => setCustomDeckName(e.target.value)}
+                    placeholder={parsedDecks[0]?.name || 'Enter deck name'}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Leave empty to use the original deck name from .apkg
+                  </p>
+                </div>
+              )}
+
+              {/* Parsing indicator */}
+              {isParsing && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  Parsing .apkg file...
+                </div>
+              )}
             </div>
           </div>
         )}

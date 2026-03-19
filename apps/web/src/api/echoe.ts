@@ -678,12 +678,23 @@ export const mergeDuplicates = (dto: MergeDuplicatesDto) => {
  * Import an APKG file
  * @param file APKG file to import
  * @param deckId Optional deck ID to import all cards into
+ * @param deckName Optional deck name to use when creating new decks (instead of using APKG deck names)
  */
-export const importApkg = (file: File, deckId?: string) => {
+export const importApkg = (file: File, deckId?: string, deckName?: string) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const url = deckId ? `/api/v1/import/apkg?deckId=${encodeURIComponent(deckId)}` : '/api/v1/import/apkg';
+  let url = '/api/v1/import/apkg';
+  const params: string[] = [];
+  if (deckId) {
+    params.push(`deckId=${encodeURIComponent(deckId)}`);
+  }
+  if (deckName) {
+    params.push(`deckName=${encodeURIComponent(deckName)}`);
+  }
+  if (params.length > 0) {
+    url += `?${params.join('&')}`;
+  }
 
   return request.post<unknown, { code: number; data: ImportResultDto }>(
     url,
