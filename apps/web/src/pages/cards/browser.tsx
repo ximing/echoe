@@ -1,7 +1,8 @@
 import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ToastService } from '../../services/toast.service';
+import { CardEditorService } from '../../services/card-editor.service';
 import {
   Search,
   ChevronDown,
@@ -132,7 +133,17 @@ export default function CardBrowserPage() {
 
 const CardBrowserPageContent = view(() => {
   const toastService = useService(ToastService);
+  const cardEditorState = useService(CardEditorService);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Get prefill params from URL
+  useEffect(() => {
+    const deckId = searchParams.get('deckId');
+    const notetypeId = searchParams.get('notetypeId');
+    if (deckId) cardEditorState.prefillDeckId = deckId;
+    if (notetypeId) cardEditorState.prefillNotetypeId = notetypeId;
+  }, [searchParams]);
 
   // State
   const [cards, setCards] = useState<EchoeCardListItemDto[]>([]);
@@ -389,7 +400,10 @@ const CardBrowserPageContent = view(() => {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Card Browser</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/cards/cards/new')}
+              onClick={() => {
+                // Use deck filter as prefill if set
+                cardEditorState.openCreate(deckFilter);
+              }}
               className="px-3 py-1.5 bg-primary-600 dark:bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
             >
               Add Cards
@@ -637,9 +651,17 @@ const CardBrowserPageContent = view(() => {
         </div>
       </div>
 
+      {/* Detail Panel Backdrop */}
+      {showDetailPanel && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setShowDetailPanel(false)}
+        />
+      )}
+
       {/* Detail Panel */}
       {showDetailPanel && selectedCard && (
-        <div className="fixed inset-y-0 right-0 w-[480px] bg-white dark:bg-dark-800 shadow-lg flex flex-col">
+        <div className="fixed right-0 top-0 bottom-0 w-[480px] bg-white dark:bg-dark-800 shadow-xl flex flex-col z-50 border-l border-gray-200 dark:border-dark-700">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-dark-700">
             <h2 className="font-semibold text-gray-900 dark:text-white">Card Details</h2>
             <button
@@ -736,7 +758,10 @@ const CardBrowserPageContent = view(() => {
           {/* Actions */}
           <div className="border-t border-gray-200 dark:border-dark-700 p-4 space-y-2">
             <button
-              onClick={() => navigate(`/cards/cards/${selectedCard.card.noteId}/edit`)}
+              onClick={() => {
+                cardEditorState.openEdit(selectedCard.card.noteId, selectedCard.card.deckId, selectedCard.card.notetypeId);
+                setShowDetailPanel(false);
+              }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600"
             >
               <Edit className="w-4 h-4" />
@@ -752,6 +777,7 @@ const CardBrowserPageContent = view(() => {
           </div>
         </div>
       )}
+
     </div>
   );
 });

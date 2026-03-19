@@ -18,6 +18,8 @@ import { ApiTokenService } from './services/api-token.service';
 import { InboxService } from './services/inbox.service';
 import { InboxReportService } from './services/inbox-report.service';
 import { ApkgParserService } from './services/apkg-parser.service';
+import { CardEditorService } from './services/card-editor.service';
+
 /**
  * Register services globally
  * These are accessible throughout the entire application
@@ -37,6 +39,7 @@ register(EchoeStatsService);
 register(EchoeSettingsService);
 register(EchoeCsvImportService);
 register(EchoeDashboardService);
+register(CardEditorService);
 
 // Initialize theme before rendering
 resolve(ThemeService).loadTheme();

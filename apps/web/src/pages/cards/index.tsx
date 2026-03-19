@@ -2,6 +2,7 @@ import { view, useService } from '@rabjs/react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
+import { CardEditorService } from '../../services/card-editor.service';
 import { ToastService } from '../../services/toast.service';
 import * as echoeApi from '../../api/echoe';
 import {
@@ -34,6 +35,7 @@ export default function CardsPage() {
 
 const CardsPageContent = view(() => {
   const deckService = useService(EchoeDeckService);
+  const cardEditorState = useService(CardEditorService);
   const toastService = useService(ToastService);
   const navigate = useNavigate();
 
@@ -372,7 +374,10 @@ const renderDeckCard = (deck: EchoeDeckWithCountsDto, deckService: EchoeDeckServ
           <button
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/cards/browser?deckId=${deck.deckId}`);
+              cardEditorState.openCreate(deck.deckId);
+              cardEditorState.setOnSaved(() => {
+                deckService.loadDecks();
+              });
             }}
             className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
           >

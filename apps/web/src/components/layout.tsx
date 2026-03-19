@@ -4,7 +4,9 @@ import { view, useService } from '@rabjs/react';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { EchoeDeckService } from '../services/echoe-deck.service';
-import { Sun, Moon, LogOut, Settings, LayoutDashboard, Layers, Search, Plus, FileText, Tag, Image, BarChart3 } from 'lucide-react';
+import { CardEditorService } from '../services/card-editor.service';
+import { CardEditorDrawer } from '../pages/cards/card-editor-drawer';
+import { Sun, Moon, LogOut, Settings, LayoutDashboard, Layers, Search, FileText, Tag, Image, BarChart3 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoDarkUrl from '../assets/logo-dark.png';
 import { isElectron, isMacOS } from '../electron/isElectron';
@@ -17,6 +19,7 @@ export const Layout = view(({ children }: LayoutProps) => {
   const authService = useService(AuthService);
   const themeService = useService(ThemeService);
   const deckService = useService(EchoeDeckService);
+  const cardEditorState = useService(CardEditorService);
   const navigate = useNavigate();
   const dueCount = deckService.getTotalDue();
   const location = useLocation();
@@ -32,9 +35,6 @@ export const Layout = view(({ children }: LayoutProps) => {
   const isTagsPage = location.pathname.startsWith('/cards/tags');
   const isMediaPage = location.pathname.startsWith('/cards/media');
   const isStatsPage = location.pathname.startsWith('/cards/stats');
-
-  // Check if FAB should be shown (on /cards or /cards/study/* routes)
-  const showFab = location.pathname === '/cards' || location.pathname.startsWith('/cards/study');
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -287,6 +287,19 @@ export const Layout = view(({ children }: LayoutProps) => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+
+      {/* Global Card Editor Drawer */}
+      <CardEditorDrawer
+        isOpen={cardEditorState.isOpen}
+        onClose={() => cardEditorState.close()}
+        deckId={cardEditorState.prefillDeckId}
+        notetypeId={cardEditorState.prefillNotetypeId}
+        noteId={cardEditorState.editingNoteId}
+        onSaved={() => {
+          cardEditorState.onSaved?.();
+          cardEditorState.close();
+        }}
+      />
     </div>
   );
 });
