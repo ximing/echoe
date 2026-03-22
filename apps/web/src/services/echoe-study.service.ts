@@ -516,15 +516,27 @@ export class EchoeStudyService extends Service {
   extractTypingText(card: StudyQueueItemDto): string {
     if (!card.front) return '';
 
-    // Remove HTML tags from front content
+    // Create a temporary div to parse HTML
     const div = document.createElement('div');
     div.innerHTML = card.front;
+
+    // Remove audio buttons and their content
+    div.querySelectorAll('button.audio-play-button').forEach((el) => el.remove());
+    div.querySelectorAll('audio.cards-audio').forEach((el) => el.remove());
+
+    // Remove type-answer input fields
+    div.querySelectorAll('input.type-answer').forEach((el) => el.remove());
+
+    // Remove TTS buttons
+    div.querySelectorAll('button.tts-button').forEach((el) => el.remove());
+
+    // Get the remaining text content
     const text = div.textContent || div.innerText || '';
 
     // Restore cloze deletions (if any)
     const restoredText = text.replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, '$1');
 
-    // Clean up extra spaces
+    // Clean up extra spaces and trim
     return restoredText.trim().replace(/\s+/g, ' ');
   }
 
