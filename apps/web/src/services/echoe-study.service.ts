@@ -511,7 +511,7 @@ export class EchoeStudyService extends Service {
 
   /**
    * Extract typing text from card Front field
-   * Returns the first text field for typing practice
+   * Returns visible text content for typing practice
    */
   extractTypingText(card: StudyQueueItemDto): string {
     if (!card.front) return '';
@@ -519,6 +519,10 @@ export class EchoeStudyService extends Service {
     // Create a temporary div to parse HTML
     const div = document.createElement('div');
     div.innerHTML = card.front;
+
+    // Remove hidden elements (display:none, visibility:hidden)
+    div.querySelectorAll('[style*="display:none"], [style*="display: none"]').forEach((el) => el.remove());
+    div.querySelectorAll('[style*="visibility:hidden"], [style*="visibility: hidden"]').forEach((el) => el.remove());
 
     // Remove audio buttons and their content
     div.querySelectorAll('button.audio-play-button').forEach((el) => el.remove());
@@ -531,13 +535,16 @@ export class EchoeStudyService extends Service {
     div.querySelectorAll('button.tts-button').forEach((el) => el.remove());
 
     // Get the remaining text content
-    const text = div.textContent || div.innerText || '';
+    let text = div.textContent || div.innerText || '';
+
+    // Remove [sound:xxx] tags (plain text, not HTML)
+    text = text.replace(/\[sound:[^\]]+\]/g, '');
 
     // Restore cloze deletions (if any)
-    const restoredText = text.replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, '$1');
+    text = text.replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, '$1');
 
     // Clean up extra spaces and trim
-    return restoredText.trim().replace(/\s+/g, ' ');
+    return text.trim().replace(/\s+/g, ' ');
   }
 
   /**
