@@ -74,16 +74,44 @@ export class EchoeMediaService {
   /**
    * Upload a media file
    * Returns the stored filename and URL
+   * Implements hash-based deduplication: if a file with the same hash exists for this user,
+   * returns the existing file instead of uploading again
    */
   async uploadMedia(uid: string, buffer: Buffer, originalFilename: string): Promise<UploadMediaResultDto> {
+    // Generate hash for the file first (for deduplication check)
+    const fileHash = crypto.createHash('sha1').update(buffer).digest('hex');
+
+    const db = getDatabase();
+
+    // Check if a file with the same hash already exists for this user
+    const existingMedia = await db
+      .select()
+      .from(echoeMedia)
+      .where(and(eq(echoeMedia.uid, uid), eq(echoeMedia.hash, fileHash)))
+      .limit(1);
+
+    // If hash exists, return existing file info (deduplication)
+    if (existingMedia.length > 0) {
+      const existing = existingMedia[0];
+      const existingStorageKey = existing.storageKey || `${MEDIA_STORAGE_PREFIX}/${uid}/${existing.filename}`;
+      const url = await this.storageAdapter.generateAccessUrl(
+        existingStorageKey,
+        this.getStorageMetadata()
+      );
+
+      logger.info(
+        `Media file deduplicated: hash=${fileHash}, existing filename=${existing.filename}, uid=${uid}`
+      );
+
+      return { filename: existing.filename, url };
+    }
+
+    // Hash not found - proceed with upload
     // Generate unique filename using timestamp + hash
     const timestamp = Date.now();
-    const hash = crypto.createHash('sha1').update(buffer).digest('hex').slice(0, 8);
+    const hashPrefix = fileHash.slice(0, 8);
     const extension = originalFilename.split('.').pop() || '';
-    const storedFilename = `${timestamp}-${hash}.${extension}`;
-
-    // Generate hash for the file
-    const fileHash = crypto.createHash('sha1').update(buffer).digest('hex');
+    const storedFilename = `${timestamp}-${hashPrefix}.${extension}`;
 
     // Determine MIME type from extension
     const mimeType = this.getMimeType(extension);
@@ -96,7 +124,6 @@ export class EchoeMediaService {
     const url = await this.storageAdapter.generateAccessUrl(storageKey, this.getStorageMetadata());
 
     // Save to database
-    const db = getDatabase();
     const mediaId = generateTypeId(OBJECT_TYPE.ECHOE_MEDIA);
     await db.insert(echoeMedia).values({
       uid,
@@ -110,6 +137,8 @@ export class EchoeMediaService {
       createdAt: Math.floor(Date.now() / 1000),
       usedInCards: 0,
     });
+
+    logger.info(`New media file uploaded: hash=${fileHash}, filename=${storedFilename}, uid=${uid}`);
 
     return { filename: storedFilename, url };
   }
