@@ -43,7 +43,7 @@
 /* 输入框 */
 .typing-input {
   background: transparent;
-  border: none;
+  border: 0;
   border-bottom: 2px solid #d1d5db;
   text-align: center;
   font-size: 1rem;
@@ -52,14 +52,16 @@
   transition: border-color 0.2s;
   color: transparent; /* 隐藏原生输入文字 */
   caret-color: #3b82f6; /* 光标颜色 */
+  box-sizing: border-box;
 }
 
 .typing-input:focus {
   border-bottom-color: #3b82f6;
+  outline: none;
 }
 
 .typing-input::placeholder {
-  color: #d1d5db;
+  color: transparent; /* 隐藏 placeholder，用字符显示层代替 */
 }
 
 /* 字符状态 */
