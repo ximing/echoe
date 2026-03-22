@@ -147,7 +147,7 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
     }
 
     setIsInitialized(true);
-  }, [isOpen, isDataLoaded, noteId, noteService.currentNote, noteService.noteTypes, deckService.decks, notetypeId, deckId, isInitialized]);
+  }, [isOpen, isDataLoaded, noteId, noteService, deckService.decks, notetypeId, deckId, isInitialized]);
 
   // Initialize fields when notetype is set
   useEffect(() => {
@@ -160,6 +160,7 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
       });
     }
     setFields(initialFields);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, selectedNotetype, isInitialized]);
 
   // Handle notetype change

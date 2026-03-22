@@ -35,7 +35,7 @@ export const InboxReportDetailPage = view(() => {
     return () => {
       reportService.clearCurrentReport();
     };
-  }, [reportId]);
+  }, [reportId, reportService]);
 
   const handleBack = () => {
     navigate('/inbox/reports');

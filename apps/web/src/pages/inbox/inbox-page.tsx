@@ -71,6 +71,7 @@ export const InboxPage = view(() => {
     inboxService.filters = { source, category, isRead };
     inboxService.loadInboxItems();
     inboxService.loadSourcesAndCategories();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateFilters = (newFilters: {

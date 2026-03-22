@@ -53,7 +53,7 @@ describe('EchoeNoteController - Notes', () => {
 
     it('should call service with correct params when filters are provided', async () => {
       const mockNotes: EchoeNoteDto[] = [
-        { id: 'en_001', notetypeId: 'ent_001', deckId: 'ed_001', fields: {}, tags: [] } as EchoeNoteDto,
+        { id: 'en_001', notetypeId: 'ent_001', deckId: 'ed_001', fields: {}, tags: [] } as unknown as EchoeNoteDto,
       ];
       getNotesMock.mockResolvedValue({ notes: mockNotes, total: 1 });
 
@@ -125,7 +125,7 @@ describe('EchoeNoteController - Notes', () => {
         fields: { Front: 'Question', Back: 'Answer' },
         tags: ['tag1'],
         cards: [],
-      } as EchoeNoteWithCardsDto;
+      } as unknown as EchoeNoteWithCardsDto;
       getNoteByIdMock.mockResolvedValue(mockNote);
 
       const response = await controller.getNoteById('en_001', mockUser);
@@ -245,7 +245,7 @@ describe('EchoeNoteController - Notes', () => {
       const mockNotes = [
         { id: 'en_001', notetypeId: 'ent_001', deckId: 'ed_001', fields: {}, tags: [], cards: [] },
         { id: 'en_002', notetypeId: 'ent_001', deckId: 'ed_001', fields: {}, tags: [], cards: [] },
-      ] as EchoeNoteWithCardsDto[];
+      ] as unknown as EchoeNoteWithCardsDto[];
       createNotesBatchMock.mockResolvedValue(mockNotes);
 
       const dto = {
@@ -297,7 +297,7 @@ describe('EchoeNoteController - Notes', () => {
         deckId: 'ed_001',
         fields: { Front: 'Updated' },
         tags: [],
-      } as EchoeNoteDto;
+      } as unknown as EchoeNoteDto;
       updateNoteMock.mockResolvedValue(mockNote);
 
       const dto = { fields: { Front: 'Updated' } } as any;
@@ -598,8 +598,8 @@ describe('EchoeNoteController - Note Types', () => {
 
     it('should return all note types', async () => {
       const mockNoteTypes: EchoeNoteTypeDto[] = [
-        { id: 'ent_001', name: 'Basic', fields: [], templates: [] } as EchoeNoteTypeDto,
-        { id: 'ent_002', name: 'Cloze', fields: [], templates: [] } as EchoeNoteTypeDto,
+        { id: 'ent_001', name: 'Basic', fields: [], templates: [] } as unknown as EchoeNoteTypeDto,
+        { id: 'ent_002', name: 'Cloze', fields: [], templates: [] } as unknown as EchoeNoteTypeDto,
       ];
       getAllNoteTypesMock.mockResolvedValue(mockNoteTypes);
 
@@ -641,7 +641,7 @@ describe('EchoeNoteController - Note Types', () => {
         name: 'Basic',
         fields: [{ name: 'Front', ord: 0 }, { name: 'Back', ord: 1 }],
         templates: [{ name: 'Card 1', qfmt: '{{Front}}', afmt: '{{Back}}', ord: 0 }],
-      } as EchoeNoteTypeDto;
+      } as unknown as EchoeNoteTypeDto;
       getNoteTypeByIdMock.mockResolvedValue(mockNoteType);
 
       const response = await controller.getNoteTypeById('ent_001', mockUser);
@@ -689,7 +689,7 @@ describe('EchoeNoteController - Note Types', () => {
         name: 'Custom Type',
         fields: [{ name: 'Question', ord: 0 }],
         templates: [{ name: 'Card', qfmt: '{{Question}}', afmt: '{{Answer}}', ord: 0 }],
-      } as EchoeNoteTypeDto;
+      } as unknown as EchoeNoteTypeDto;
       createNoteTypeMock.mockResolvedValue(mockNoteType);
 
       const dto = {
@@ -739,7 +739,7 @@ describe('EchoeNoteController - Note Types', () => {
         name: 'Updated Type',
         fields: [],
         templates: [],
-      } as EchoeNoteTypeDto;
+      } as unknown as EchoeNoteTypeDto;
       updateNoteTypeMock.mockResolvedValue(mockNoteType);
 
       const dto = { name: 'Updated Type' } as any;

@@ -17,7 +17,7 @@ export const ApiTokenSettings = view(() => {
   // Load tokens on mount
   useEffect(() => {
     apiTokenService.loadTokens();
-  }, []);
+  }, [apiTokenService]);
 
   const handleCreateToken = async (e: React.FormEvent) => {
     e.preventDefault();

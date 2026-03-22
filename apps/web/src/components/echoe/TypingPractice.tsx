@@ -1,5 +1,5 @@
 import { view, useService } from '@rabjs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { EchoeStudyService } from '../../services/echoe-study.service';
 import './TypingPractice.css';
 
@@ -12,15 +12,8 @@ export const TypingPractice = view(({ words, isShowingAnswer }: TypingPracticePr
   const studyService = useService(EchoeStudyService);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 监听完成状态，触发庆祝动画
-  useEffect(() => {
-    if (studyService.typingPractice.isCompleted && !isShowingAnswer) {
-      triggerCelebration();
-    }
-  }, [studyService.typingPractice.isCompleted, isShowingAnswer]);
-
   // 触发粒子庆祝动画
-  const triggerCelebration = () => {
+  const triggerCelebration = useCallback(() => {
     if (!containerRef.current) return;
 
     const container = containerRef.current;
@@ -56,7 +49,14 @@ export const TypingPractice = view(({ words, isShowingAnswer }: TypingPracticePr
       // 清空输入，方便二次练习
       studyService.clearTypingInput();
     }, 1100);
-  };
+  }, [studyService]);
+
+  // 监听完成状态，触发庆祝动画
+  useEffect(() => {
+    if (studyService.typingPractice.isCompleted && !isShowingAnswer) {
+      triggerCelebration();
+    }
+  }, [studyService.typingPractice.isCompleted, isShowingAnswer, triggerCelebration]);
 
   // 如果没有单词，不显示
   if (words.length === 0) {

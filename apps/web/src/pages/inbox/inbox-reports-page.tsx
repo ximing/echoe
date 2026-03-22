@@ -22,7 +22,7 @@ export const InboxReportsPage = view(() => {
 
   useEffect(() => {
     reportService.loadReports();
-  }, []);
+  }, [reportService]);
 
   const handleGenerateReport = () => {
     setShowGenerateDialog(true);

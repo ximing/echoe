@@ -144,7 +144,7 @@ const CardBrowserPageContent = view(() => {
     const notetypeId = searchParams.get('notetypeId');
     if (deckId) cardEditorState.prefillDeckId = deckId;
     if (notetypeId) cardEditorState.prefillNotetypeId = notetypeId;
-  }, [searchParams]);
+  }, [searchParams, cardEditorState]);
 
   // State
   const [cards, setCards] = useState<EchoeCardListItemDto[]>([]);

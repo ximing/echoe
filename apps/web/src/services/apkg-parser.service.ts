@@ -112,7 +112,7 @@ export class ApkgParserService extends Service {
     if (result.length === 0) return;
 
     const rows = result[0].values;
-    this.notes = rows.map((row: any[]) => ({
+    this.notes = rows.map((row: unknown[]) => ({
       id: row[0] as number,
       guid: row[1] as string,
       mid: row[2] as number, // model id
@@ -137,7 +137,7 @@ export class ApkgParserService extends Service {
     if (result.length === 0) return;
 
     const rows = result[0].values;
-    this.cards = rows.map((row: any[]) => ({
+    this.cards = rows.map((row: unknown[]) => ({
       id: row[0] as number,
       nid: row[1] as number, // note id
       did: row[2] as number, // deck id
@@ -169,19 +169,22 @@ export class ApkgParserService extends Service {
     if (result.length === 0) return;
 
     const modelsJson = result[0].values[0][0] as string;
-    const modelsObj = JSON.parse(modelsJson);
+    const modelsObj = JSON.parse(modelsJson) as Record<string, unknown>;
 
-    this.models = Object.values(modelsObj).map((model: any) => ({
-      id: model.id,
-      name: model.name,
-      type: model.type, // 0=standard, 1=cloze
-      css: model.css,
-      flds: model.flds, // field definitions
-      tmpls: model.tmpls, // card templates (qfmt, afmt)
-      sortf: model.sortf,
-      did: model.did,
-      mod: model.mod,
-    }));
+    this.models = Object.values(modelsObj).map((model) => {
+      const m = model as Record<string, unknown>;
+      return {
+        id: m.id as number,
+        name: m.name as string,
+        type: m.type as number, // 0=standard, 1=cloze
+        css: m.css as string,
+        flds: m.flds as AnkiFieldDefinition[], // field definitions
+        tmpls: m.tmpls as AnkiTemplateDefinition[], // card templates (qfmt, afmt)
+        sortf: m.sortf as number,
+        did: m.did as number,
+        mod: m.mod as number,
+      };
+    });
   }
 
   /**
@@ -194,17 +197,20 @@ export class ApkgParserService extends Service {
     if (result.length === 0) return;
 
     const decksJson = result[0].values[0][0] as string;
-    const decksObj = JSON.parse(decksJson);
+    const decksObj = JSON.parse(decksJson) as Record<string, unknown>;
 
     this.decks = Object.values(decksObj)
-      .map((deck: any) => ({
-        id: deck.id,
-        name: deck.name,
-        desc: deck.desc,
-        mod: deck.mod,
-        collapsed: deck.collapsed,
-        conf: deck.conf,
-      }))
+      .map((deck) => {
+        const d = deck as Record<string, unknown>;
+        return {
+          id: d.id as number,
+          name: d.name as string,
+          desc: d.desc as string,
+          mod: d.mod as number,
+          collapsed: d.collapsed as boolean,
+          conf: d.conf as number,
+        };
+      })
       // Sort: non-Default decks first, then Default deck last
       .sort((a, b) => {
         if (a.id === 1) return 1; // Default deck goes last
@@ -223,7 +229,7 @@ export class ApkgParserService extends Service {
     if (result.length === 0) return;
 
     const rows = result[0].values;
-    this.revlog = rows.map((row: any[]) => ({
+    this.revlog = rows.map((row: unknown[]) => ({
       id: row[0] as number, // timestamp in milliseconds
       cid: row[1] as number, // card id
       usn: row[2] as number,
@@ -281,29 +287,29 @@ export class ApkgParserService extends Service {
   /**
    * Split note fields into array
    */
-  public splitFields(note: any): string[] {
+  public splitFields(note: AnkiNote): string[] {
     return note.flds.split('\x1f');
   }
 
   /**
    * Split tags into array
    */
-  public splitTags(note: any): string[] {
+  public splitTags(note: AnkiNote): string[] {
     return note.tags.trim().split(/\s+/).filter(Boolean);
   }
 
   /**
    * Get field names for a note's model
    */
-  public getFieldNames(note: any): string[] {
+  public getFieldNames(note: AnkiNote): string[] {
     const model = this.models.find(m => m.id === note.mid);
-    return model?.flds.map((f: any) => f.name) || [];
+    return model?.flds.map((f) => f.name) || [];
   }
 
   /**
    * Map field values to field names
    */
-  public getFieldMap(note: any): Record<string, string> {
+  public getFieldMap(note: AnkiNote): Record<string, string> {
     const fieldNames = this.getFieldNames(note);
     const fieldValues = this.splitFields(note);
     return Object.fromEntries(
@@ -380,13 +386,29 @@ export interface AnkiCard {
   data: string;
 }
 
+export interface AnkiFieldDefinition {
+  name: string;
+  ord: number;
+  sticky: boolean;
+  rtl: boolean;
+  font: string;
+  size: number;
+}
+
+export interface AnkiTemplateDefinition {
+  name: string;
+  qfmt: string;
+  afmt: string;
+  ord: number;
+}
+
 export interface AnkiModel {
   id: number;
   name: string;
   type: number; // 0=standard, 1=cloze
   css: string;
-  flds: any[]; // field definitions
-  tmpls: any[]; // card templates (qfmt, afmt)
+  flds: AnkiFieldDefinition[]; // field definitions
+  tmpls: AnkiTemplateDefinition[]; // card templates (qfmt, afmt)
   sortf: number;
   did: number;
   mod: number;
