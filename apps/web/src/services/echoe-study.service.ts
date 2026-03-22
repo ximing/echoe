@@ -511,7 +511,7 @@ export class EchoeStudyService extends Service {
 
   /**
    * Extract typing text from card Front field
-   * Returns visible text content for typing practice
+   * Returns the main word/phrase for typing practice
    */
   extractTypingText(card: StudyQueueItemDto): string {
     if (!card.front) return '';
@@ -520,7 +520,15 @@ export class EchoeStudyService extends Service {
     const div = document.createElement('div');
     div.innerHTML = card.front;
 
-    // Remove hidden elements (display:none, visibility:hidden)
+    // Strategy 1: Try to find h1, h2, or h3 tag (most cards have the main word in heading)
+    const heading = div.querySelector('h1, h2, h3');
+    if (heading) {
+      const text = heading.textContent || '';
+      return text.trim();
+    }
+
+    // Strategy 2: If no heading, try to extract first significant text
+    // Remove hidden elements
     div.querySelectorAll('[style*="display:none"], [style*="display: none"]').forEach((el) => el.remove());
     div.querySelectorAll('[style*="visibility:hidden"], [style*="visibility: hidden"]').forEach((el) => el.remove());
 
@@ -539,6 +547,12 @@ export class EchoeStudyService extends Service {
 
     // Remove [sound:xxx] tags (plain text, not HTML)
     text = text.replace(/\[sound:[^\]]+\]/g, '');
+
+    // Remove content in brackets (音标等)
+    text = text.replace(/\[[^\]]*\]/g, '');
+
+    // Remove content in parentheses (附加信息)
+    text = text.replace(/\([^)]*\)/g, '');
 
     // Restore cloze deletions (if any)
     text = text.replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, '$1');
