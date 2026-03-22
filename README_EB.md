@@ -78,7 +78,7 @@ pnpm dev:client
 
 Default ports:
 
-- Web: `http://localhost:5173`
+- Web: `http://localhost:5373`
 - Server: `http://localhost:3200`
 
 ## Common Commands

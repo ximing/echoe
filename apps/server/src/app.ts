@@ -193,8 +193,8 @@ export async function createApp() {
   app.use(cors());
   app.use(cookieParser());
   app.use(morgan('dev'));
-  app.use(bodyParser.json());
-  app.use(bodyParser.urlencoded({ extended: true }));
+  app.use(bodyParser.json({ limit: '1mb' }));
+  app.use(bodyParser.urlencoded({ extended: true, limit: '1mb' }));
   // API Token auth runs BEFORE JWT auth to implement Token > JWT priority
   app.use(apiTokenAuthMiddleware);
   app.use(authHandler);

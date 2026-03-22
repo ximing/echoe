@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { ToastService } from '../../services/toast.service';
 import { EchoeDeckService } from '../../services/echoe-deck.service';
 import { ApkgParserService, type AnkiDeck } from '../../services/apkg-parser.service';
-import * as echoeApi from '../../api/echoe';
+import { ApkgImportService } from '../../services/apkg-import.service';
 import type { ImportResultDto } from '@echoe/dto';
 import {
   ArrowLeft,
@@ -26,6 +26,7 @@ const ApkgImportPageContent = view(() => {
   const toastService = useService(ToastService);
   const deckService = useService(EchoeDeckService);
   const apkgParserService = useService(ApkgParserService);
+  const apkgImportService = useService(ApkgImportService);
   const navigate = useNavigate();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +35,12 @@ const ApkgImportPageContent = view(() => {
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    stage: string;
+    current: number;
+    total: number;
+    message: string;
+  } | null>(null);
 
   // APKG parsed data
   const [parsedDecks, setParsedDecks] = useState<AnkiDeck[]>([]);
@@ -148,17 +155,31 @@ const ApkgImportPageContent = view(() => {
     }
 
     setIsImporting(true);
+    setImportProgress(null);
+
     try {
+      // Set up progress callback
+      apkgImportService.setProgressCallback((progress) => {
+        setImportProgress(progress);
+      });
+
       // When no target deck is selected and user provided a custom deck name, use it
       const deckName = !selectedDeckId && customDeckName ? customDeckName : undefined;
-      const response = await echoeApi.importApkg(selectedFile, selectedDeckId || undefined, deckName);
-      setImportResult(response.data);
+
+      // Use client-side import service
+      const result = await apkgImportService.importApkg(
+        selectedFile,
+        selectedDeckId || undefined,
+        deckName
+      );
+
+      setImportResult(result);
 
       // Show appropriate message based on results
-      if (response.data.errors.length === 0) {
+      if (result.errors.length === 0) {
         toastService.success('Import completed successfully');
-      } else if (response.data.notesAdded > 0 || response.data.cardsAdded > 0) {
-        toastService.warning(`Import completed with ${response.data.errors.length} warnings. Check details below.`);
+      } else if (result.notesAdded > 0 || result.cardsAdded > 0) {
+        toastService.warning(`Import completed with ${result.errors.length} warnings. Check details below.`);
       } else {
         toastService.error('Import failed. Please check the error details below.');
       }
@@ -183,6 +204,7 @@ const ApkgImportPageContent = view(() => {
       });
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -433,7 +455,23 @@ const ApkgImportPageContent = view(() => {
                 Target Deck (optional)
               </label>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                Leave empty to use deck name from .apkg, or select a deck to import all cards into it
+                {parsedDecks.length > 0 ? (
+                  <>
+                    Main deck from .apkg: <span className="font-medium text-gray-700 dark:text-gray-300">{parsedDecks[0].name.replace(/::/g, ' > ')}</span>
+                    {parsedDecks.length > 1 && (
+                      <span className="ml-1 text-gray-400">
+                        ({parsedDecks.length} decks total,
+                        {parsedDecks.filter(d => d.id !== 1).length > 0
+                          ? ` ${parsedDecks.filter(d => d.id !== 1).length} content deck${parsedDecks.filter(d => d.id !== 1).length > 1 ? 's' : ''}`
+                          : ''})
+                      </span>
+                    )}
+                    <br />
+                    Or select an existing deck to merge all cards into it
+                  </>
+                ) : (
+                  'Leave empty to use deck name from .apkg, or select a deck to import all cards into it'
+                )}
               </p>
               <div className="relative">
                 <select
@@ -443,7 +481,8 @@ const ApkgImportPageContent = view(() => {
                 >
                   {parsedDecks.length > 0 ? (
                     <option value="">
-                      {customDeckName || parsedDecks[0].name} ({parsedDecks.length} deck{parsedDecks.length > 1 ? 's' : ''})
+                      Use deck from .apkg: {customDeckName || parsedDecks[0].name.replace(/::/g, ' > ')}
+                      {parsedDecks.filter(d => d.id !== 1).length > 1 && ` (+${parsedDecks.filter(d => d.id !== 1).length - 1} more)`}
                     </option>
                   ) : (
                     <option value="">Import deck structure from .apkg</option>
@@ -476,11 +515,21 @@ const ApkgImportPageContent = view(() => {
                     Decks in this .apkg:
                   </div>
                   <ul className="space-y-1">
-                    {parsedDecks.map((deck) => (
-                      <li key={deck.id} className="text-sm text-gray-600 dark:text-gray-400">
-                        {deck.name}
-                      </li>
-                    ))}
+                    {parsedDecks.map((deck) => {
+                      const parts = deck.name.split('::');
+                      const depth = parts.length - 1;
+                      const displayName = parts[parts.length - 1];
+                      const parentPath = depth > 0 ? parts.slice(0, -1).join(' > ') : null;
+                      return (
+                        <li key={deck.id} className="text-sm text-gray-600 dark:text-gray-400" style={{ paddingLeft: `${depth * 12}px` }}>
+                          {depth > 0 && <span className="text-gray-400 dark:text-gray-500 mr-1">└</span>}
+                          <span>{displayName}</span>
+                          {parentPath && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({parentPath})</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -495,7 +544,7 @@ const ApkgImportPageContent = view(() => {
                     type="text"
                     value={customDeckName}
                     onChange={(e) => setCustomDeckName(e.target.value)}
-                    placeholder={parsedDecks[0]?.name || 'Enter deck name'}
+                    placeholder={parsedDecks[0]?.name?.replace(/::/g, ' > ') || 'Enter deck name'}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -511,6 +560,49 @@ const ApkgImportPageContent = view(() => {
                   Parsing .apkg file...
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Import Progress */}
+        {isImporting && importProgress && (
+          <div className="mt-6 bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Import Progress
+            </h3>
+
+            <div className="space-y-4">
+              {/* Current Stage */}
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-600 dark:text-gray-400">{importProgress.message}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {importProgress.current}/{importProgress.total}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                  <div
+                    className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Stage Indicators */}
+              <div className="grid grid-cols-5 gap-2 text-xs">
+                {['parsing', 'decks', 'notetypes', 'media', 'notes'].map((stage, index) => (
+                  <div
+                    key={stage}
+                    className={`text-center py-2 rounded ${
+                      importProgress.stage === stage
+                        ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-medium'
+                        : 'bg-gray-100 dark:bg-dark-700 text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

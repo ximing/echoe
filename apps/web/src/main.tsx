@@ -18,6 +18,7 @@ import { ApiTokenService } from './services/api-token.service';
 import { InboxService } from './services/inbox.service';
 import { InboxReportService } from './services/inbox-report.service';
 import { ApkgParserService } from './services/apkg-parser.service';
+import { ApkgImportService } from './services/apkg-import.service';
 import { CardEditorService } from './services/card-editor.service';
 
 /**
@@ -27,6 +28,7 @@ import { CardEditorService } from './services/card-editor.service';
 const AppWithServices = bindServices(App, []);
 register(AuthService);
 register(ApkgParserService);
+register(ApkgImportService);
 register(ThemeService);
 register(ToastService);
 register(UserModelService);

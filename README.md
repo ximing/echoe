@@ -78,7 +78,7 @@ pnpm dev:client
 
 默认端口：
 
-- Web: `http://localhost:5173`
+- Web: `http://localhost:5373`
 - Server: `http://localhost:3200`
 
 ## 常用命令

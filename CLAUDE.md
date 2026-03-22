@@ -19,7 +19,7 @@ echoe is a full-stack AI-powered note-taking and knowledge management system bui
 
 ```
 apps/
-├── web       # Admin panel (Vite + React 19 + TailwindCSS) - port 5173
+├── web       # Admin panel (Vite + React 19 + TailwindCSS) - port 5373
 ├── client    # User-facing client application
 └── server    # Express.js backend API - port 3200
 

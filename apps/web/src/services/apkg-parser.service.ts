@@ -17,6 +17,7 @@ export class ApkgParserService extends Service {
   database: Database | null = null;
   mediaMapping: Record<string, string> = {}; // numeric filename -> original filename
   mediaFiles: Map<string, Blob> = new Map(); // numeric filename -> file blob
+  private reverseMediaMapping: Map<string, string> = new Map(); // originalName → numericName
 
   // Parsed Anki data
   notes: AnkiNote[] = [];
@@ -68,6 +69,11 @@ export class ApkgParserService extends Service {
       if (mediaFile) {
         const mediaJson = await mediaFile.async('text');
         this.mediaMapping = JSON.parse(mediaJson);
+      }
+
+      // Build reverse mapping: originalName -> numericName
+      for (const [numericName, originalName] of Object.entries(this.mediaMapping)) {
+        this.reverseMediaMapping.set(originalName, numericName);
       }
 
       // Extract media files
@@ -190,14 +196,21 @@ export class ApkgParserService extends Service {
     const decksJson = result[0].values[0][0] as string;
     const decksObj = JSON.parse(decksJson);
 
-    this.decks = Object.values(decksObj).map((deck: any) => ({
-      id: deck.id,
-      name: deck.name,
-      desc: deck.desc,
-      mod: deck.mod,
-      collapsed: deck.collapsed,
-      conf: deck.conf,
-    }));
+    this.decks = Object.values(decksObj)
+      .map((deck: any) => ({
+        id: deck.id,
+        name: deck.name,
+        desc: deck.desc,
+        mod: deck.mod,
+        collapsed: deck.collapsed,
+        conf: deck.conf,
+      }))
+      // Sort: non-Default decks first, then Default deck last
+      .sort((a, b) => {
+        if (a.id === 1) return 1; // Default deck goes last
+        if (b.id === 1) return -1;
+        return 0; // Keep original order for other decks
+      });
   }
 
   /**
@@ -224,6 +237,81 @@ export class ApkgParserService extends Service {
   }
 
   /**
+   * Get media file by original filename (e.g., "youdao-xxx.mp3")
+   */
+  public getMediaFileByOriginalName(originalName: string): Blob | undefined {
+    const numericName = this.reverseMediaMapping.get(originalName);
+    return numericName ? this.mediaFiles.get(numericName) : undefined;
+  }
+
+  /**
+   * Extract media references from HTML content (e.g., [sound:file.mp3])
+   */
+  public extractMediaReferences(html: string): string[] {
+    const regex = /\[sound:([^\]]+)\]/g;
+    const matches: string[] = [];
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      matches.push(match[1]);
+    }
+    return matches;
+  }
+
+  /**
+   * Parse hierarchical deck name (e.g., "Parent::Child")
+   */
+  public parseDeckHierarchy(deckName: string): { parent: string | null; name: string } {
+    const parts = deckName.split('::');
+    if (parts.length === 1) {
+      return { parent: null, name: deckName };
+    }
+    return {
+      parent: parts.slice(0, -1).join('::'),
+      name: parts[parts.length - 1]
+    };
+  }
+
+  /**
+   * Get full deck path as array (e.g., ["Parent", "Child"])
+   */
+  public getDeckPath(deckName: string): string[] {
+    return deckName.split('::');
+  }
+
+  /**
+   * Split note fields into array
+   */
+  public splitFields(note: any): string[] {
+    return note.flds.split('\x1f');
+  }
+
+  /**
+   * Split tags into array
+   */
+  public splitTags(note: any): string[] {
+    return note.tags.trim().split(/\s+/).filter(Boolean);
+  }
+
+  /**
+   * Get field names for a note's model
+   */
+  public getFieldNames(note: any): string[] {
+    const model = this.models.find(m => m.id === note.mid);
+    return model?.flds.map((f: any) => f.name) || [];
+  }
+
+  /**
+   * Map field values to field names
+   */
+  public getFieldMap(note: any): Record<string, string> {
+    const fieldNames = this.getFieldNames(note);
+    const fieldValues = this.splitFields(note);
+    return Object.fromEntries(
+      fieldNames.map((name, i) => [name, fieldValues[i] || ''])
+    );
+  }
+
+  /**
    * Get media file by numeric name
    */
   getMediaFile(numericName: string): Blob | undefined {
@@ -245,6 +333,7 @@ export class ApkgParserService extends Service {
     this.database = null;
     this.mediaMapping = {};
     this.mediaFiles.clear();
+    this.reverseMediaMapping.clear();
     this.notes = [];
     this.cards = [];
     this.models = [];

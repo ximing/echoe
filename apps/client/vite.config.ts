@@ -4,7 +4,7 @@ import renderer from 'vite-plugin-electron-renderer';
 import { resolve } from 'path';
 
 // Vite Dev Server URL for the web app (when running in development)
-const WEB_APP_DEV_URL = process.env.echoe_WEB_DEV_URL ?? 'http://localhost:5173';
+const WEB_APP_DEV_URL = process.env.echoe_WEB_DEV_URL ?? 'http://localhost:5373';
 
 export default defineConfig({
   define: {

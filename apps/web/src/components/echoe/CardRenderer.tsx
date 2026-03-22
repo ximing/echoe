@@ -201,9 +201,10 @@ function processCloze(template: string, _fields: Record<string, string>, side: '
 }
 
 /**
- * Process audio tags [sound:filename.mp3] -> <audio>
+ * Process audio tags [sound:filename.mp3] -> hidden <audio> + custom play button
  */
 function processAudio(template: string): string {
+  let audioIndex = 0;
   return template.replace(/\[sound:([^\]]+)\]/g, (_, filename) => {
     // Reject invalid filenames with path traversal
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
@@ -211,7 +212,26 @@ function processAudio(template: string): string {
     }
     // URL encode the filename but keep slashes and colons
     const encodedFilename = encodeURIComponent(filename);
-    return `<audio class="cards-audio" src="/api/v1/media/${encodedFilename}" controls></audio>`;
+    const audioId = `audio-${Date.now()}-${audioIndex++}`;
+
+    // Extract display name (remove extension)
+    const displayName = filename.replace(/\.[^.]+$/, '');
+
+    return `
+      <span class="inline-flex items-center gap-2">
+        <audio id="${audioId}" class="cards-audio hidden" src="/api/v1/media/${encodedFilename}"></audio>
+        <button
+          class="audio-play-button inline-flex items-center gap-1 px-2 py-1 text-sm text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
+          data-audio-id="${audioId}"
+          title="Play audio"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"/>
+          </svg>
+          <span class="audio-filename text-xs">${escapeHtml(displayName)}</span>
+        </button>
+      </span>
+    `;
   });
 }
 
@@ -448,6 +468,41 @@ export function CardRenderer({
     // Process type-answer inputs
     return processTypeAnswer(sanitized, fields, localTypedAnswers, side);
   }, [qfmt, afmt, fields, richTextFields, side, clozeOrdinal, localTypedAnswers]);
+
+  // Attach audio play button click handlers
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+    const playButtons = container.querySelectorAll<HTMLButtonElement>('button.audio-play-button');
+
+    playButtons.forEach((button) => {
+      const audioId = button.getAttribute('data-audio-id');
+      if (!audioId) return;
+
+      const audio = document.getElementById(audioId) as HTMLAudioElement;
+      if (!audio) return;
+
+      const handlePlay = () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {
+          // Ignore play errors
+        });
+      };
+
+      button.addEventListener('click', handlePlay);
+      (button as HTMLButtonElement & { _audioHandler?: () => void })._audioHandler = handlePlay;
+    });
+
+    return () => {
+      playButtons.forEach((button) => {
+        const handler = (button as HTMLButtonElement & { _audioHandler?: () => void })._audioHandler;
+        if (handler) {
+          button.removeEventListener('click', handler);
+        }
+      });
+    };
+  }, [processedContent]);
 
   // Auto-play audio based on autoplay setting and side
   useEffect(() => {

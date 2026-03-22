@@ -590,7 +590,7 @@ const StudyPageContent = view(() => {
       </div>
 
       {/* Action Area */}
-      <div className="px-4 py-4 bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
+      <div className="px-4 py-4 bg-white dark:bg-dark-800">
         <div className="max-w-2xl mx-auto">
           {!studyService.isShowingAnswer ? (
             <button
