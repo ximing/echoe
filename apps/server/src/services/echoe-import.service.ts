@@ -1430,16 +1430,34 @@ export class EchoeImportService {
         const normalized = normalizeNoteFields({ notetypeFields, fields, richTextFields });
 
         // Check for existing note in user scope (uid, guid)
+        // Per Anki v11 spec §8.2: APKG import uses guid as sole matching key
         const existing = await db
-          .select({ noteId: echoeNotes.noteId })
+          .select({ noteId: echoeNotes.noteId, mid: echoeNotes.mid, mod: echoeNotes.mod })
           .from(echoeNotes)
           .where(and(eq(echoeNotes.uid, uid), eq(echoeNotes.guid, row.guid), eq(echoeNotes.deletedAt, 0)))
           .limit(1);
 
         if (existing.length > 0) {
           const noteId = existing[0].noteId;
+          const existingMid = existing[0].mid;
+          const existingMod = existing[0].mod;
           referenceMap.nidToNoteId.set(sourceNid, noteId);
 
+          // Anki v11 spec §8.2 matching logic:
+          // 1. If notetype differs, skip (conflicting)
+          if (existingMid !== mappedMid) {
+            skipped++;
+            errors.push(`Skipped note ${row.guid}: conflicting notetype (existing: ${existingMid}, incoming: ${mappedMid})`);
+            continue;
+          }
+
+          // 2. If mod timestamp is same or older, skip (duplicate)
+          if (row.mod <= existingMod) {
+            skipped++;
+            continue;
+          }
+
+          // 3. Otherwise, update note (incoming is newer)
           await db
             .update(echoeNotes)
             .set({
