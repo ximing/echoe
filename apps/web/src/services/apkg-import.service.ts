@@ -236,13 +236,26 @@ export class ApkgImportService extends Service {
         const createResponse = await echoeApi.createNoteType({
           name: model.name,
           css: model.css || '',
-          flds: model.flds.map((f: any) => ({
+          flds: model.flds.map((f: { name: string; ord: number; sticky?: boolean; rtl?: boolean; font?: string; size?: number; description?: string; plainText?: boolean }) => ({
             name: f.name,
+            ord: f.ord,
+            sticky: f.sticky || false,
+            rtl: f.rtl || false,
+            font: f.font || 'Arial',
+            size: f.size || 20,
+            description: f.description || '',
+            mathjax: false,
+            hidden: false,
           })),
-          tmpls: model.tmpls.map((t: any) => ({
+          tmpls: model.tmpls.map((t: { name: string; ord: number; qfmt: string; afmt: string; bqfmt?: string; bafmt?: string; did?: string }, index: number) => ({
+            id: `${model.id}-${index}`,
             name: t.name,
+            ord: t.ord,
             qfmt: t.qfmt,
             afmt: t.afmt || '',
+            bqfmt: t.bqfmt || '',
+            bafmt: t.bafmt || '',
+            did: t.did || '',
           })),
         });
 
@@ -269,7 +282,7 @@ export class ApkgImportService extends Service {
     const totalMedia = Object.keys(mediaMapping).length;
     let uploadedCount = 0;
 
-    for (const [numericKey, originalName] of Object.entries(mediaMapping)) {
+    for (const originalName of Object.values(mediaMapping)) {
       const blob = this.apkgParser.getMediaFileByOriginalName(originalName);
 
       if (blob) {

@@ -590,7 +590,7 @@ const ApkgImportPageContent = view(() => {
 
               {/* Stage Indicators */}
               <div className="grid grid-cols-5 gap-2 text-xs">
-                {['parsing', 'decks', 'notetypes', 'media', 'notes'].map((stage, index) => (
+                {['parsing', 'decks', 'notetypes', 'media', 'notes'].map((stage) => (
                   <div
                     key={stage}
                     className={`text-center py-2 rounded ${

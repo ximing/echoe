@@ -5,8 +5,6 @@ import { ToastService } from '../../services/toast.service';
 import { CardEditorService } from '../../services/card-editor.service';
 import {
   Search,
-  ChevronDown,
-  ChevronUp,
   Trash2,
   Pause,
   Play,
@@ -792,7 +790,7 @@ const CardBrowserPageContent = view(() => {
           <div className="border-t border-gray-200 dark:border-dark-700 p-4 space-y-2">
             <button
               onClick={() => {
-                cardEditorState.openEdit(selectedCard.card.noteId, selectedCard.card.deckId, selectedCard.card.notetypeId);
+                cardEditorState.openEdit(selectedCard.card.noteId, selectedCard.card.deckId, selectedCard.card.mid);
                 setShowDetailPanel(false);
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-600"

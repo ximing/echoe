@@ -17,7 +17,7 @@ import {
   Code,
   Image,
 } from 'lucide-react';
-import type { EchoeNoteTypeDto, EchoeDeckWithCountsDto, EchoeFieldDto } from '@echoe/dto';
+import type { EchoeNoteTypeDto, EchoeDeckWithCountsDto } from '@echoe/dto';
 
 interface CardEditorDrawerProps {
   isOpen: boolean;
@@ -113,9 +113,10 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
       setRichTextFields(note.richTextFields || {});
       setTags(note.tags || []);
 
-      // Find deck from note
-      if (note.did) {
-        const deck = deckService.decks.find((d) => d.deckId === note.did);
+      // Note: deck is not stored in note, use deckId from prop instead
+      // Find deck from prop
+      if (deckId) {
+        const deck = deckService.decks.find((d) => d.deckId === deckId);
         if (deck) {
           setSelectedDeck(deck);
         }
@@ -327,7 +328,7 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
       return;
     }
 
-    if (!isEditMode && !selectedDeck) {
+    if (!isEditMode && !selectedDeck?.deckId) {
       toastService.error('Please select a deck');
       return;
     }
@@ -364,7 +365,7 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
         // Create new note
         await noteService.createNewNote({
           notetypeId: selectedNotetype.id,
-          deckId: selectedDeck.deckId,
+          deckId: selectedDeck?.deckId || '',
           fields,
           richTextFields: completeRichTextFields,
           tags,
@@ -492,7 +493,7 @@ const CardEditorDrawerContent = view(({ isOpen, onClose, deckId, notetypeId, not
           </div>
 
           {/* Fields */}
-          {selectedNotetype?.flds.map((field, index) => {
+          {selectedNotetype?.flds.map((field) => {
             const isSourceMode = showSourceMode[field.ord] || false;
             const isCloze = selectedNotetype?.type === 1 && field.name.toLowerCase() === 'text';
             return (
