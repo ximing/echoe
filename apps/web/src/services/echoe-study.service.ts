@@ -78,6 +78,18 @@ export class EchoeStudyService extends Service {
   autoplay: string = 'never';
   ttsSpeed: number = 1;
 
+  // Typing practice state
+  typingPractice = {
+    words: [] as string[],
+    currentInput: '',
+    validationResults: [] as Array<{
+      char: string;
+      isCorrect: boolean;
+      shouldShake: boolean;
+    }>,
+    isCompleted: false,
+  };
+
   /**
    * Load study queue
    */
@@ -124,6 +136,7 @@ export class EchoeStudyService extends Service {
       this.undoStack = [];
       this.sessionStartTime = Date.now();
       this.cardStartTime = Date.now();
+      this.resetTypingPractice();
     } catch {
       this.error = 'Failed to load study queue';
       this.queue = [];
@@ -306,6 +319,7 @@ export class EchoeStudyService extends Service {
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
       this.resetStudyOptionsState();
+      this.resetTypingPractice();
       this.cardStartTime = Date.now();
 
       // Check if session complete
@@ -342,6 +356,7 @@ export class EchoeStudyService extends Service {
       this.currentIndex = Math.max(0, this.currentIndex - 1);
       this.isShowingAnswer = false;
       this.resetStudyOptionsState();
+      this.resetTypingPractice();
       this.cardStartTime = Date.now();
 
       // Decrease stats for the undone card
@@ -378,6 +393,7 @@ export class EchoeStudyService extends Service {
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
       this.resetStudyOptionsState();
+      this.resetTypingPractice();
       this.cardStartTime = Date.now();
 
       return true;
@@ -402,6 +418,7 @@ export class EchoeStudyService extends Service {
       this.isShowingAnswer = false;
       this.clearTypedAnswers();
       this.resetStudyOptionsState();
+      this.resetTypingPractice();
       this.cardStartTime = Date.now();
 
       return true;
@@ -490,6 +507,96 @@ export class EchoeStudyService extends Service {
     }
 
     return `${Math.round(interval / 365)}y`;
+  }
+
+  /**
+   * Extract typing text from card Front field
+   * Returns the first text field for typing practice
+   */
+  extractTypingText(card: StudyQueueItemDto): string {
+    if (!card.front) return '';
+
+    // Remove HTML tags from front content
+    const div = document.createElement('div');
+    div.innerHTML = card.front;
+    const text = div.textContent || div.innerText || '';
+
+    // Restore cloze deletions (if any)
+    const restoredText = text.replace(/\{\{c\d+::([^:}]+)(?:::[^}]+)?\}\}/g, '$1');
+
+    // Clean up extra spaces
+    return restoredText.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Handle typing input and validate in real-time
+   */
+  onTypingInput(input: string): void {
+    const targetText = this.typingPractice.words.join(' ');
+    const results: Array<{ char: string; isCorrect: boolean; shouldShake: boolean }> = [];
+
+    // Compare character by character
+    for (let i = 0; i < input.length; i++) {
+      const inputChar = input[i];
+      const targetChar = targetText[i] || '';
+
+      if (inputChar === targetChar) {
+        results.push({
+          char: inputChar,
+          isCorrect: true,
+          shouldShake: false,
+        });
+      } else {
+        results.push({
+          char: inputChar,
+          isCorrect: false,
+          shouldShake: true,
+        });
+      }
+    }
+
+    this.typingPractice.currentInput = input;
+    this.typingPractice.validationResults = results;
+
+    // Check if completed
+    if (input === targetText && input.length > 0) {
+      this.typingPractice.isCompleted = true;
+    } else {
+      this.typingPractice.isCompleted = false;
+    }
+
+    // Reset shake flag after 200ms
+    setTimeout(() => {
+      this.typingPractice.validationResults = this.typingPractice.validationResults.map(
+        (r) => ({
+          ...r,
+          shouldShake: false,
+        })
+      );
+    }, 200);
+  }
+
+  /**
+   * Reset typing practice state (called when card changes)
+   */
+  resetTypingPractice(): void {
+    const currentCard = this.getCurrentCard();
+    if (currentCard) {
+      const text = this.extractTypingText(currentCard);
+      this.typingPractice = {
+        words: text ? text.split(' ') : [],
+        currentInput: '',
+        validationResults: [],
+        isCompleted: false,
+      };
+    } else {
+      this.typingPractice = {
+        words: [],
+        currentInput: '',
+        validationResults: [],
+        isCompleted: false,
+      };
+    }
   }
 
   /**

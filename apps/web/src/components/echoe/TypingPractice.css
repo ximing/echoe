@@ -1,0 +1,159 @@
+/* 容器 */
+.typing-practice-container {
+  position: relative;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: transparent;
+}
+
+/* 输入区域 */
+.typing-practice-input-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 输入框包装器 */
+.typing-input-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* 字符显示层（覆盖在输入框上方） */
+.typing-char-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  font-size: 1rem;
+  padding: 0.5rem;
+  z-index: 1;
+}
+
+/* 输入框 */
+.typing-input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #d1d5db;
+  text-align: center;
+  font-size: 1rem;
+  padding: 0.5rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: transparent; /* 隐藏原生输入文字 */
+  caret-color: #3b82f6; /* 光标颜色 */
+}
+
+.typing-input:focus {
+  border-bottom-color: #3b82f6;
+}
+
+.typing-input::placeholder {
+  color: #d1d5db;
+}
+
+/* 字符状态 */
+.typing-char-correct {
+  color: #10b981;
+  transition: color 0.2s;
+}
+
+.typing-char-error {
+  color: #ef4444;
+}
+
+/* 抖动动画 */
+.shake {
+  animation: shake 0.3s;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+/* 粒子动画 */
+.typing-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #3b82f6);
+  pointer-events: none;
+  animation: particle-burst 1s ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes particle-burst {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0);
+    opacity: 0;
+  }
+}
+
+/* 反面结果展示 */
+.typing-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.typing-result-word {
+  font-size: 1.125rem;
+  display: inline-flex;
+}
+
+.typing-result-correct {
+  color: #10b981;
+}
+
+.typing-result-error {
+  color: #ef4444;
+  text-decoration: line-through;
+}
+
+.typing-result-missing {
+  color: #9ca3af;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .typing-input {
+    border-bottom-color: #4b5563;
+  }
+
+  .typing-input:focus {
+    border-bottom-color: #60a5fa;
+  }
+
+  .typing-input::placeholder {
+    color: #6b7280;
+  }
+}

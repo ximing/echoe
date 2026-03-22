@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { EchoeStudyService } from '../../services/echoe-study.service';
 import { ToastService } from '../../services/toast.service';
+import { TypingPractice } from '../../components/echoe/TypingPractice';
 import { diffStrings } from '../../utils/echoe/diff';
 import {
   ChevronLeft,
@@ -10,10 +11,52 @@ import {
   RotateCcw,
   CheckCircle,
   Clock,
-  Volume2,
   Brain,
 } from 'lucide-react';
 import type { StudyQueueItemDto } from '@echoe/dto';
+
+/**
+ * Process audio tags [sound:filename.mp3] -> hidden <audio> + custom play button
+ */
+function processAudio(template: string): string {
+  let audioIndex = 0;
+  return template.replace(/\[sound:([^\]]+)\]/g, (_, filename) => {
+    // Reject invalid filenames with path traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return ''; // Reject invalid filenames
+    }
+    // URL encode the filename but keep slashes and colons
+    const encodedFilename = encodeURIComponent(filename);
+    const audioId = `audio-${Date.now()}-${audioIndex++}`;
+
+    return `
+      <span class="inline-flex items-center gap-2">
+        <audio id="${audioId}" class="cards-audio hidden" src="/api/v1/media/${encodedFilename}"></audio>
+        <button
+          class="audio-play-button inline-flex items-center gap-1 px-2 py-1 text-sm text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors"
+          data-audio-id="${audioId}"
+          title="Play audio"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"/>
+          </svg>
+          <span class="audio-filename text-xs">${escapeHtml(filename)}</span>
+        </button>
+      </span>
+    `;
+  });
+}
+
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
 
 /**
  * Render diff for type-in-answer
@@ -45,17 +88,6 @@ function renderTypeAnswerDiff(typedValue: string, correctValue: string): string 
   diffHtml += '</span>';
 
   return diffHtml;
-}
-
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  };
-  return text.replace(/[&<>"']/g, (m) => map[m]);
 }
 
 /**
@@ -136,6 +168,41 @@ function CardContent({
     }
   }, [isShowingAnswer, card]);
 
+  // Attach audio play button click handlers
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+    const playButtons = container.querySelectorAll<HTMLButtonElement>('button.audio-play-button');
+
+    playButtons.forEach((button) => {
+      const audioId = button.getAttribute('data-audio-id');
+      if (!audioId) return;
+
+      const audio = document.getElementById(audioId) as HTMLAudioElement;
+      if (!audio) return;
+
+      const handlePlay = () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {
+          // Ignore play errors
+        });
+      };
+
+      button.addEventListener('click', handlePlay);
+      (button as HTMLButtonElement & { _audioHandler?: () => void })._audioHandler = handlePlay;
+    });
+
+    return () => {
+      playButtons.forEach((button) => {
+        const handler = (button as HTMLButtonElement & { _audioHandler?: () => void })._audioHandler;
+        if (handler) {
+          button.removeEventListener('click', handler);
+        }
+      });
+    };
+  }, [card, isShowingAnswer]);
+
   // Auto-play audio based on autoplay setting and side
   useEffect(() => {
     if (!containerRef.current || autoplay === 'never') return;
@@ -207,11 +274,11 @@ function CardContent({
   let content: string;
 
   if (!isShowingAnswer) {
-    // Front side - use as-is (backend already rendered input placeholders)
-    content = card.front;
+    // Front side - process audio tags
+    content = processAudio(card.front);
   } else {
     // Back side - process type-answer diff
-    let backHtml = card.back;
+    let backHtml = processAudio(card.back);
 
     // Replace type-answer inputs with diff display
     backHtml = backHtml.replace(
@@ -239,7 +306,7 @@ function CardContent({
   }
 
   return (
-    <div ref={containerRef} className="p-8 min-h-[300px] flex items-center justify-center">
+    <div ref={containerRef} className="p-8 min-h-[240px] flex items-center justify-center">
       <div
         className="prose prose-sm dark:prose-invert max-w-none w-full"
         dangerouslySetInnerHTML={{ __html: content }}
@@ -360,18 +427,6 @@ const StudyPageContent = view(() => {
       toastService.error('Failed to reset card');
     }
     setMenuOpen(false);
-  };
-
-  // Handle replay audio
-  const handleReplayAudio = () => {
-    // Find all audio elements in the card and play them
-    const audioElements = document.querySelectorAll<HTMLAudioElement>('.cards-card-renderer audio.cards-audio, .prose audio.cards-audio');
-    audioElements.forEach((audio) => {
-      audio.currentTime = 0;
-      audio.play().catch(() => {
-        // Ignore play errors
-      });
-    });
   };
 
   // Get current card
@@ -524,25 +579,23 @@ const StudyPageContent = view(() => {
         </div>
       </div>
 
+      {/* Typing Practice Area */}
+      <div className="px-4 py-2 bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
+        <div className="max-w-2xl mx-auto">
+          <TypingPractice
+            words={studyService.typingPractice.words}
+            isShowingAnswer={studyService.isShowingAnswer}
+          />
+        </div>
+      </div>
+
       {/* Action Area */}
       <div className="px-4 py-4 bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
         <div className="max-w-2xl mx-auto">
-          {/* Replay Audio Button */}
-          <div className="flex justify-center mb-3">
-            <button
-              onClick={handleReplayAudio}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
-              title="Replay Audio"
-            >
-              <Volume2 className="w-4 h-4" />
-              Replay Audio
-            </button>
-          </div>
-
           {!studyService.isShowingAnswer ? (
             <button
               onClick={() => studyService.showAnswer()}
-              className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white text-lg font-medium rounded-xl transition-colors"
+              className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white text-lg font-medium rounded-xl transition-colors"
             >
               Show Answer
             </button>
@@ -558,28 +611,28 @@ const StudyPageContent = view(() => {
               <div className="grid grid-cols-4 gap-3">
                 <button
                   onClick={() => handleRating(1)}
-                  className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                  className="py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex flex-col items-center"
                 >
                   <span className="font-medium">Again</span>
                   <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(1)}</span>
                 </button>
                 <button
                   onClick={() => handleRating(2)}
-                  className="py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                  className="py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors flex flex-col items-center"
                 >
                   <span className="font-medium">Hard</span>
                   <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(2)}</span>
                 </button>
                 <button
                   onClick={() => handleRating(3)}
-                  className="py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                  className="py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex flex-col items-center"
                 >
                   <span className="font-medium">Good</span>
                   <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(3)}</span>
                 </button>
                 <button
                   onClick={() => handleRating(4)}
-                  className="py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex flex-col items-center"
+                  className="py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex flex-col items-center"
                 >
                   <span className="font-medium">Easy</span>
                   <span className="text-xs opacity-80 min-h-4">{studyService.getNextIntervalText(4)}</span>
