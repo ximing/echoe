@@ -610,6 +610,15 @@ export class EchoeStudyService extends Service {
   }
 
   /**
+   * Clear typing input (for retry after completion)
+   */
+  clearTypingInput(): void {
+    this.typingPractice.currentInput = '';
+    this.typingPractice.validationResults = [];
+    this.typingPractice.isCompleted = false;
+  }
+
+  /**
    * Reset typing practice state (called when card changes)
    */
   resetTypingPractice(): void {

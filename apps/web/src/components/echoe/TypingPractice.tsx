@@ -50,9 +50,11 @@ export const TypingPractice = view(({ words, isShowingAnswer }: TypingPracticePr
       container.appendChild(particle);
     }
 
-    // 1 秒后清理
+    // 1 秒后清理粒子并清空输入
     setTimeout(() => {
       container.querySelectorAll('.typing-particle').forEach((p) => p.remove());
+      // 清空输入，方便二次练习
+      studyService.clearTypingInput();
     }, 1100);
   };
 
@@ -95,6 +97,13 @@ const TypingInput = view(
         setTimeout(() => inputRef.current?.focus(), 100);
       }
     }, [index]);
+
+    // 监听 Service 的 currentInput 变化，如果被清空则清空本地值
+    useEffect(() => {
+      if (studyService.typingPractice.currentInput === '') {
+        setLocalValue('');
+      }
+    }, [studyService.typingPractice.currentInput]);
 
     // 计算输入框宽度
     const inputWidth = Math.max(60, word.length * 12);
