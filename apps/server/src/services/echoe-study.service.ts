@@ -1187,9 +1187,31 @@ export class EchoeStudyService {
   private renderTemplate(template: string, fields: Record<string, string>, side: 'front' | 'back' = 'front', clozeOrdinal: number = 1): string {
     let result = template;
 
+    // Handle Handlebars conditional blocks {{#FieldName}}...{{/FieldName}}
+    // Show content only if field has a value
+    result = result.replace(/\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_fullMatch, fieldName, content) => {
+      const trimmedName = fieldName.trim();
+      const fieldValue = fields[trimmedName];
+
+      // If field is empty or undefined, hide the entire block
+      if (!fieldValue || fieldValue.trim() === '') {
+        return '';
+      }
+
+      // Otherwise, render the content (which may contain field references)
+      return content;
+    });
+
+    // Handle {{edit:FieldName}} syntax (Anki editor syntax)
+    // In study mode, this should just show the field value
+    result = result.replace(/\{\{edit:([^}]+)\}\}/g, (_fullMatch, fieldName) => {
+      const trimmedName = fieldName.trim();
+      return fields[trimmedName] || '';
+    });
+
     // Replace field variables {{FieldName}}
     for (const [key, value] of Object.entries(fields)) {
-      result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
+      result = result.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), value);
     }
 
     // Handle cloze deletions {{cN::text}} or {{cN::text::hint}}

@@ -16,11 +16,16 @@ import {
 import type { StudyQueueItemDto } from '@echoe/dto';
 
 /**
- * Process audio tags [sound:filename.mp3] -> hidden <audio> + custom play button
+ * Process media tags:
+ * - [sound:filename.mp3] -> hidden <audio> + custom play button
+ * - <img src="filename.jpg"> -> <img src="/api/v1/media/filename.jpg">
  */
 function processAudio(template: string): string {
   let audioIndex = 0;
-  return template.replace(/\[sound:([^\]]+)\]/g, (_, filename) => {
+  let result = template;
+
+  // Process audio tags [sound:filename.mp3]
+  result = result.replace(/\[sound:([^\]]+)\]/g, (_, filename) => {
     // Reject invalid filenames with path traversal
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return ''; // Reject invalid filenames
@@ -45,6 +50,27 @@ function processAudio(template: string): string {
       </span>
     `;
   });
+
+  // Process image tags <img src="filename.jpg">
+  // Ensure image src points to the media API endpoint
+  result = result.replace(/<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi, (match, before, src, after) => {
+    // Skip if already an absolute URL or API path
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/api/v1/media/')) {
+      return match;
+    }
+
+    // Reject invalid filenames with path traversal
+    if (src.includes('..')) {
+      return match;
+    }
+
+    // URL encode the filename
+    const encodedSrc = encodeURIComponent(src);
+
+    return `<img${before} src="/api/v1/media/${encodedSrc}"${after}>`;
+  });
+
+  return result;
 }
 
 function escapeHtml(text: string): string {
@@ -580,14 +606,15 @@ const StudyPageContent = view(() => {
       </div>
 
       {/* Typing Practice Area */}
-      <div className="px-4 py-2 bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
+      {/* TODO: 系统优化打印组件体验 */}
+      {/* <div className="px-4 py-2 bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-dark-700">
         <div className="max-w-2xl mx-auto">
           <TypingPractice
             words={studyService.typingPractice.words}
             isShowingAnswer={studyService.isShowingAnswer}
           />
         </div>
-      </div>
+      </div> */}
 
       {/* Action Area */}
       <div className="px-4 py-4 bg-white dark:bg-dark-800">
