@@ -18,3 +18,8 @@ attachments/
 .worktrees/
 worktrees/
 coverage
+
+# Claude Code - keep configuration, ignore runtime data
+.claude/projects/
+.claude/agent-memory/
+.claude/settings.local.json
